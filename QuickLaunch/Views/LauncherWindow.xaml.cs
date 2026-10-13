@@ -23,7 +23,7 @@ public partial class LauncherWindow : Window
     private readonly DispatcherTimer _externalWatch = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private Point _externalPoint;
     private bool _externalAccepts;
-    private bool _externalDrag, _menuOpen, _closing, _awaitingDrop;
+    private bool _externalDrag, _menuOpen, _closing, _awaitingDrop, _movingWindow;
     private int _ownedWindows;
     private CancellationTokenSource? _importStop;
     private DateTime _dropDeadline;
@@ -115,7 +115,7 @@ public partial class LauncherWindow : Window
     public void Toggle()
     {
         if (_ownedWindows > 0) { OwnedWindows.Cast<Window>().LastOrDefault(w => w.IsVisible)?.Activate(); return; }
-        if (DragSession.Active || _menuOpen) return;
+        if (DragSession.Active || _menuOpen || _movingWindow) return;
         if (IsVisible && IsActive) HidePanel();
         else ShowPanel("hotkey", (NativeMethods.GetAsyncKeyState(1) & 0x8000) != 0);
     }
@@ -239,8 +239,26 @@ public partial class LauncherWindow : Window
 
     private void MaybeHide()
     {
-        if (!_closing && ViewModel.HideOnDeactivate && IsVisible && !IsActive && !Pinned && !DragSession.Active && !_externalDrag && !_awaitingDrop && !_menuOpen && _ownedWindows == 0)
+        if (!_closing && ViewModel.HideOnDeactivate && IsVisible && !IsActive && !Pinned && !DragSession.Active && !_externalDrag && !_awaitingDrop && !_menuOpen && !_movingWindow && _ownedWindows == 0)
             HidePanel();
+    }
+
+    private void WindowDragMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed || _closing || _movingWindow || DragSession.Active || _externalDrag || _ownedWindows > 0) return;
+        e.Handled = true;
+        _movingWindow = true;
+        try
+        {
+            // This region excludes toolbar buttons, tabs and tiles. Let Windows move
+            // the native window so dragging also works across monitors and DPI scales.
+            DragMove();
+        }
+        finally
+        {
+            _movingWindow = false;
+            MaybeHide();
+        }
     }
 
     public void SelectGroup(LaunchGroup group, bool preview = false)

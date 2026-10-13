@@ -55,10 +55,13 @@
                     <Button Content="设置" Click="SettingsClick" />
                     <Button Content="隐藏" Click="HideClick" /><Button Content="退出" Click="ExitClick" />
                 </StackPanel>
-                <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="QuickLaunch" FontSize="22" FontWeight="SemiBold" />
-                    <TextBlock Text="{Binding StorageStatus}" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="0,3,0,0" />
-                </StackPanel>
+                <Border x:Name="WindowDragArea" Background="Transparent" Cursor="SizeAll"
+                        ToolTip="拖动此处移动窗口" MouseLeftButtonDown="WindowDragMouseDown">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="QuickLaunch" FontSize="22" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding StorageStatus}" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="0,3,0,0" />
+                    </StackPanel>
+                </Border>
             </DockPanel>
             <DockPanel Grid.Row="1" Margin="0,0,0,10">
                 <Button x:Name="AddGroupButton" DockPanel.Dock="Right" Content="+" ToolTip="新建分组；也可拖动条目到此处" Click="AddGroupClick" IsEnabled="{Binding CanEdit}" />
