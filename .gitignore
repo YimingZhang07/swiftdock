@@ -1,0 +1,16 @@
+.tools/
+.vs/
+**/bin/
+**/obj/
+artifacts/
+TestResults/
+*.user
+*.suo
+*.log
+*.tmp
+portable.flag
+config.json
+config.json.bak
+config.lock
+icons/
+
