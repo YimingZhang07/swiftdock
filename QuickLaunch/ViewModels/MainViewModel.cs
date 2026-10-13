@@ -24,7 +24,6 @@ public sealed class MainViewModel : ObservableObject
     public bool IsReadOnly => _store.IsReadOnly;
     public HotkeyConfig Hotkey => _settings.Hotkey;
     public string HotkeyDisplay => Hotkey.Display;
-    public bool HideOnDeactivate => _settings.HideOnDeactivate;
     public int Columns => _settings.Columns;
     public int IconSize => _settings.IconSize;
     public double CellSize => Math.Max(88, IconSize + 36);
@@ -75,12 +74,11 @@ public sealed class MainViewModel : ObservableObject
         _lastGroupId = id;
         Changed();
     }
-    public void ApplySettings(HotkeyConfig hotkey, bool hideOnDeactivate)
+    public void ApplySettings(HotkeyConfig hotkey)
     {
         if (!CanEdit) return;
-        _settings = _settings with { Hotkey = hotkey.Copy(), HideOnDeactivate = hideOnDeactivate };
+        _settings = _settings with { Hotkey = hotkey.Copy() };
         OnPropertyChanged(nameof(HotkeyDisplay));
-        OnPropertyChanged(nameof(HideOnDeactivate));
         Changed();
     }
     public AppConfig Snapshot()

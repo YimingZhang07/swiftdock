@@ -32,6 +32,25 @@ public sealed class ConfigTests : IDisposable
     }
 
     [Fact]
+    public async Task LegacyAutoHideSettingIsRetiredWithoutLosingItems()
+    {
+        Directory.CreateDirectory(_directory);
+        var original = AppConfig.CreateDefault();
+        var json = System.Text.Json.Nodes.JsonNode.Parse(JsonSerializer.Serialize(original, ConfigJsonContext.Default.AppConfig))!;
+        json["hideOnDeactivate"] = true;
+        await File.WriteAllTextAsync(ConfigPath, json.ToJsonString());
+
+        await using var store = ConfigService.Open(_directory);
+        Assert.False(store.IsReadOnly);
+        Assert.False(store.Initial.HideOnDeactivate);
+        Assert.Equal(original.Groups.SelectMany(g => g.Items).Select(i => i.Id),
+            store.Initial.Groups.SelectMany(g => g.Items).Select(i => i.Id));
+        await store.SaveAsync(store.Initial, 1);
+        Assert.DoesNotContain("hideOnDeactivate", await File.ReadAllTextAsync(ConfigPath));
+        Assert.Empty(Directory.GetFiles(_directory, "*.broken-*.json"));
+    }
+
+    [Fact]
     public async Task CorruptPrimaryRestoresWithoutOverwritingGoodBackup()
     {
         Directory.CreateDirectory(_directory);

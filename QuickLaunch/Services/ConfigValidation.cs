@@ -66,7 +66,7 @@ public static class ConfigValidation
             }
         }
         var groups = config.Groups.Count == 0 ? new List<GroupConfig> { new() } : config.Groups;
-        return config with { Groups = groups, LastGroupId = groups.Any(g => g.Id == config.LastGroupId)
+        return config with { HideOnDeactivate = false, Groups = groups, LastGroupId = groups.Any(g => g.Id == config.LastGroupId)
             ? config.LastGroupId : groups[0].Id };
     }
 }

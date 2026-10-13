@@ -109,7 +109,7 @@ public partial class App : Application
             using var process = System.Diagnostics.Process.GetCurrentProcess();
             bool elevated = new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
             _log.Write("startup", new { runtime = Environment.Version.ToString(), os = Environment.OSVersion.VersionString,
-                elevated, milestone = "v0.1.0", processToReadyMs = (DateTime.UtcNow - process.StartTime.ToUniversalTime()).TotalMilliseconds,
+                elevated, milestone = $"v{typeof(App).Assembly.GetName().Version?.ToString(3)}", processToReadyMs = (DateTime.UtcNow - process.StartTime.ToUniversalTime()).TotalMilliseconds,
                 configDirectory = paths.ConfigDirectory, _store.IsReadOnly, _store.Notice });
             var notices = new List<string>();
             if (_store.Notice is not null) notices.Add(_store.Notice);
@@ -166,13 +166,13 @@ public partial class App : Application
         if (_settings is not null) { _settings.Activate(); return; }
         if (!_window.IsVisible) _window.ShowPanel("settings");
         _window.SetSettingsOpen(true);
-        _settings = new(_viewModel.Hotkey, _viewModel.HideOnDeactivate, _viewModel.CanEdit, _store.DirectoryPath,
+        _settings = new(_viewModel.Hotkey, _viewModel.CanEdit, _store.DirectoryPath,
             _hotkey.Registered ? $"当前已注册：{_hotkey.Current!.Display}" : $"注册失败，错误码 {_hotkey.Error}；请选择其他组合。",
-            (candidate, hide) =>
+            candidate =>
             {
                 if (!_viewModel.CanEdit) return "配置只读，未修改。";
                 if (!_hotkey.TryChange(candidate)) return $"新组合被占用或不可用（{_hotkey.Error}）；原有热键和配置已保留。";
-                _viewModel.ApplySettings(candidate, hide);
+                _viewModel.ApplySettings(candidate);
                 UpdateTrayText();
                 _log?.Write("hotkey.changed", new { hotkey = candidate.Display });
                 return "已应用，配置将自动保存。";
@@ -195,7 +195,6 @@ public partial class App : Application
         var menu = new ContextMenu();
         menu.Items.Add(new MenuItem { Header = "显示 QuickLaunch", Command = new RelayCommand(() => ShowMain("tray-menu")) });
         menu.Items.Add(new MenuItem { Header = "设置", Command = new RelayCommand(OpenSettings) });
-        menu.Items.Add(new MenuItem { Header = "保持显示以添加", Command = new RelayCommand(() => { _window!.Pinned = true; ShowMain("tray-add"); }) });
         menu.Items.Add(new MenuItem { Header = "打开配置目录", Command = new RelayCommand(() =>
             _ = LaunchService.StartAsync(new("配置目录", _store!.DirectoryPath, LaunchKind.Folder))) });
         var startupItem = new MenuItem { Header = "登录时自动启动", IsCheckable = true, IsEnabled = _viewModel!.CanEdit };

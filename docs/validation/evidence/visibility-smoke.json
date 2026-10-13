@@ -1,0 +1,178 @@
+{
+  "passed": true,
+  "runtime": "10.0.12",
+  "os": "Microsoft Windows NT 10.0.26200.0",
+  "hotkeyRegistration": {
+    "Registered": true,
+    "lastAttemptError": 1409
+  },
+  "nativeHotkeyRollback": true,
+  "foregroundObserved": false,
+  "focusObserved": true,
+  "nativeVisibilityObserved": true,
+  "dpi": 192,
+  "checks": [
+    {
+      "name": "isolated-hotkey-registered",
+      "passed": true
+    },
+    {
+      "name": "visible-window-with-layout",
+      "passed": true
+    },
+    {
+      "name": "two-groups",
+      "passed": true
+    },
+    {
+      "name": "real-frozen-icons-loaded",
+      "passed": true
+    },
+    {
+      "name": "native-hwnd",
+      "passed": true
+    },
+    {
+      "name": "root-capture-acquired",
+      "passed": true
+    },
+    {
+      "name": "capture-survives-hidden-source-group",
+      "passed": true
+    },
+    {
+      "name": "group-preview-does-not-mutate-items",
+      "passed": true
+    },
+    {
+      "name": "hide-retains-hwnd",
+      "passed": true
+    },
+    {
+      "name": "reshow-retains-hwnd",
+      "passed": true
+    },
+    {
+      "name": "user-show-invalidates-prewarm-hide",
+      "passed": true
+    },
+    {
+      "name": "configuration-writable",
+      "passed": true
+    },
+    {
+      "name": "reorder-persisted",
+      "passed": true
+    },
+    {
+      "name": "latest-revision-saved",
+      "passed": true
+    },
+    {
+      "name": "settings-owned-and-visible",
+      "passed": true
+    },
+    {
+      "name": "settings-applied",
+      "passed": true
+    },
+    {
+      "name": "settings-close-keeps-main-alive",
+      "passed": true
+    },
+    {
+      "name": "settings-persisted",
+      "passed": true
+    },
+    {
+      "name": "url-disables-app-only-fields",
+      "passed": true
+    },
+    {
+      "name": "edit-dialog-produces-valid-url",
+      "passed": true
+    },
+    {
+      "name": "theme-resource-update-reaches-window",
+      "passed": true
+    },
+    {
+      "name": "import-deduplicates-and-removes-placeholders",
+      "passed": true
+    },
+    {
+      "name": "edit-keeps-identity",
+      "passed": true
+    },
+    {
+      "name": "delete-undo-restores-item",
+      "passed": true
+    },
+    {
+      "name": "group-order-updates",
+      "passed": true
+    },
+    {
+      "name": "deleted-group-view-cleared",
+      "passed": true
+    },
+    {
+      "name": "native-hotkey-conflict-preserves-old",
+      "passed": true
+    },
+    {
+      "name": "secondary-exits-successfully",
+      "passed": true
+    },
+    {
+      "name": "secondary-forwards-show-request",
+      "passed": true
+    },
+    {
+      "name": "deactivation-keeps-panel-visible",
+      "passed": true
+    },
+    {
+      "name": "launch-accepted-pending-keeps-panel-visible",
+      "passed": true
+    },
+    {
+      "name": "launch-accepted-completion-keeps-panel-visible",
+      "passed": true
+    },
+    {
+      "name": "launch-failed-pending-keeps-panel-visible",
+      "passed": true
+    },
+    {
+      "name": "launch-failed-completion-keeps-panel-visible",
+      "passed": true
+    },
+    {
+      "name": "launch-cancelled-pending-keeps-panel-visible",
+      "passed": true
+    },
+    {
+      "name": "launch-cancelled-completion-keeps-panel-visible",
+      "passed": true
+    },
+    {
+      "name": "launch-completion-respects-explicit-hide",
+      "passed": true
+    }
+  ],
+  "savedRevision": 13,
+  "profileDirectory": "C:\\Users\\yimingz\\repo\\quick-launcher\\artifacts\\validation\\profiles\\smoke-aabccb92188a48e3b3f10bffd09c85c7",
+  "notCovered": [
+    "Real hotkey input",
+    "Mouse drag event sequences",
+    "External browser OLE",
+    "Mixed monitor DPI",
+    "Cross-login-session UI",
+    "UAC",
+    "Shell launch",
+    "Physical presentation latency",
+    "OS shutdown"
+  ],
+  "screenshotKind": "WPF RenderTargetBitmap; not a physical-screen presentation measurement"
+}

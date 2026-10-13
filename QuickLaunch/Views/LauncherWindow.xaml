@@ -75,7 +75,7 @@
             <Border x:Name="Insertion" Grid.Row="2" HorizontalAlignment="Left" VerticalAlignment="Top"
                     Width="3" Height="78" Background="{DynamicResource AccentBrush}" Visibility="Collapsed" IsHitTestVisible="False" />
             <StackPanel Grid.Row="3" Margin="0,12,0,0">
-                <CheckBox x:Name="KeepVisible" Content="保持显示以添加：从资源管理器或浏览器拖入" Foreground="{DynamicResource MutedBrush}" Margin="4,4,0,8" />
+                <TextBlock Text="可从资源管理器或浏览器拖入添加" Foreground="{DynamicResource MutedBrush}" Margin="4,4,0,8" />
                 <Button x:Name="CancelImportButton" Content="取消导入" Click="CancelImportClick" Visibility="Collapsed" HorizontalAlignment="Left" />
                 <TextBlock x:Name="Status" Foreground="{DynamicResource AccentBrush}" TextWrapping="Wrap" FontSize="12" Margin="4,0" />
             </StackPanel>

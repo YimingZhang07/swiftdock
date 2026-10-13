@@ -36,7 +36,7 @@ public partial class LauncherWindow
             delete.Click += (_, _) => DeleteGroup(group);
             menu.Items.Add(rename); menu.Items.Add(delete);
             menu.Opened += (_, _) => _menuOpen = true;
-            menu.Closed += (_, _) => { _menuOpen = false; Dispatcher.BeginInvoke(() => MaybeHide()); };
+            menu.Closed += (_, _) => _menuOpen = false;
             tab.ContextMenu = menu; Tabs.Children.Add(tab);
         }
         if (Groups.Count == 0) return;
@@ -239,7 +239,7 @@ public partial class LauncherWindow
     }
     public void HighlightDropTab(LaunchGroup? group)
     { foreach (Button tab in Tabs.Children) tab.SetResourceReference(BackgroundProperty, tab.Tag == group ? "HoverBrush" : "PanelBrush"); }
-    public void AfterDrag() => Dispatcher.BeginInvoke(() => { if (IsVisible) Services.WindowPlacement.FitContent(this, CellSize, SelectedGroup.Items.Count); MaybeHide(); });
+    public void AfterDrag() => Dispatcher.BeginInvoke(() => { if (IsVisible) Services.WindowPlacement.FitContent(this, CellSize, SelectedGroup.Items.Count); });
     public void FlyGhostTo(LaunchItem item, LaunchGroup target)
     {
         int generation = ++_ghostGeneration;

@@ -13,7 +13,7 @@
             <CheckBox x:Name="Windows" Content="Win" Foreground="{DynamicResource TextBrush}" />
         </StackPanel>
         <ComboBox x:Name="MainKey" Width="150" HorizontalAlignment="Left" Margin="0,0,0,18" />
-        <CheckBox x:Name="HideOnDeactivate" Content="点击其他窗口时隐藏面板" Foreground="{DynamicResource TextBrush}" Margin="0,0,0,18" />
+        <TextBlock Text="启动项目或切换到其他窗口时，面板保持显示。" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,18" />
         <CheckBox x:Name="StartupBox" Content="登录 Windows 时自动启动此配置" Foreground="{DynamicResource TextBrush}" Margin="0,0,0,18" Click="StartupClick" />
         <TextBlock x:Name="Result" TextWrapping="Wrap" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,16" />
         <TextBlock x:Name="DirectoryLabel" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" FontSize="11" Margin="0,0,0,16" />

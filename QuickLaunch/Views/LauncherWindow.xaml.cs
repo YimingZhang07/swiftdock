@@ -19,21 +19,20 @@ public partial class LauncherWindow : Window
 {
     private readonly Dictionary<LaunchGroup, ItemsControl> _grids = [];
     private CancellationTokenSource _shutdown = new();
-    private readonly DispatcherTimer _dropWait = new() { Interval = TimeSpan.FromMilliseconds(100) };
+    private readonly Func<LaunchItem, bool, Task<LaunchResult>> _startLaunch;
     private readonly DispatcherTimer _externalWatch = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private Point _externalPoint;
     private bool _externalAccepts;
-    private bool _externalDrag, _menuOpen, _closing, _awaitingDrop, _movingWindow;
+    private bool _externalDrag, _menuOpen, _closing, _movingWindow;
     private int _ownedWindows;
     private CancellationTokenSource? _importStop;
-    private DateTime _dropDeadline;
     private int _showGeneration;
     private string? _focusedItemId;
     private EventHandler? _renderHandler;
     private DispatcherTimer? _measureTimeout;
     private TaskCompletionSource<double?>? _showCompletion;
     private TaskCompletionSource<double?>? _renderCompletion;
-    private bool _warming, _pinBeforeWarmup;
+    private bool _warming;
     private CancellationTokenSource? _warmupStop;
     public Task<double?> PendingShow => _showCompletion?.Task ?? Task.FromResult<double?>(null);
     public Task<double?> PendingRender => _renderCompletion?.Task ?? Task.FromResult<double?>(null);
@@ -46,17 +45,21 @@ public partial class LauncherWindow : Window
     public LaunchGroup SelectedGroup { get; private set; }
     public DragCoordinator DragSession { get; }
     public bool Importing { get; private set; }
-    public bool Pinned { get => KeepVisible.IsChecked == true; set => KeepVisible.IsChecked = value; }
     public Action? ExitRequested { get; set; }
     public Action? SettingsRequested { get; set; }
     public string StatusText => Status.Text;
 
     public LauncherWindow(DiagnosticLog log, MainViewModel viewModel, IconService icons)
+        : this(log, viewModel, icons, LaunchService.StartAsync) { }
+
+    internal LauncherWindow(DiagnosticLog log, MainViewModel viewModel, IconService icons,
+        Func<LaunchItem, bool, Task<LaunchResult>> startLaunch)
     {
         InitializeComponent();
         Log = log;
         ViewModel = viewModel;
         Icons = icons;
+        _startLaunch = startLaunch;
         DataContext = viewModel;
         SelectedGroup = Groups.FirstOrDefault(g => g.Id == viewModel.LastGroupId) ?? Groups[0];
         DragSession = new(this);
@@ -68,27 +71,17 @@ public partial class LauncherWindow : Window
         {
             if (e.NewFocus is Button { DataContext: LaunchItem item }) _focusedItemId = item.Id;
         };
-        Deactivated += (_, _) => MaybeHide();
         PreviewDragEnter += ExternalOver;
         PreviewDragOver += ExternalOver;
         PreviewDragLeave += ExternalLeave;
         PreviewDrop += ExternalDrop;
-        _dropWait.Tick += (_, _) =>
-        {
-            if (!_externalDrag && (DateTime.UtcNow >= _dropDeadline || (NativeMethods.GetAsyncKeyState(1) & 0x8000) == 0))
-            {
-                _awaitingDrop = false;
-                _dropWait.Stop();
-                MaybeHide();
-            }
-        };
         _externalWatch.Tick += (_, _) =>
         {
             bool held = ((NativeMethods.GetAsyncKeyState(1) | NativeMethods.GetAsyncKeyState(2)) & 0x8000) != 0;
             if (!_externalDrag || !held || !IsVisible || _closing)
             {
                 _externalWatch.Stop(); _externalDrag = false;
-                ShowInsertion(null); HighlightDropTab(null); MaybeHide();
+                ShowInsertion(null); HighlightDropTab(null);
             }
             else if (_externalAccepts) { AutoScroll(_externalPoint); ShowInsertion(SlotAt(_externalPoint)); }
         };
@@ -130,8 +123,6 @@ public partial class LauncherWindow : Window
         _showCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         _renderCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         int generation = ++_showGeneration;
-        _awaitingDrop = forDrop;
-        if (forDrop) { _dropDeadline = DateTime.UtcNow.AddSeconds(2); _dropWait.Start(); }
         ShowActivated = !forDrop;
         if (source != "prewarm") WindowPlacement.AtCursor(this, ViewModel.Columns, CellSize, SelectedGroup.Items.Count);
         Show();
@@ -183,9 +174,8 @@ public partial class LauncherWindow : Window
     {
         ++_showGeneration;
         CancelMeasurement();
-        _dropWait.Stop();
         _externalWatch.Stop();
-        _awaitingDrop = _externalDrag = false;
+        _externalDrag = false;
         DragSession.Cancel();
         Hide();
     }
@@ -193,7 +183,7 @@ public partial class LauncherWindow : Window
     public async Task<bool> PrewarmAsync()
     {
         if (_closing || IsVisible || _warming) return false;
-        _warming = true; _pinBeforeWarmup = Pinned; Pinned = true; Opacity = 0;
+        _warming = true; Opacity = 0;
         var cancellation = new CancellationTokenSource(); _warmupStop = cancellation;
         var watch = Stopwatch.StartNew();
         WindowPlacement.AtCursor(this, ViewModel.Columns, CellSize, SelectedGroup.Items.Count);
@@ -234,13 +224,7 @@ public partial class LauncherWindow : Window
     }
     private void RestoreWarmupState()
     {
-        _warming = false; _warmupStop?.Cancel(); Opacity = 1; Pinned = _pinBeforeWarmup;
-    }
-
-    private void MaybeHide()
-    {
-        if (!_closing && ViewModel.HideOnDeactivate && IsVisible && !IsActive && !Pinned && !DragSession.Active && !_externalDrag && !_awaitingDrop && !_menuOpen && !_movingWindow && _ownedWindows == 0)
-            HidePanel();
+        _warming = false; _warmupStop?.Cancel(); Opacity = 1;
     }
 
     private void WindowDragMouseDown(object sender, MouseButtonEventArgs e)
@@ -257,7 +241,6 @@ public partial class LauncherWindow : Window
         finally
         {
             _movingWindow = false;
-            MaybeHide();
         }
     }
 
@@ -326,10 +309,7 @@ public partial class LauncherWindow : Window
     public async Task LaunchAsync(LaunchItem item, bool elevate = false)
     {
         if (item.IsPending) return;
-        var watch = Stopwatch.StartNew();
-        HidePanel();
-        Log.Write("launch.hide-call", new { milliseconds = watch.Elapsed.TotalMilliseconds, item.Kind });
-        var result = await LaunchService.StartAsync(item, elevate);
+        var result = await _startLaunch(item, elevate);
         if (_closing) return;
         await DragSession.WhenIdle;
         if (_closing) return;
@@ -347,7 +327,6 @@ public partial class LauncherWindow : Window
     {
         _ownedWindows = Math.Max(0, _ownedWindows + (value ? 1 : -1));
         if (value) CancelMeasurement();
-        if (!value) Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, () => MaybeHide());
     }
     private void ItemMenuOpened(object sender, RoutedEventArgs e)
     {
@@ -362,7 +341,6 @@ public partial class LauncherWindow : Window
     private void ItemMenuClosed(object sender, RoutedEventArgs e)
     {
         _menuOpen = false;
-        Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, () => MaybeHide());
     }
     private void OpenMenuClick(object sender, RoutedEventArgs e) => LaunchFromMenu(sender, false);
     private void AdminMenuClick(object sender, RoutedEventArgs e) => LaunchFromMenu(sender, true);
@@ -378,8 +356,6 @@ public partial class LauncherWindow : Window
     {
         _externalDrag = true;
         _externalWatch.Start();
-        _awaitingDrop = false;
-        _dropWait.Stop();
         var point = e.GetPosition(Root);
         _externalPoint = point;
         HighlightDropTab(GroupAt(point));
@@ -396,7 +372,6 @@ public partial class LauncherWindow : Window
         _externalDrag = false;
         _externalWatch.Stop(); HighlightDropTab(null);
         ShowInsertion(null);
-        Dispatcher.BeginInvoke(() => MaybeHide());
     }
     private async void ExternalDrop(object sender, DragEventArgs e)
     {
@@ -441,7 +416,7 @@ public partial class LauncherWindow : Window
         {
             ViewModel.CancelImport(target, pending); _importStop?.Dispose(); _importStop = null;
             Importing = false; CancelImportButton.Visibility = Visibility.Collapsed;
-            _externalDrag = false; ShowInsertion(null); MaybeHide();
+            _externalDrag = false; ShowInsertion(null);
         }
     }
     private void CancelImportClick(object sender, RoutedEventArgs e) { _importStop?.Cancel(); SetStatus("已取消导入。"); }
@@ -533,7 +508,6 @@ public partial class LauncherWindow : Window
         _shutdown.Cancel();
         DragSession.Cancel();
         CancelMeasurement();
-        _dropWait.Stop();
         _externalWatch.Stop();
     }
     public void ResumeAfterExitFailure()

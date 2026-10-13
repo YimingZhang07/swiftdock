@@ -27,7 +27,9 @@ public sealed record AppConfig
     [JsonRequired]
     public int Version { get; init; } = 1;
     public HotkeyConfig Hotkey { get; init; } = new();
-    public bool HideOnDeactivate { get; init; } = true;
+    // Accept the retired setting when reading older profiles; normalization clears it.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool HideOnDeactivate { get; init; }
     public int IconSize { get; init; } = 48;
     public int Columns { get; init; } = 6;
     public string? LastGroupId { get; init; }

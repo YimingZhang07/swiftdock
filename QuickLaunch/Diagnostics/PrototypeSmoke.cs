@@ -26,7 +26,19 @@ internal static class PrototypeSmoke
             results.Add(new { name, passed = value });
             passed &= value;
         }
-        window.Pinned = true;
+        // A user's running launcher may own Alt+Space. Only this isolated smoke
+        // profile switches to an available combination; leave that instance alone.
+        if (!hotkey.Registered)
+        {
+            foreach (int key in Enumerable.Range(1, 12).Reverse())
+            {
+                var candidate = new HotkeyConfig { Modifiers = ["Control", "Alt", "Shift"], Key = $"F{key}" };
+                if (!hotkey.TryChange(candidate)) continue;
+                window.ViewModel.ApplySettings(candidate);
+                break;
+            }
+        }
+        Check("isolated-hotkey-registered", hotkey.Registered);
         window.ShowPanel("smoke");
         await Task.Delay(250);
         Check("visible-window-with-layout", window.IsVisible && window.ActualWidth > 0 && window.ActualHeight > 0);
@@ -72,14 +84,14 @@ internal static class PrototypeSmoke
         await Task.Delay(80);
         var settings = Application.Current.Windows.OfType<SettingsWindow>().Single();
         Check("settings-owned-and-visible", settings.IsVisible && settings.Owner == window && window.IsVisible);
-        settings.HideOnDeactivate.IsChecked = false;
+        long settingsRevision = window.ViewModel.Revision;
         settings.ApplyButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-        Check("settings-applied", !window.ViewModel.HideOnDeactivate);
+        Check("settings-applied", window.ViewModel.Revision > settingsRevision);
         settings.Close();
         Check("settings-close-keeps-main-alive", window.IsVisible && new WindowInteropHelper(window).Handle == handle);
         await window.ViewModel.FlushAsync();
         persisted = ConfigValidation.Parse(await File.ReadAllBytesAsync(store.FilePath));
-        Check("settings-persisted", !persisted.HideOnDeactivate);
+        Check("settings-persisted", persisted.Hotkey.SameAs(window.ViewModel.Hotkey) && store.SavedRevision == window.ViewModel.Revision);
 
         var editor = new EditItemDialog(null);
         var editorTimeout = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
@@ -144,6 +156,7 @@ internal static class PrototypeSmoke
         }
         await Task.Delay(80);
         Check("secondary-forwards-show-request", app.InstanceShowRequests > requestsBefore && window.IsVisible);
+        await WindowVisibilitySmoke.RunAsync(window, store.DirectoryPath, Check);
         var report = new
         {
             passed, runtime = Environment.Version.ToString(), os = Environment.OSVersion.VersionString,
