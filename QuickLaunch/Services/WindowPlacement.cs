@@ -7,7 +7,7 @@ namespace QuickLaunch.Services;
 
 public static class WindowPlacement
 {
-    public static void AtCursor(Window window)
+    public static void AtCursor(Window window, int columns = 6)
     {
         var hwnd = new WindowInteropHelper(window).EnsureHandle();
         if (!NativeMethods.GetCursorPos(out var point)) return;
@@ -18,7 +18,7 @@ public static class WindowPlacement
             ? dpi / 96.0 : NativeMethods.GetDpiForWindow(hwnd) / 96.0;
         if (scale <= 0) scale = 1;
         var work = info.Work;
-        window.Width = Math.Min(620, (work.Right - work.Left) / scale);
+        window.Width = Math.Min(columns * 88 + 34 + SystemParameters.VerticalScrollBarWidth, (work.Right - work.Left) / scale);
         window.Height = Math.Min(500, (work.Bottom - work.Top) / scale * 0.7);
         var width = (int)Math.Round(window.Width * scale);
         var height = (int)Math.Round(window.Height * scale);

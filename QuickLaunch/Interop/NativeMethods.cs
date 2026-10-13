@@ -33,6 +33,10 @@ internal static partial class NativeMethods
     internal static partial bool SetForegroundWindow(nint hwnd);
     [LibraryImport("user32.dll")]
     internal static partial nint GetForegroundWindow();
+    // A user-invoked secondary process may grant foreground permission to the primary.
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool AllowSetForegroundWindow(uint processId);
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool GetCursorPos(out Point point);

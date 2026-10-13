@@ -17,8 +17,13 @@ public sealed class DiagnosticLog : IAsyncDisposable
     public DiagnosticLog(string directory)
     {
         Directory.CreateDirectory(directory);
-        // A unique session file avoids collisions between M0 prototypes.
-        FilePath = Path.Combine(directory, $"m0-{DateTime.Now:yyyyMMdd-HHmmss}-{Environment.ProcessId}.jsonl");
+        // Bound retained sessions without touching foreign logs or active files held open by other instances.
+        foreach (var old in new DirectoryInfo(directory).EnumerateFiles("quicklaunch-*.jsonl")
+                     .OrderByDescending(file => file.LastWriteTimeUtc).Skip(19))
+        {
+            try { old.Delete(); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
+        FilePath = Path.Combine(directory, $"quicklaunch-{DateTime.Now:yyyyMMdd-HHmmss}-{Environment.ProcessId}.jsonl");
         _writer = Task.Run(async () =>
         {
             try

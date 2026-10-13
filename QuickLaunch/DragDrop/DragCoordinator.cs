@@ -23,7 +23,7 @@ public sealed class DragCoordinator
     {
         _view = view;
         _hover = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
-        _hover.Tick += (_, _) => { _hover.Stop(); if (_hoverTarget is not null) _view.SelectGroup(_hoverTarget); };
+        _hover.Tick += (_, _) => { _hover.Stop(); if (_hoverTarget is not null) _view.SelectGroup(_hoverTarget, preview: true); };
         view.CaptureRoot.PreviewMouseLeftButtonDown += Down;
         view.CaptureRoot.PreviewMouseMove += Move;
         view.CaptureRoot.PreviewMouseLeftButtonUp += Up;
@@ -32,7 +32,7 @@ public sealed class DragCoordinator
 
     private void Down(object sender, MouseButtonEventArgs e)
     {
-        if (_view.Importing || Active || e.OriginalSource is not DependencyObject target) return;
+        if (!_view.CanEdit || _view.Importing || Active || e.OriginalSource is not DependencyObject target) return;
         var button = LauncherWindow.Ancestor<Button>(target);
         if (button?.DataContext is not LaunchItem item) return;
         _item = item;
@@ -102,7 +102,8 @@ public sealed class DragCoordinator
                         catch { source.Items.Insert(oldIndex, item); throw; }
                     }
                     _view.Log.Write("drag.commit", new { item.Id, source = source.Name, target = target.Name, slot });
-                    _view.SetStatus($"已移动 {item.Name}（M0 仅保存在本次会话）");
+                    _view.ViewModel.CommitGroup(_view.SelectedGroup.Id);
+                    _view.SetStatus($"已移动 {item.Name}，将自动保存");
                 }
                 finally { Clear(); }
             }
@@ -115,7 +116,7 @@ public sealed class DragCoordinator
         if (!Active) return;
         var source = _source;
         Clear();
-        if (source is not null) _view.SelectGroup(source);
+        if (source is not null) _view.SelectGroup(source, preview: true);
         _view.Log.Write("drag.cancel");
         _view.SetStatus("已取消移动，数据未改变");
     }

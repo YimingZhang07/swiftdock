@@ -8,7 +8,7 @@
     <Window.Resources>
         <ItemsPanelTemplate x:Key="TilePanel"><WrapPanel ItemWidth="88" ItemHeight="88" /></ItemsPanelTemplate>
         <DataTemplate x:Key="TileTemplate">
-            <Button Width="82" Height="82" Padding="3" ToolTip="{Binding Path}" Click="ItemClick"
+            <Button x:Name="TileButton" Width="82" Height="82" Padding="3" Opacity="0.7" ToolTip="{Binding ToolTip}" Click="ItemClick"
                     AutomationProperties.Name="{Binding Name}">
                 <Button.ContextMenu>
                     <ContextMenu Opened="ItemMenuOpened" Closed="ItemMenuClosed">
@@ -17,10 +17,16 @@
                     </ContextMenu>
                 </Button.ContextMenu>
                 <StackPanel>
-                    <TextBlock Text="{Binding Glyph}" FontSize="28" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" />
+                    <TextBlock x:Name="TileGlyph" Text="{Binding Glyph}" FontSize="28" Foreground="#F28B82" HorizontalAlignment="Center" />
                     <TextBlock Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis" TextAlignment="Center" Margin="0,5,0,0" />
                 </StackPanel>
             </Button>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding ErrorMessage}" Value="{x:Null}">
+                    <Setter TargetName="TileButton" Property="Opacity" Value="1" />
+                    <Setter TargetName="TileGlyph" Property="Foreground" Value="{StaticResource AccentBrush}" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
         </DataTemplate>
     </Window.Resources>
     <Border BorderBrush="#33404F" BorderThickness="1" CornerRadius="12" Padding="16">
@@ -31,11 +37,12 @@
             </Grid.RowDefinitions>
             <DockPanel Margin="0,0,0,12">
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                    <Button Content="设置" Click="SettingsClick" />
                     <Button Content="隐藏" Click="HideClick" /><Button Content="退出" Click="ExitClick" />
                 </StackPanel>
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="QuickLaunch" FontSize="22" FontWeight="SemiBold" />
-                    <TextBlock Text="M0 · 桌面交互原型" FontSize="11" Foreground="#9CAEC2" Margin="0,3,0,0" />
+                    <TextBlock Text="{Binding StorageStatus}" FontSize="11" Foreground="#9CAEC2" Margin="0,3,0,0" />
                 </StackPanel>
             </DockPanel>
             <StackPanel x:Name="Tabs" Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10" />
@@ -48,8 +55,9 @@
                 <CheckBox x:Name="KeepVisible" Content="保持显示以添加：从资源管理器或浏览器拖入" Foreground="#BECADA" Margin="4,4,0,8" />
                 <TextBlock x:Name="Status" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" FontSize="12" Margin="4,0" />
             </StackPanel>
-            <TextBlock Grid.Row="4" Text="Alt+Space 呼出 / 隐藏    ·    Enter 启动    ·    拖到标签切组    ·    Esc 取消"
-                       Foreground="#8C9CAF" FontSize="10" Margin="4,12,0,0" TextWrapping="Wrap" />
+            <TextBlock Grid.Row="4" Foreground="#8C9CAF" FontSize="10" Margin="4,12,0,0" TextWrapping="Wrap">
+                <Run Text="{Binding HotkeyDisplay, Mode=OneWay}" /><Run Text=" 呼出 / 隐藏    ·    Enter 启动    ·    Esc 取消" />
+            </TextBlock>
             <Canvas Grid.RowSpan="5" IsHitTestVisible="False" ClipToBounds="True">
                 <Border x:Name="Ghost" Background="#E0476D71" Padding="12" CornerRadius="8" Visibility="Collapsed">
                     <TextBlock x:Name="GhostText" Foreground="White" />

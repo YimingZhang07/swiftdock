@@ -11,43 +11,41 @@ using QuickLaunch.DragDrop;
 using QuickLaunch.Interop;
 using QuickLaunch.Models;
 using QuickLaunch.Services;
+using QuickLaunch.ViewModels;
 
 namespace QuickLaunch.Views;
 
 public partial class LauncherWindow : Window
 {
     private readonly Dictionary<LaunchGroup, ItemsControl> _grids = [];
-    private readonly CancellationTokenSource _shutdown = new();
+    private CancellationTokenSource _shutdown = new();
     private readonly DispatcherTimer _dropWait = new() { Interval = TimeSpan.FromMilliseconds(100) };
-    private bool _externalDrag, _menuOpen, _closing, _awaitingDrop;
+    private bool _externalDrag, _menuOpen, _closing, _awaitingDrop, _settingsOpen;
     private DateTime _dropDeadline;
     private int _showGeneration;
+    private string? _focusedItemId;
     private EventHandler? _renderHandler;
     private DispatcherTimer? _measureTimeout;
     public DiagnosticLog Log { get; }
     public Grid CaptureRoot => Root;
-    public IReadOnlyList<LaunchGroup> Groups { get; }
+    public MainViewModel ViewModel { get; }
+    public IReadOnlyList<LaunchGroup> Groups => ViewModel.Groups;
+    public bool CanEdit => ViewModel.CanEdit;
     public LaunchGroup SelectedGroup { get; private set; }
     public DragCoordinator DragSession { get; }
     public bool Importing { get; private set; }
     public bool Pinned { get => KeepVisible.IsChecked == true; set => KeepVisible.IsChecked = value; }
     public Action? ExitRequested { get; set; }
+    public Action? SettingsRequested { get; set; }
     public string StatusText => Status.Text;
 
-    public LauncherWindow(DiagnosticLog log)
+    public LauncherWindow(DiagnosticLog log, MainViewModel viewModel)
     {
         InitializeComponent();
         Log = log;
-        var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-        Groups = [
-            new("常用", [new("记事本", Path.Combine(windows, "System32", "notepad.exe"), LaunchKind.App),
-                new("用户目录", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), LaunchKind.Folder),
-                new("GitHub", "https://github.com", LaunchKind.Url),
-                new("计算器", Path.Combine(windows, "System32", "calc.exe"), LaunchKind.App)]),
-            new("工作", [new("文档", Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), LaunchKind.Folder),
-                new("Microsoft Learn", "https://learn.microsoft.com/dotnet/", LaunchKind.Url)])
-        ];
-        SelectedGroup = Groups[0];
+        ViewModel = viewModel;
+        DataContext = viewModel;
+        SelectedGroup = Groups.FirstOrDefault(g => g.Id == viewModel.LastGroupId) ?? Groups[0];
         DragSession = new(this);
         foreach (var group in Groups)
         {
@@ -66,6 +64,10 @@ public partial class LauncherWindow : Window
         }
         SelectGroup(SelectedGroup);
         PreviewKeyDown += KeyPressed;
+        PreviewGotKeyboardFocus += (_, e) =>
+        {
+            if (e.NewFocus is Button { DataContext: LaunchItem item }) _focusedItemId = item.Id;
+        };
         Deactivated += (_, _) => MaybeHide();
         PreviewDragEnter += ExternalOver;
         PreviewDragOver += ExternalOver;
@@ -80,7 +82,7 @@ public partial class LauncherWindow : Window
                 MaybeHide();
             }
         };
-        SetStatus("拖入项目可测试启动；添加和排序仅保留在本次 M0 会话。");
+        SetStatus(viewModel.IsReadOnly ? "当前为只读配置，可启动项目，不能添加或排序。" : "添加和排序会自动保存；热键可在设置中修改。");
     }
 
     public void InitializeNative()
@@ -115,7 +117,7 @@ public partial class LauncherWindow : Window
         _awaitingDrop = forDrop;
         if (forDrop) { _dropDeadline = DateTime.UtcNow.AddSeconds(2); _dropWait.Start(); }
         ShowActivated = !forDrop;
-        WindowPlacement.AtCursor(this);
+        WindowPlacement.AtCursor(this, ViewModel.Columns);
         Show();
         nint hwnd = new WindowInteropHelper(this).Handle;
         if (!forDrop)
@@ -168,24 +170,26 @@ public partial class LauncherWindow : Window
 
     private void MaybeHide()
     {
-        if (!_closing && IsVisible && !IsActive && !Pinned && !DragSession.Active && !_externalDrag && !_awaitingDrop && !_menuOpen)
+        if (!_closing && ViewModel.HideOnDeactivate && IsVisible && !IsActive && !Pinned && !DragSession.Active && !_externalDrag && !_awaitingDrop && !_menuOpen && !_settingsOpen)
             HidePanel();
     }
 
-    public void SelectGroup(LaunchGroup group)
+    public void SelectGroup(LaunchGroup group, bool preview = false)
     {
         SelectedGroup = group;
         foreach (var pair in _grids) pair.Value.Visibility = pair.Key == group ? Visibility.Visible : Visibility.Collapsed;
         foreach (Button tab in Tabs.Children) tab.Foreground = (LaunchGroup)tab.Tag == group
             ? (Brush)FindResource("AccentBrush") : Brushes.LightGray;
         Viewer.ScrollToTop();
+        if (!preview) ViewModel.CommitGroup(group.Id);
     }
 
     private void FocusFirst()
     {
         var grid = _grids[SelectedGroup];
         grid.UpdateLayout();
-        var first = Descendants<Button>(grid).FirstOrDefault();
+        var buttons = Descendants<Button>(grid).ToList();
+        var first = buttons.FirstOrDefault(b => b.DataContext is LaunchItem item && item.Id == _focusedItemId) ?? buttons.FirstOrDefault();
         if (first is not null) first.Focus(); else grid.Focus();
     }
 
@@ -193,6 +197,7 @@ public partial class LauncherWindow : Window
     {
         if (e.Key == Key.Escape)
         {
+            if (_menuOpen) return; // Let the menu consume Esc before the panel's hide shortcut.
             if (DragSession.Active) DragSession.Cancel(); else HidePanel();
             e.Handled = true;
         }
@@ -214,6 +219,7 @@ public partial class LauncherWindow : Window
         Log.Write("launch.hide-call", new { milliseconds = watch.Elapsed.TotalMilliseconds, item.Kind });
         var result = await LaunchService.StartAsync(item, elevate);
         if (_closing) return;
+        ViewModel.RecordLaunch(item, result);
         SetStatus($"{item.Name}：{result.Message}");
         Log.Write("launch.result", new { item.Kind, result.Accepted, result.Cancelled, result.Message });
     }
@@ -222,13 +228,23 @@ public partial class LauncherWindow : Window
     { if (!DragSession.Active && sender is Button { DataContext: LaunchItem item }) _ = LaunchAsync(item); }
     private void HideClick(object sender, RoutedEventArgs e) => HidePanel();
     private void ExitClick(object sender, RoutedEventArgs e) => ExitRequested?.Invoke();
+    private void SettingsClick(object sender, RoutedEventArgs e) => SettingsRequested?.Invoke();
+    public void SetSettingsOpen(bool value)
+    {
+        _settingsOpen = value;
+        if (!value) Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, () => MaybeHide());
+    }
     private void ItemMenuOpened(object sender, RoutedEventArgs e)
     {
         _menuOpen = true;
         if (sender is ContextMenu menu && menu.PlacementTarget is Button { DataContext: LaunchItem item })
             ((MenuItem)menu.Items[1]).IsEnabled = item.Kind == LaunchKind.App;
     }
-    private void ItemMenuClosed(object sender, RoutedEventArgs e) { _menuOpen = false; MaybeHide(); }
+    private void ItemMenuClosed(object sender, RoutedEventArgs e)
+    {
+        _menuOpen = false;
+        Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, () => MaybeHide());
+    }
     private void OpenMenuClick(object sender, RoutedEventArgs e) => LaunchFromMenu(sender, false);
     private void AdminMenuClick(object sender, RoutedEventArgs e) => LaunchFromMenu(sender, true);
     private void LaunchFromMenu(object sender, bool admin)
@@ -246,7 +262,7 @@ public partial class LauncherWindow : Window
         _dropWait.Stop();
         var point = e.GetPosition(Root);
         bool target = GroupAt(point) is not null || SlotAt(point) is not null;
-        e.Effects = !DragSession.Active && !Importing && target && DropParser.Supports(e.Data) ? Allowed(e) : DragDropEffects.None;
+        e.Effects = CanEdit && !DragSession.Active && !Importing && target && DropParser.Supports(e.Data) ? Allowed(e) : DragDropEffects.None;
         ShowInsertion(e.Effects != DragDropEffects.None ? SlotAt(point) : null);
         e.Handled = true;
     }
@@ -262,7 +278,7 @@ public partial class LauncherWindow : Window
     {
         e.Handled = true;
         e.Effects = DragDropEffects.None;
-        if (Importing || DragSession.Active) { _externalDrag = false; return; }
+        if (!CanEdit || Importing || DragSession.Active) { _externalDrag = false; return; }
         var point = e.GetPosition(Root);
         var tab = GroupAt(point);
         var target = tab ?? SelectedGroup;
@@ -278,8 +294,9 @@ public partial class LauncherWindow : Window
             SetStatus("正在解析拖入项目…");
             _externalDrag = false;
             ShowInsertion(null);
-            var resolution = await DropParser.ResolveAsync(snapshot, _shutdown.Token);
-            if (_closing) return;
+            var cancellation = _shutdown.Token;
+            var resolution = await DropParser.ResolveAsync(snapshot, cancellation);
+            if (_closing || cancellation.IsCancellationRequested) return;
             int insert = Math.Min(slot.Value, target.Items.Count);
             foreach (var item in resolution.Items) target.Items.Insert(insert++, item);
             SetStatus($"已添加 {resolution.Items.Count} 项。{string.Join("；", resolution.Errors)}");
@@ -343,10 +360,19 @@ public partial class LauncherWindow : Window
     public void PrepareExit()
     {
         _closing = true;
+        IsEnabled = false;
         _shutdown.Cancel();
         DragSession.Cancel();
         CancelMeasurement();
         _dropWait.Stop();
+    }
+    public void ResumeAfterExitFailure()
+    {
+        _closing = false;
+        _shutdown.Dispose();
+        _shutdown = new();
+        IsEnabled = true;
+        ShowPanel("save-failed");
     }
     protected override void OnClosing(CancelEventArgs e)
     {

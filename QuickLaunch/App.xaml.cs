@@ -7,7 +7,9 @@ using System.Windows.Media;
 using CommunityToolkit.Mvvm.Input;
 using H.NotifyIcon;
 using QuickLaunch.Diagnostics;
+using QuickLaunch.Models;
 using QuickLaunch.Services;
+using QuickLaunch.ViewModels;
 using QuickLaunch.Views;
 
 namespace QuickLaunch;
@@ -16,42 +18,98 @@ public partial class App : Application
 {
     private DiagnosticLog? _log;
     private LauncherWindow? _window;
+    private SettingsWindow? _settings;
     private HotkeyService? _hotkey;
     private TaskbarIcon? _tray;
-    private bool _exiting;
+    private SingleInstanceService? _instance;
+    private ConfigService? _store;
+    private MainViewModel? _viewModel;
+    private volatile bool _exiting;
+    private bool _pendingShow, _smoke;
+    public int InstanceShowRequests { get; private set; }
 
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        _smoke = e.Args.Contains("--smoke-test");
         try
         {
-            string directory = Argument(e.Args, "--diagnostics-dir")
-                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "QuickLaunch", "M0");
-            _log = new(directory);
-            _window = new(_log) { ExitRequested = () => _ = ExitAsync() };
+            string? explicitConfig = Argument(e.Args, "--config-dir");
+            if (_smoke && explicitConfig is null) throw new ArgumentException("冒烟检查必须指定独立 --config-dir，禁止修改用户配置。");
+            var paths = DataPaths.Resolve(explicitConfig, Argument(e.Args, "--diagnostics-dir"));
+            bool readOnly = false;
+            if (!DataPaths.CanWrite(paths.ConfigDirectory))
+            {
+                if (_smoke) readOnly = true;
+                else
+                {
+                    var answer = MessageBox.Show("所选配置目录不可写。\n是：使用默认目录\n否：只读运行\n取消：退出", "QuickLaunch", MessageBoxButton.YesNoCancel);
+                    if (answer == MessageBoxResult.Cancel) { Shutdown(); return; }
+                    if (answer == MessageBoxResult.Yes) paths = DataPaths.Resolve(DataPaths.DefaultConfigDirectory, Argument(e.Args, "--diagnostics-dir"));
+                    else readOnly = true;
+                }
+            }
+            _instance = new(paths.ConfigDirectory, () =>
+            {
+                if (!Dispatcher.HasShutdownStarted) Dispatcher.BeginInvoke(() =>
+                {
+                    if (_exiting) return;
+                    InstanceShowRequests++;
+                    if (_window is null) _pendingShow = true;
+                    else ShowMain("second-instance");
+                });
+            }, () => !_exiting && !Dispatcher.HasShutdownStarted);
+            if (!_instance.IsPrimary)
+            {
+                await _instance.NotifyPrimaryAsync();
+                if (!_instance.IsPrimary)
+                {
+                    await _instance.DisposeAsync();
+                    _instance = null;
+                    Shutdown();
+                    return;
+                }
+            }
+            try { _log = new(paths.LogDirectory); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _log = new(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "QuickLaunch", "logs"));
+                _log.Write("log.fallback", new { ex.Message });
+            }
+            _store = ConfigService.Open(paths.ConfigDirectory, readOnly);
+            _viewModel = new(_store);
+            _window = new(_log, _viewModel) { ExitRequested = () => _ = ExitAsync(), SettingsRequested = OpenSettings };
             MainWindow = _window;
             _window.InitializeNative();
-            _hotkey = new(new WindowInteropHelper(_window).Handle, _window.Toggle);
-            _log.Write("hotkey.registered", new { _hotkey.Registered, _hotkey.Error });
+            _hotkey = new(new WindowInteropHelper(_window).Handle, () =>
+            {
+                if (_settings?.IsVisible == true) _settings.Activate();
+                else _window.Toggle();
+            }, _viewModel.Hotkey);
+            _log.Write("hotkey.registered", new { _hotkey.Registered, _hotkey.Error, hotkey = _viewModel.HotkeyDisplay });
             CreateTray();
             using var identity = WindowsIdentity.GetCurrent();
             bool elevated = new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
             _log.Write("startup", new { runtime = Environment.Version.ToString(), os = Environment.OSVersion.VersionString,
-                elevated, log = _log.FilePath, milestone = "M0", configurationPersisted = false });
-            if (elevated) _window.SetStatus("当前以管理员权限运行；请用普通权限重启以验证外部拖入。");
-            if (!_hotkey.Registered) _window.SetStatus($"Alt+Space 注册失败（{_hotkey.Error}），可点击托盘显示。M1 将提供热键设置。");
-            SessionEnding += (_, _) => _window.PrepareExit();
-            if (e.Args.Contains("--smoke-test"))
+                elevated, milestone = "M1", configDirectory = paths.ConfigDirectory, _store.IsReadOnly, _store.Notice });
+            var notices = new List<string>();
+            if (_store.Notice is not null) notices.Add(_store.Notice);
+            if (elevated) notices.Add("当前以管理员权限运行；请用普通权限重启以接收外部拖入。");
+            if (!_hotkey.Registered) notices.Add($"{_viewModel.HotkeyDisplay} 注册失败（{_hotkey.Error}），请从设置修改热键；托盘仍可呼出。");
+            if (notices.Count > 0) _window.SetStatus(string.Join("\n", notices));
+            SessionEnding += OnSessionEnding;
+            if (_smoke)
             {
-                bool passed = await PrototypeSmoke.RunAsync(_window, _hotkey, directory);
+                bool passed = await PrototypeSmoke.RunAsync(_window, _hotkey, _store, this, paths.LogDirectory);
                 await ExitAsync(passed ? 0 : 1);
             }
-            else if (!e.Args.Contains("--silent")) _window.ShowPanel("startup");
+            else if (!e.Args.Contains("--silent") || _pendingShow) ShowMain(_pendingShow ? "pending-instance" : "startup");
+            _pendingShow = false;
         }
         catch (Exception ex)
         {
             _log?.Write("startup.failed", new { ex.Message, type = ex.GetType().Name });
-            if (!e.Args.Contains("--smoke-test")) MessageBox.Show(ex.Message, "QuickLaunch 无法启动");
+            if (!_smoke) MessageBox.Show(ex is OperationCanceledException ? "已有实例未及时响应，请稍后重新启动。" : ex.Message, "QuickLaunch 无法启动");
             await ExitAsync(1);
         }
     }
@@ -59,27 +117,60 @@ public partial class App : Application
     private static string? Argument(string[] args, string key)
     {
         int index = Array.IndexOf(args, key);
-        return index >= 0 && index + 1 < args.Length ? args[index + 1] : null;
+        if (index < 0) return null;
+        if (index + 1 >= args.Length || args[index + 1].StartsWith("--", StringComparison.Ordinal)) throw new ArgumentException($"{key} 缺少参数。");
+        return args[index + 1];
     }
 
+    private void ShowMain(string source)
+    {
+        if (_settings?.IsVisible == true) _settings.Activate();
+        else _window?.ShowPanel(source);
+    }
+
+    public void OpenSettings()
+    {
+        if (_exiting || _window is null || _viewModel is null || _store is null || _hotkey is null) return;
+        if (_settings is not null) { _settings.Activate(); return; }
+        if (!_window.IsVisible) _window.ShowPanel("settings");
+        _window.SetSettingsOpen(true);
+        _settings = new(_viewModel.Hotkey, _viewModel.HideOnDeactivate, _viewModel.CanEdit, _store.DirectoryPath,
+            _hotkey.Registered ? $"当前已注册：{_hotkey.Current!.Display}" : $"注册失败，错误码 {_hotkey.Error}；请选择其他组合。",
+            (candidate, hide) =>
+            {
+                if (!_viewModel.CanEdit) return "配置只读，未修改。";
+                if (!_hotkey.TryChange(candidate)) return $"新组合被占用或不可用（{_hotkey.Error}）；原有热键和配置已保留。";
+                _viewModel.ApplySettings(candidate, hide);
+                UpdateTrayText();
+                _log?.Write("hotkey.changed", new { hotkey = candidate.Display });
+                return "已应用，配置将自动保存。";
+            }) { Owner = _window };
+        _settings.Closed += (_, _) => { _settings = null; _window.SetSettingsOpen(false); };
+        _settings.Show();
+    }
+
+    private void UpdateTrayText()
+    {
+        if (_tray is not null) _tray.ToolTipText = $"QuickLaunch · {_viewModel!.HotkeyDisplay}";
+    }
     private void CreateTray()
     {
-        // H.NotifyIcon supports GeneratedIconSource, but not arbitrary WPF DrawingImage.
         var icon = new GeneratedIconSource
         {
             Text = "Q", FontSize = 32, Foreground = new SolidColorBrush(Color.FromRgb(117, 219, 197)),
             Background = new SolidColorBrush(Color.FromRgb(23, 29, 39))
         };
         var menu = new ContextMenu();
-        menu.Items.Add(new MenuItem { Header = "显示 QuickLaunch", Command = new RelayCommand(() => _window!.ShowPanel("tray-menu")) });
-        menu.Items.Add(new MenuItem { Header = "保持显示以添加", Command = new RelayCommand(() => { _window!.Pinned = true; _window.ShowPanel("tray-add"); }) });
+        menu.Items.Add(new MenuItem { Header = "显示 QuickLaunch", Command = new RelayCommand(() => ShowMain("tray-menu")) });
+        menu.Items.Add(new MenuItem { Header = "设置", Command = new RelayCommand(OpenSettings) });
+        menu.Items.Add(new MenuItem { Header = "保持显示以添加", Command = new RelayCommand(() => { _window!.Pinned = true; ShowMain("tray-add"); }) });
+        menu.Items.Add(new MenuItem { Header = "打开配置目录", Command = new RelayCommand(() =>
+            _ = LaunchService.StartAsync(new("配置目录", _store!.DirectoryPath, LaunchKind.Folder))) });
         menu.Items.Add(new Separator());
         menu.Items.Add(new MenuItem { Header = "退出", Command = new RelayCommand(() => _ = ExitAsync()) });
-        _tray = new TaskbarIcon
-        {
-            ToolTipText = "QuickLaunch · Alt+Space", IconSource = icon, ContextMenu = menu,
-            LeftClickCommand = new RelayCommand(() => _window!.ShowPanel("tray"))
-        };
+        _tray = new TaskbarIcon { IconSource = icon, ContextMenu = menu,
+            LeftClickCommand = new RelayCommand(() => ShowMain("tray")) };
+        UpdateTrayText();
         _tray.ForceCreate(enablesEfficiencyMode: false);
         _log!.Write("tray.created");
     }
@@ -88,15 +179,60 @@ public partial class App : Application
     {
         if (_exiting) return;
         _exiting = true;
+        _settings?.Close();
         _window?.PrepareExit();
+        _viewModel?.Suspend(true);
+        if (_viewModel is not null)
+        {
+            while (true)
+            {
+                try { await _viewModel.FlushAsync(); break; }
+                catch (Exception ex)
+                {
+                    _log?.Write("save.exit-failed", new { ex.Message });
+                    if (_smoke) { code = 1; break; }
+                    var answer = MessageBox.Show($"配置尚未保存：{ex.Message}\n是：重试\n否：放弃未保存修改并退出\n取消：返回程序", "QuickLaunch", MessageBoxButton.YesNoCancel);
+                    if (answer == MessageBoxResult.Yes) continue;
+                    if (answer == MessageBoxResult.No) break;
+                    _exiting = false;
+                    _viewModel.Suspend(false);
+                    _window?.ResumeAfterExitFailure();
+                    return;
+                }
+            }
+        }
         _hotkey?.Dispose();
         _tray?.Dispose();
+        if (_store is not null) await _store.DisposeAsync();
+        if (_instance is not null) await _instance.DisposeAsync();
         if (_log is not null)
         {
-            _log.Write("shutdown", new { code });
+            _log.Write("shutdown", new { code, savedRevision = _store?.SavedRevision });
             try { await _log.DisposeAsync(); } catch (TimeoutException) { }
         }
         _window?.Close();
         Shutdown(code);
+    }
+
+    private void OnSessionEnding(object sender, SessionEndingCancelEventArgs e)
+    {
+        if (_exiting) return;
+        _exiting = true;
+        _window?.PrepareExit();
+        _viewModel?.Suspend(true);
+        if (_store is { IsReadOnly: false } && _viewModel is not null)
+        {
+            try
+            {
+                // This completion depends only on the IO worker, never the UI dispatcher.
+                // OS shutdown gets a bounded best-effort flush, unlike normal async exit.
+                bool saved = _store.SaveAsync(_viewModel.Snapshot(), _viewModel.Revision).Wait(TimeSpan.FromMilliseconds(800));
+                _log?.Write("session-ending", new { saved });
+            }
+            catch (Exception ex) { _log?.Write("session-ending.failed", new { ex.Message }); }
+        }
+        _hotkey?.Dispose();
+        _tray?.Dispose();
+        // Do not cancel OS shutdown or await IPC/logging indefinitely; OS releases remaining handles.
     }
 }
