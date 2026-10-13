@@ -1,0 +1,60 @@
+<Window x:Class="QuickLaunch.Views.LauncherWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="QuickLaunch" Width="620" Height="500" WindowStyle="None"
+        ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True"
+        Background="#171D27" Foreground="#EEF2F6" FontFamily="Segoe UI, Microsoft YaHei UI"
+        UseLayoutRounding="True" AllowDrop="True">
+    <Window.Resources>
+        <ItemsPanelTemplate x:Key="TilePanel"><WrapPanel ItemWidth="88" ItemHeight="88" /></ItemsPanelTemplate>
+        <DataTemplate x:Key="TileTemplate">
+            <Button Width="82" Height="82" Padding="3" ToolTip="{Binding Path}" Click="ItemClick"
+                    AutomationProperties.Name="{Binding Name}">
+                <Button.ContextMenu>
+                    <ContextMenu Opened="ItemMenuOpened" Closed="ItemMenuClosed">
+                        <MenuItem Header="打开" Click="OpenMenuClick" />
+                        <MenuItem Header="以管理员身份运行" Click="AdminMenuClick" />
+                    </ContextMenu>
+                </Button.ContextMenu>
+                <StackPanel>
+                    <TextBlock Text="{Binding Glyph}" FontSize="28" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis" TextAlignment="Center" Margin="0,5,0,0" />
+                </StackPanel>
+            </Button>
+        </DataTemplate>
+    </Window.Resources>
+    <Border BorderBrush="#33404F" BorderThickness="1" CornerRadius="12" Padding="16">
+        <Grid x:Name="Root" Background="Transparent">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                <RowDefinition Height="*" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <DockPanel Margin="0,0,0,12">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                    <Button Content="隐藏" Click="HideClick" /><Button Content="退出" Click="ExitClick" />
+                </StackPanel>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="QuickLaunch" FontSize="22" FontWeight="SemiBold" />
+                    <TextBlock Text="M0 · 桌面交互原型" FontSize="11" Foreground="#9CAEC2" Margin="0,3,0,0" />
+                </StackPanel>
+            </DockPanel>
+            <StackPanel x:Name="Tabs" Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10" />
+            <ScrollViewer x:Name="Viewer" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <Grid x:Name="GroupHost" MinHeight="100" Background="Transparent" />
+            </ScrollViewer>
+            <Border x:Name="Insertion" Grid.Row="2" HorizontalAlignment="Left" VerticalAlignment="Top"
+                    Width="3" Height="78" Background="{StaticResource AccentBrush}" Visibility="Collapsed" IsHitTestVisible="False" />
+            <StackPanel Grid.Row="3" Margin="0,12,0,0">
+                <CheckBox x:Name="KeepVisible" Content="保持显示以添加：从资源管理器或浏览器拖入" Foreground="#BECADA" Margin="4,4,0,8" />
+                <TextBlock x:Name="Status" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" FontSize="12" Margin="4,0" />
+            </StackPanel>
+            <TextBlock Grid.Row="4" Text="Alt+Space 呼出 / 隐藏    ·    Enter 启动    ·    拖到标签切组    ·    Esc 取消"
+                       Foreground="#8C9CAF" FontSize="10" Margin="4,12,0,0" TextWrapping="Wrap" />
+            <Canvas Grid.RowSpan="5" IsHitTestVisible="False" ClipToBounds="True">
+                <Border x:Name="Ghost" Background="#E0476D71" Padding="12" CornerRadius="8" Visibility="Collapsed">
+                    <TextBlock x:Name="GhostText" Foreground="White" />
+                </Border>
+            </Canvas>
+        </Grid>
+    </Border>
+</Window>

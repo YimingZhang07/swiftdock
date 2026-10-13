@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="QuickLaunch.Tests/QuickLaunch.Tests.csproj" />
+  <Project Path="QuickLaunch/QuickLaunch.csproj" />
+</Solution>

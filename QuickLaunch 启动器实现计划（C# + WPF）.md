@@ -1,7 +1,7 @@
 # QuickLaunch 启动器实现计划（C# + WPF）
 
 Oct 12, 2026 · @Yiming Zhang  
-修订：2026-10-13 · 设计评审后更新；当前为实现计划，未声称任何功能或性能指标已经通过验证。
+修订：2026-10-13 · 设计评审后更新。当前已实现 M0 原型，Release 构建、18 项逻辑测试和 8 项程序内 WPF 检查通过；真实桌面交互验收尚未完成，未进入 M1。详见 [M0 验证记录](docs/validation/M0.md)。下文性能目标仍待实测验收。
 
 ## 1. 项目目标与范围
 
@@ -43,10 +43,10 @@ QuickLaunch 是一个 Windows 常驻启动器：按热键快速弹出面板，�
 
 | 项 | 选择 | 理由 |
 | --- | --- | --- |
-| 运行时 | .NET 10 LTS；使用 WinRT `UISettings` 时采用 `net10.0-windows10.0.19041.0` | 使用受支持运行时；带 Windows 版本的 TFM 提供所需平台 API 引用，不等于承诺所有旧系统均受支持 |
+| 运行时 | .NET 10 LTS；M0 固定 SDK 10.0.401、TFM `net10.0-windows10.0.19041.0`，实测 Runtime 10.0.12 | 使用受支持运行时；带 Windows 版本的 TFM 提供所需平台 API 引用，不等于承诺所有旧系统均受支持 |
 | 发布方式 | 首先 `SelfContained=false`、显式 `win-x64`；ReadyToRun 做开关对照 | 用户需要匹配架构的 .NET 10 Windows Desktop Runtime；测量后决定 R2R 默认值 |
-| MVVM | `CommunityToolkit.Mvvm` | `ObservableObject`、`RelayCommand` 源生成器，减少样板代码 |
-| 托盘 | `H.NotifyIcon.Wpf` | 不引入 WinForms |
+| MVVM | `CommunityToolkit.Mvvm` 8.4.2（M0 已还原、编译） | `ObservableObject`、`RelayCommand` 源生成器，减少样板代码 |
+| 托盘 | `H.NotifyIcon.Wpf` 2.4.1（M0 已创建托盘） | 不引入 WinForms；原型使用该库支持的 GeneratedIconSource |
 | JSON | `System.Text.Json` + 源生成 `JsonSerializerContext` | 明确配置契约，避免此序列化路径依赖运行时反射 |
 | Win32 | 手写 P/Invoke（`LibraryImport`） | 热键、图标、焦点、窗口样式 |
 | 日志 | 有界后台队列 + 大小限制/轮转 | 回调只入队；磁盘失败或队列满不阻塞交互 |
@@ -378,6 +378,8 @@ Windows 对前台激活有限制，不能承诺任意场景 100% 成功。热键
 
 范围：最小 .NET 10 WPF 原型，少量硬编码条目和两个组；不先实现完整设置、缓存和动画系统。验证结果记录到后续创建的 `docs/validation/M0.md`，必要的设计调整同步回本文。
 
+2026-10-13 实施状态：源码及验证脚本已提交；发布版在 Windows 11 x64、192 DPI、普通权限下自动检查通过。真实按键/鼠标、Explorer/Chrome/Edge OLE、混合 DPI 与 UAC 仍需按验证记录操作；下列组合验收项不以自动冒烟结果全部替代。
+
 - [ ] 固定可用的 SDK、TFM、两个包版本，Release 发布程序能在指定 Windows 11 x64 环境启动；记录 Runtime 前提和圆角降级行为
 - [ ] 热键/托盘触发显示、前台与键盘焦点检查可用；测试普通应用、管理员窗口和打开菜单的场景，失败时无卡死、无输入注入
 - [ ] 100%/150%/200% 混合 DPI、负坐标显示器下定位正确；条件不足的环境标注未验证
@@ -526,4 +528,6 @@ Win32 前台限制、UIPI、浏览器 OLE、混合 DPI、UAC 和实际呈现不�
 - [Shell 剪贴板格式](https://learn.microsoft.com/en-us/windows/win32/shell/clipboard)：虚拟文件描述符及数据格式，文件名不等于保证存在的网页标题。
 - [RFC 3986 §6.2.2.1](https://www.rfc-editor.org/rfc/rfc3986.html#section-6.2.2.1)：URI 大小写规范化边界。
 
-待 M0/M2 决定并回填的事项：包版本与目标环境、外部拖放呼出路径、主题通知来源、激活失败场景、端到端测量方法、ReadyToRun 默认值、是否保留离屏预热、视图保留/虚拟化策略和 60MB 内存预算的可行性。所有决定记录依据，不能用未经测量的保证替代。
+M0 已固定的版本与实测环境见第 2 节及验证记录；托盘图像改用经运行验证的 GeneratedIconSource。当前提供“保持显示以添加”入口，热键在真实 OLE 拖放期间的行为仍待确认。ReadyToRun 在原型中关闭，最终默认值留待 M2 对照。
+
+仍待 M0/M2 决定并回填：外部拖放热键呼出路径、主题通知来源、各类前台的激活失败场景、端到端测量证据、ReadyToRun 最终默认值、是否保留离屏预热、视图保留/虚拟化策略和 60MB 内存预算的可行性。所有决定记录依据，不能用未经测量的保证替代。
