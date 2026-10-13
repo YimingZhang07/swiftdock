@@ -1,0 +1,54 @@
+using System.IO;
+using QuickLaunch.Models;
+using QuickLaunch.Services;
+using Xunit;
+
+namespace QuickLaunch.Tests;
+
+public sealed class IconTests
+{
+    [Theory]
+    [InlineData(48, 1, 48)] [InlineData(48, 1.5, 72)] [InlineData(48, 2, 96)]
+    public void CacheUsesPhysicalPixels(double dip, double scale, int expected) => Assert.Equal(expected, IconService.PixelSize(dip, scale));
+
+    [Fact]
+    public void SourceIdentitySurvivesRestartAndChangesWithPath()
+    {
+        var item = new LaunchItem("app", @"C:\one.exe", LaunchKind.App);
+        Assert.Equal(IconService.SourceKey(item), IconService.SourceKey(item with { Id = Guid.NewGuid().ToString("N") }));
+        Assert.NotEqual(IconService.SourceKey(item), IconService.SourceKey(item with { Path = @"C:\two.exe" }));
+    }
+
+    [Fact]
+    public async Task FrozenIconIsReusedFromMemoryThenDiskAndCorruptionRecovers()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "QuickLaunch-icons-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await using (var log = new DiagnosticLog(directory))
+            {
+                var item = new LaunchItem("Web", "https://example.com", LaunchKind.Url);
+                using (var icons = new IconService(directory, log))
+                {
+                    var image = await icons.GetAsync(item, 96);
+                    Assert.NotNull(image); Assert.True(image.IsFrozen); Assert.Equal(96, image.PixelWidth);
+                    Assert.Same(image, await icons.GetAsync(item, 96));
+                    Assert.Equal(1, icons.Extractions); Assert.Equal(1, icons.MemoryHits);
+                }
+                using (var icons = new IconService(directory, log))
+                {
+                    Assert.NotNull(await icons.GetAsync(item, 96));
+                    Assert.Equal(1, icons.DiskHits); Assert.Equal(0, icons.Extractions);
+                }
+                await File.WriteAllTextAsync(Assert.Single(Directory.GetFiles(directory, "*.png")), "broken PNG");
+                using (var icons = new IconService(directory, log))
+                {
+                    Assert.NotNull(await icons.GetAsync(item, 96));
+                    Assert.Equal(1, icons.Extractions);
+                }
+            }
+        }
+        finally { foreach (string file in Directory.GetFiles(directory)) File.Delete(file); Directory.Delete(directory); }
+    }
+}

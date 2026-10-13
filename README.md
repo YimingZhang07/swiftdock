@@ -1,67 +1,58 @@
 # QuickLaunch
 
-Windows 常驻启动器，C# / .NET 10 / WPF。当前已实现 **M1 基础功能**：热键与设置、托盘、单实例唤出、配置保存/恢复、窗口生命周期、分组与 Shell 启动。M0 的基本拖入和排序已接入持久化。
+Windows x64 常驻启动器，C# / .NET 10 / WPF。v0.1.0 已实现计划中的图标缓存、导入、拖拽、编辑、撤销、自启和主题跟随；性能目标与人工验收状态单独记录，不把“功能已实现”等同于“全部指标达标”。
 
-新增条目、排序、分组选择和热键设置现在会自动保存。真实图标缓存、完整导入/拖拽体验、条目编辑/删除撤销、自启和主题跟随仍按 M2–M5 实施。完整方案见仓库根目录的《QuickLaunch 启动器实现计划（C# + WPF）》；当前证据与待验证场景见 [M1 验证记录](docs/validation/M1.md)，[M0 记录](docs/validation/M0.md)保留为历史。
+## 使用
 
-## 开发与运行
+推荐使用 `artifacts/releases/` 中的 **standalone** 发布包，解压后运行 `QuickLaunch.exe`，无需另装 .NET。详细操作见 [使用说明](docs/QUICKSTART.zh-CN.md)。
 
-Windows 11 x64，在仓库根目录用 PowerShell 执行：
+- 默认 `Alt+Space` 呼出/隐藏，热键可在“设置”修改，冲突时保留旧组合。
+- 添加 exe、lnk、文件、文件夹或 http/https 网址；也可从桌面、Explorer、浏览器拖入。
+- 高 DPI Shell 图标，内存/磁盘缓存，右键可刷新；网址使用内置地球图标。
+- 条目排序、悬停标签跨组移动、拖到“+”新建组、标签排序、边缘滚动、预览/飞入动画；Esc 或窗外松开取消。
+- 编辑名称/路径/参数/工作目录，打开所在位置，单条提权启动；删除后 5 秒内 Ctrl+Z 撤销最近一次删除。
+- 分组新建、双击重命名、非空删除确认；方向键、Enter、Ctrl+Tab / Ctrl+Shift+Tab、Ctrl+1…9、F2、Delete。
+- 跟随系统深浅色和强调色；设置/托盘可管理当前配置的登录自启。
+- 单实例定向唤出、原子配置保存、备份恢复、损坏原件保留、未知版本只读。
 
-```powershell
-# 首次使用：从微软官方源安装仓库专用 SDK，验证 SHA-512。
-.\scripts\Setup.ps1
+## 配置
 
-# 锁定依赖还原、Release 构建、测试。
-.\scripts\Validate.ps1
+默认数据为 `%APPDATA%\QuickLaunch\config.json`；图标和日志在 `%LOCALAPPDATA%\QuickLaunch`。exe 同目录放置 `portable.flag` 可使用便携数据目录。`--config-dir <绝对目录>` 可选择独立配置。
 
-# 启动；保持这个终端，使用面板或托盘的“退出”关闭。
-.\scripts\Run.ps1
-```
+修改后 500ms 防抖保存，退出时保存最后修改。顶栏显示保存状态；保存失败不会覆盖原文件，退出时可重试、放弃未保存修改或返回。另一个登录会话占用写锁时只读启动。
 
-SDK 固定为 `10.0.401`，安装在被 Git 忽略的 `.tools/dotnet`。包缓存也放在 `.tools`，不会替换系统 .NET。直接使用 Visual Studio/系统 dotnet 时需安装满足 `global.json` 的 SDK。
+手工编辑 JSON 前先退出应用，暂不支持运行中热重载。单条删除撤销不涵盖整组删除。移动便携目录前应先关闭自启，移动后重新开启。
 
-- 默认 `Alt+Space` 显示/隐藏；通过面板或托盘的“设置”修改。新组合冲突时保留旧组合和配置，即使初始注册失败也可从托盘进入设置。
-- 方向键/Tab 移动焦点，Enter 启动；单击条目先隐藏再启动。
-- 拖动条目可以排序；悬停另一标签 400ms 切组，松开提交；Esc/窗口外松开取消。
-- 从 Explorer 或浏览器开始拖动后可尝试热键呼出；更便于验证的入口是勾选“保持显示以添加”，再切换到源应用拖入。
-- 右键条目可打开；应用类条目可单独请求管理员运行。启动器本身请以普通权限运行。
-- 本阶段支持 FileDrop、Unicode URL、Mozilla URL/标题和纯文本；ANSI URL 仅接受 ASCII。网页标题缺失时采用域名。导入的详细格式写入诊断日志。
-- `Run.ps1 -Silent` 启动到托盘。同一用户/登录会话/配置目录再次启动，会唤出已有窗口并退出第二个进程。
+## 开发
 
-## 配置与保存
-
-- 默认配置：`%APPDATA%\QuickLaunch\config.json`，备份为 `config.json.bak`。托盘可直接打开配置目录。
-- exe 同目录存在 `portable.flag` 时使用便携目录；目录不可写会提供默认目录或只读选择。
-- 可用 `Run.ps1 -ConfigDirectory 'D:\MyQuickLaunch'` 选择独立配置；直接运行 exe 时对应参数是 `--config-dir`。
-- 修改后 500ms 防抖，UI 快照交给单一后台写入器，原子替换正式文件；正常退出会保存最后一次修改。顶栏显示“等待保存 / 保存中 / 已保存 / 尚未保存”。退出时保存失败可重试、放弃未保存修改或返回程序。
-- 正式文件损坏时尝试备份；损坏原件先改名保留，恢复不覆盖唯一完好备份。更高版本配置只读，未知字段/缺失 ID 不静默丢弃。
-- 另一个登录会话占用同一配置写锁时，当前实例提供只读启动功能，不保存计数、设置或排序。
-- 若需手工改 JSON，**先退出启动器**，修改后重新启动；M1 尚未实现运行中配置热重载，应用内完整条目编辑留到 M5。
-- 默认日志在 `%LOCALAPPDATA%\QuickLaunch\logs`；仓库运行脚本将诊断日志放到 `artifacts/m1`。日志按会话限额，保留最近的非占用会话文件。
-
-## 验证与产物
+Windows 11 x64，仓库根目录 PowerShell：
 
 ```powershell
-# 使用新建的隔离配置，短暂显示窗口和设置，验证第二实例转发，然后自动退出。
-.\scripts\Validate.ps1 -DesktopSmoke
-
-# 发布；目标机器需要 .NET 10 Windows Desktop Runtime x64。
-.\scripts\dotnet.ps1 publish .\QuickLaunch\QuickLaunch.csproj -c Release -r win-x64 --self-contained false --no-restore --disable-build-servers '-m:1' '-p:PublishReadyToRun=false' -o artifacts/publish/m1
+.\scripts\Setup.ps1                    # 安装仓库专用 SDK，验证 SHA-512
+.\scripts\Validate.ps1 -DesktopSmoke   # 锁定依赖、Release、逻辑与程序内窗口检查
+.\scripts\Run.ps1                      # 正常运行
+.\scripts\Run.ps1 -Silent              # 托盘运行，后台加载图标并预热当前组
+.\scripts\Run.ps1 -ConfigDirectory 'D:\LauncherProfile'
 ```
 
-产物路径：
+SDK 10.0.401 和 NuGet 缓存位于忽略的 `.tools/`，不会替换系统安装。运行脚本启动 apphost exe，保留 manifest 中的 asInvoker/PerMonitorV2。自启若只依赖进程临时设置的开发运行时会被拒绝；使用独立包，或安装系统 .NET 10 Windows Desktop Runtime。
 
-- `artifacts/tests/m1.trx`：37 项测试的结果。
-- `artifacts/m1/smoke-result.json`：18 项 WPF/持久化/双进程检查报告。
-- `artifacts/m1/m1-window.png`：WPF 渲染快照，用于布局检查，不是物理屏幕呈现测量。
-- `artifacts/m1/quicklaunch-*.jsonl`：每次会话的有界诊断日志。
-- `artifacts/publish/m1/`：framework-dependent 发布目录。
+`Run.ps1 -Smoke` 只使用新建的隔离配置，禁止与 `-ConfigDirectory` 混用。自动化检查不修改日常配置或真正的登录启动项。
 
-`Run.ps1 -Smoke` 总是创建新的测试配置，不能与 `-ConfigDirectory` 混用；直接传 `--smoke-test` 也必须明确指定独立测试目录。不会用日常配置做自动化修改。
+## 发布与性能检查
 
-脚本设置仓库内 Runtime 路径并运行 apphost exe，以应用其 asInvoker/PerMonitorV2 manifest。若直接双击发布 exe，Windows 需要能找到系统安装的 .NET 10 Windows Desktop Runtime；仓库 SDK 不会自动注册到系统。使用仓库 Runtime 测试发布 exe 时，先把当前终端的 `DOTNET_ROOT` 和 `DOTNET_ROOT_X64` 设置为仓库 `.tools/dotnet` 的绝对路径。
+```powershell
+.\scripts\Publish.ps1                         # 独立版 + ZIP + SHA-256
+.\scripts\Publish.ps1 -FrameworkDependent     # 依赖系统 Desktop Runtime
+.\scripts\Publish.ps1 -ReadyToRun             # R2R 对照版本
+.\scripts\Benchmark.ps1 -Interactive          # 点击面板确认后进行 4×50 项测试
+.\scripts\Benchmark.ps1 -SingleGroup -Prewarm  # 200 项、预热对照
+.\scripts\Benchmark.ps1 -Prewarm -IdleSeconds 300
+.\scripts\MeasureStartup.ps1 -Executable '<发布目录>\QuickLaunch.exe'
+```
 
-`show.ui-proxy` 只表示一次显示请求后的渲染回调和焦点检查完成，不表示真实按键到屏幕的延迟。当前测试也不替代真实浏览器 OLE、UAC 或混合 DPI 的人工验收。
+基准会重复显示/隐藏窗口，使用专用生成数据，不启动条目。后台运行可能没有前台权限；这种情况下焦点确认失败单列，渲染耗时不能冒充完整呼出耗时。首次、预热后、闲置恢复及首次/已访问分组分开记录；不强制 GC 或修剪工作集。
 
-如果在受限执行环境遇到热键错误 5、托盘 `TryCreate failed` 或测试宿主连接超时，在正常本机终端重试；不要为此把启动器改成管理员程序。普通桌面的热键占用与权限失败应按日志错误码区分。
+日志和产物：`artifacts/tests/launcher.trx`、`artifacts/validation/smoke-result.json`、`artifacts/validation/window.png`、`artifacts/benchmarks/`、`artifacts/startup/`、`artifacts/releases/`。窗口 PNG 为 WPF 渲染快照，不是物理屏幕呈现证据。
+
+当前结果、预算未达项和未验证场景见 [M2–M5 实施与验证](docs/validation/M2-M5.md)。[M0](docs/validation/M0.md) 和 [M1](docs/validation/M1.md) 是历史记录。

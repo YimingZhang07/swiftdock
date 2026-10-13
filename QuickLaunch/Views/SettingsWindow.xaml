@@ -2,20 +2,21 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="QuickLaunch 设置" Width="480" SizeToContent="Height" ResizeMode="NoResize"
-        WindowStartupLocation="CenterOwner" Background="#171D27" Foreground="#EEF2F6"
+        WindowStartupLocation="CenterOwner" Background="{DynamicResource WindowBrush}" Foreground="{DynamicResource TextBrush}"
         ShowInTaskbar="False" FontFamily="Segoe UI, Microsoft YaHei UI">
     <StackPanel Margin="24">
         <TextBlock Text="全局热键" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,18" />
         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-            <CheckBox x:Name="Alt" Content="Alt" Foreground="White" Margin="0,0,14,0" />
-            <CheckBox x:Name="Control" Content="Ctrl" Foreground="White" Margin="0,0,14,0" />
-            <CheckBox x:Name="Shift" Content="Shift" Foreground="White" Margin="0,0,14,0" />
-            <CheckBox x:Name="Windows" Content="Win" Foreground="White" />
+            <CheckBox x:Name="Alt" Content="Alt" Foreground="{DynamicResource TextBrush}" Margin="0,0,14,0" />
+            <CheckBox x:Name="Control" Content="Ctrl" Foreground="{DynamicResource TextBrush}" Margin="0,0,14,0" />
+            <CheckBox x:Name="Shift" Content="Shift" Foreground="{DynamicResource TextBrush}" Margin="0,0,14,0" />
+            <CheckBox x:Name="Windows" Content="Win" Foreground="{DynamicResource TextBrush}" />
         </StackPanel>
         <ComboBox x:Name="MainKey" Width="150" HorizontalAlignment="Left" Margin="0,0,0,18" />
-        <CheckBox x:Name="HideOnDeactivate" Content="点击其他窗口时隐藏面板" Foreground="White" Margin="0,0,0,18" />
-        <TextBlock x:Name="Result" TextWrapping="Wrap" Foreground="#75DBC5" Margin="0,0,0,16" />
-        <TextBlock x:Name="DirectoryLabel" TextWrapping="Wrap" Foreground="#AAB9CA" FontSize="11" Margin="0,0,0,16" />
+        <CheckBox x:Name="HideOnDeactivate" Content="点击其他窗口时隐藏面板" Foreground="{DynamicResource TextBrush}" Margin="0,0,0,18" />
+        <CheckBox x:Name="StartupBox" Content="登录 Windows 时自动启动此配置" Foreground="{DynamicResource TextBrush}" Margin="0,0,0,18" Click="StartupClick" />
+        <TextBlock x:Name="Result" TextWrapping="Wrap" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,16" />
+        <TextBlock x:Name="DirectoryLabel" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" FontSize="11" Margin="0,0,0,16" />
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
             <Button x:Name="ApplyButton" Content="应用" Click="ApplyClick" />
             <Button Content="关闭" Click="CloseClick" IsCancel="True" />

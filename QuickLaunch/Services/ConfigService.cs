@@ -144,6 +144,7 @@ public sealed class ConfigService : IAsyncDisposable
                 {
                     var validated = ConfigValidation.Normalize(newest.Snapshot);
                     byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(validated, ConfigJsonContext.Default.AppConfig);
+                    if (bytes.Length > 4 * 1024 * 1024) throw new InvalidDataException("配置超过 4MB 上限，未覆盖已有配置。");
                     _writer.Write(FilePath, bytes);
                     Interlocked.Exchange(ref _savedRevision, newest.Revision);
                 }

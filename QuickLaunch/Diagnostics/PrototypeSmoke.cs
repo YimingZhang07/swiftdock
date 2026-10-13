@@ -31,6 +31,8 @@ internal static class PrototypeSmoke
         await Task.Delay(250);
         Check("visible-window-with-layout", window.IsVisible && window.ActualWidth > 0 && window.ActualHeight > 0);
         Check("two-groups", window.Groups.Count == 2);
+        await window.LoadIconsAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        Check("real-frozen-icons-loaded", window.Groups[0].Items.All(i => i.Visual.Image is { IsFrozen: true }));
         nint handle = new WindowInteropHelper(window).Handle;
         Check("native-hwnd", handle != 0 && NativeMethods.GetWindowRect(handle, out _));
         var before = window.Groups.Select(g => g.Items.Select(i => i.Id).ToArray()).ToArray();
@@ -47,12 +49,17 @@ internal static class PrototypeSmoke
         image.Render(window);
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(image));
-        using (var output = File.Create(Path.Combine(directory, "m1-window.png"))) encoder.Save(output);
+        using (var output = File.Create(Path.Combine(directory, "window.png"))) encoder.Save(output);
         window.HidePanel();
         Check("hide-retains-hwnd", !window.IsVisible && new WindowInteropHelper(window).Handle == handle);
         window.ShowPanel("smoke-reshow");
         await Task.Delay(150);
         Check("reshow-retains-hwnd", window.IsVisible && new WindowInteropHelper(window).Handle == handle);
+        window.HidePanel();
+        var warming = window.PrewarmAsync();
+        window.ShowPanel("smoke-interrupt-warmup");
+        await warming;
+        Check("user-show-invalidates-prewarm-hide", window.IsVisible && window.Opacity == 1);
         Check("configuration-writable", !store.IsReadOnly);
         var group = window.Groups[0];
         group.Items.Move(0, group.Items.Count - 1);
@@ -73,6 +80,42 @@ internal static class PrototypeSmoke
         await window.ViewModel.FlushAsync();
         persisted = ConfigValidation.Parse(await File.ReadAllBytesAsync(store.FilePath));
         Check("settings-persisted", !persisted.HideOnDeactivate);
+
+        var editor = new EditItemDialog(null);
+        var editorTimeout = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        editorTimeout.Tick += (_, _) => editor.Close();
+        editor.Loaded += (_, _) => editor.Dispatcher.BeginInvoke(() =>
+        {
+            editor.NameBox.Text = "测试网页"; editor.PathBox.Text = "https://example.com/download.exe";
+            Check("url-disables-app-only-fields", !editor.ArgumentsBox.IsEnabled && !editor.WorkingBox.IsEnabled && !editor.ElevateBox.IsEnabled);
+            editor.SaveButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        });
+        editorTimeout.Start();
+        bool editorAccepted;
+        try { editorAccepted = window.ShowEditor(editor); } finally { editorTimeout.Stop(); }
+        Check("edit-dialog-produces-valid-url", editorAccepted && editor.Result?.Kind == LaunchKind.Url && editor.Result.Name == "测试网页");
+
+        var oldBrushes = new[] { "WindowBrush", "PanelBrush", "HoverBrush", "TextBrush", "MutedBrush", "BorderBrush", "AccentBrush", "ErrorBrush" }
+            .ToDictionary(key => key, key => Application.Current.Resources[key]);
+        ThemeService.ApplyPalette(Application.Current.Resources, false, Colors.Teal);
+        await BenchmarkRunner.NextFrame();
+        Check("theme-resource-update-reaches-window", window.Background is SolidColorBrush brush && brush.Color == (Color)ColorConverter.ConvertFromString("#F7F7F8"));
+        foreach (var pair in oldBrushes) Application.Current.Resources[pair.Key] = pair.Value;
+
+        var temporary = window.ViewModel.AddGroup("校验分组"); window.SelectGroup(temporary);
+        var pending = window.ViewModel.BeginImport(temporary, 0, 2);
+        var web = new LaunchItem("验证网页", "https://example.com/Validation", LaunchKind.Url);
+        var imported = window.ViewModel.CompleteImport(temporary, pending, [web, web with { Id = Guid.NewGuid().ToString("N") }]);
+        Check("import-deduplicates-and-removes-placeholders", imported.Added == 1 && temporary.Items.All(i => !i.IsPending));
+        window.ViewModel.UpdateItem(temporary, web, web with { Name = "已重命名" });
+        Check("edit-keeps-identity", temporary.Items[0].Id == web.Id && temporary.Items[0].Name == "已重命名");
+        window.ViewModel.DeleteItem(temporary, temporary.Items[0]);
+        Check("delete-undo-restores-item", window.ViewModel.UndoDelete() && temporary.Items[0].Id == web.Id);
+        window.ViewModel.MoveGroup(window.Groups.ToList().IndexOf(temporary), 0);
+        Check("group-order-updates", window.Groups[0] == temporary);
+        window.ViewModel.RemoveGroup(temporary); window.SelectGroup(window.Groups[0]);
+        Check("deleted-group-view-cleared", !window.Groups.Contains(temporary));
+        await window.ViewModel.FlushAsync();
 
         bool? nativeHotkeyRollback = null;
         if (hotkey.Current is { } previous)
@@ -106,6 +149,7 @@ internal static class PrototypeSmoke
             passed, runtime = Environment.Version.ToString(), os = Environment.OSVersion.VersionString,
             hotkeyRegistration = new { hotkey.Registered, lastAttemptError = hotkey.Error }, nativeHotkeyRollback,
             foregroundObserved = NativeMethods.GetForegroundWindow() == handle, focusObserved = window.IsKeyboardFocusWithin,
+            nativeVisibilityObserved = NativeMethods.IsWindowVisible(handle),
             dpi = NativeMethods.GetDpiForWindow(handle), checks = results,
             savedRevision = store.SavedRevision, profileDirectory = store.DirectoryPath,
             notCovered = new[] { "Real hotkey input", "Mouse drag event sequences", "External browser OLE", "Mixed monitor DPI", "Cross-login-session UI", "UAC", "Shell launch", "Physical presentation latency", "OS shutdown" },

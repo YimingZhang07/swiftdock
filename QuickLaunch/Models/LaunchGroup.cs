@@ -1,10 +1,12 @@
 using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace QuickLaunch.Models;
 
-public sealed class LaunchGroup(string name, IEnumerable<LaunchItem> items, string? id = null)
+public sealed class LaunchGroup(string name, IEnumerable<LaunchItem> items, string? id = null) : ObservableObject
 {
     public string Id { get; } = id ?? Guid.NewGuid().ToString("N");
-    public string Name { get; } = name;
+    private string _name = name;
+    public string Name { get => _name; set => SetProperty(ref _name, value); }
     public ObservableCollection<LaunchItem> Items { get; } = new(items);
 }

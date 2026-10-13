@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.IO;
 using System.Text;
+using System.Diagnostics;
 using System.Windows;
 using QuickLaunch.Models;
 using QuickLaunch.Services;
@@ -13,10 +14,13 @@ public sealed record DropResolution(IReadOnlyList<LaunchItem> Items, IReadOnlyLi
 public static class DropParser
 {
     public const int MaxPayloadBytes = 1024 * 1024;
-    private static readonly string[] UrlFormats = ["UniformResourceLocatorW", "UniformResourceLocator", "text/x-moz-url"];
+    private static readonly string[] UrlFormats = ["UniformResourceLocatorW", "text/x-moz-url", "UniformResourceLocator"];
 
-    public static bool Supports(IDataObject data) => data.GetDataPresent(DataFormats.FileDrop, false)
-        || data.GetDataPresent(DataFormats.UnicodeText, false) || UrlFormats.Any(f => data.GetDataPresent(f, false));
+    public static bool Supports(IDataObject data)
+    {
+        try { return data.GetDataPresent(DataFormats.FileDrop, false) || data.GetDataPresent(DataFormats.UnicodeText, false) || UrlFormats.Any(f => data.GetDataPresent(f, false)); }
+        catch (Exception ex) when (ex is System.Runtime.InteropServices.ExternalException or InvalidOperationException) { return false; }
+    }
 
     // Called on the OLE/UI thread; only copies source-owned data, never touches destination files.
     public static DropSnapshot Capture(IDataObject data)
@@ -30,12 +34,20 @@ public static class DropParser
         }
         string? title = null;
         if (data.GetDataPresent("FileGroupDescriptorW", false))
-            title = DescriptorTitle(ReadBytes(data.GetData("FileGroupDescriptorW", false)));
+        {
+            try { title = DescriptorTitle(ReadBytes(data.GetData("FileGroupDescriptorW", false))); }
+            catch (Exception ex) when (ex is IOException or InvalidDataException or System.Runtime.InteropServices.ExternalException) { }
+        }
         foreach (string format in UrlFormats)
         {
             if (!data.GetDataPresent(format, false)) continue;
-            var value = data.GetData(format, false);
-            var text = value is string str ? str : DecodeUrl(ReadBytes(value), format != "UniformResourceLocator");
+            string text;
+            try
+            {
+                var value = data.GetData(format, false);
+                text = value is string str ? str : DecodeUrl(ReadBytes(value), format != "UniformResourceLocator");
+            }
+            catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or System.Runtime.InteropServices.ExternalException) { continue; }
             if (text.Length > MaxPayloadBytes / 2) throw new InvalidDataException("拖入文本过长。");
             if (format == "text/x-moz-url")
             {
@@ -43,7 +55,8 @@ public static class DropParser
                 text = lines[0].Trim();
                 if (lines.Length > 1 && !string.IsNullOrWhiteSpace(lines[1])) title = lines[1].Trim();
             }
-            return new(formats, [], text.TrimEnd('\0').Trim(), title);
+            text = text.Split('\0')[0].TrimStart('\uFEFF').Trim();
+            if (LaunchService.IsWebUrl(text)) return new(formats, [], text, title);
         }
         string? plain = data.GetData(DataFormats.UnicodeText, false) as string;
         if (plain?.Length > MaxPayloadBytes / 2) throw new InvalidDataException("拖入文本过长。");
@@ -81,7 +94,7 @@ public static class DropParser
             throw new InvalidDataException("网址字节流长度无效。");
         // ANSI URL payloads are accepted only when ASCII; Unicode/text fallback is preferred.
         if (!unicode && bytes.Any(b => b > 127)) throw new InvalidDataException("请用 Unicode 网址或纯文本拖入。");
-        return (unicode ? new UnicodeEncoding(false, false, true).GetString(bytes) : Encoding.ASCII.GetString(bytes)).TrimEnd('\0');
+        return (unicode ? new UnicodeEncoding(false, false, true).GetString(bytes) : Encoding.ASCII.GetString(bytes)).Split('\0')[0].TrimStart('\uFEFF');
     }
 
     public static string? DescriptorTitle(byte[] bytes)
@@ -114,7 +127,7 @@ public static class DropParser
             {
                 string path = Environment.ExpandEnvironmentVariables(original);
                 if (Directory.Exists(path))
-                    items.Add(new(Path.GetFileName(Path.TrimEndingDirectorySeparator(path)), path, LaunchKind.Folder));
+                    items.Add(new(Path.GetFileName(Path.TrimEndingDirectorySeparator(path)) is { Length: > 0 } name ? name : path, ItemIdentity.PortablePath(path), LaunchKind.Folder));
                 else if (!File.Exists(path)) errors.Add($"目标不存在或无法访问：{path}");
                 else if (Path.GetExtension(path).Equals(".url", StringComparison.OrdinalIgnoreCase))
                 {
@@ -129,12 +142,19 @@ public static class DropParser
                 else
                 {
                     bool app = new[] { ".exe", ".lnk", ".bat", ".cmd" }.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
-                    items.Add(new(Path.GetFileNameWithoutExtension(path), path, app ? LaunchKind.App : LaunchKind.File));
+                    string name = Path.GetFileNameWithoutExtension(path);
+                    if (Path.GetExtension(path).Equals(".exe", StringComparison.OrdinalIgnoreCase))
+                    {
+                        try { if (FileVersionInfo.GetVersionInfo(path).FileDescription is { Length: > 0 } description) name = description; }
+                        catch (Exception ex) when (ex is IOException or System.ComponentModel.Win32Exception or UnauthorizedAccessException) { }
+                    }
+                    items.Add(new(name, ItemIdentity.PortablePath(path), app ? LaunchKind.App : LaunchKind.File));
                 }
             }
             catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException)
             { errors.Add(ex.Message); }
         }
+        token.ThrowIfCancellationRequested();
         return new DropResolution(items, errors);
     }, token);
 }

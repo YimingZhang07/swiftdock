@@ -7,131 +7,137 @@ using QuickLaunch.Views;
 
 namespace QuickLaunch.DragDrop;
 
-// One capture owner outside group views. Preview changes selection, never item collections.
 public sealed class DragCoordinator
 {
     private readonly LauncherWindow _view;
-    private readonly DispatcherTimer _hover;
-    private LaunchGroup? _source, _hoverTarget;
+    private readonly DispatcherTimer _hover, _scroll;
+    private LaunchGroup? _source, _hoverTarget, _tab, _startGroup;
     private LaunchItem? _item;
     private Point _start;
     private bool _ending;
-    public bool Active => _item is not null;
+    private string? _previewKey;
+    private TaskCompletionSource? _done;
+    public bool Active => _item is not null || _tab is not null;
     public bool Dragging { get; private set; }
+    public Task WhenIdle => Active && _done is not null ? _done.Task : Task.CompletedTask;
 
     public DragCoordinator(LauncherWindow view)
     {
         _view = view;
         _hover = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
-        _hover.Tick += (_, _) => { _hover.Stop(); if (_hoverTarget is not null) _view.SelectGroup(_hoverTarget, preview: true); };
+        _hover.Tick += (_, _) => { _hover.Stop(); if (_hoverTarget is not null) { _view.SelectGroup(_hoverTarget, preview: true); _previewKey = null; } };
+        _scroll = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(30) };
+        _scroll.Tick += (_, _) => { if (Dragging) { var point = Mouse.GetPosition(_view.CaptureRoot); _view.AutoScroll(point); Preview(point); } };
         view.CaptureRoot.PreviewMouseLeftButtonDown += Down;
         view.CaptureRoot.PreviewMouseMove += Move;
         view.CaptureRoot.PreviewMouseLeftButtonUp += Up;
         view.CaptureRoot.LostMouseCapture += (_, _) => { if (!_ending && Active) Cancel(); };
     }
-
     private void Down(object sender, MouseButtonEventArgs e)
     {
-        if (!_view.CanEdit || _view.Importing || Active || e.OriginalSource is not DependencyObject target) return;
+        if (!_view.CanEdit || Active || e.OriginalSource is not DependencyObject target) return;
         var button = LauncherWindow.Ancestor<Button>(target);
-        if (button?.DataContext is not LaunchItem item) return;
-        _item = item;
-        _source = _view.SelectedGroup;
-        _start = e.GetPosition(_view.CaptureRoot);
-        button.Focus();
+        if (button?.DataContext is LaunchItem item && !item.IsPending) { _item = item; _source = _view.SelectedGroup; }
+        else if (button?.Tag is LaunchGroup group)
+        {
+            if (e.ClickCount == 2) { e.Handled = true; _view.RenameGroup(group); return; }
+            _tab = group;
+        }
+        else return;
+        _startGroup = _view.SelectedGroup; _start = e.GetPosition(_view.CaptureRoot);
+        _done = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        button?.Focus();
         if (!_view.CaptureRoot.CaptureMouse()) Clear();
         e.Handled = true;
     }
-
     private void Move(object sender, MouseEventArgs e)
     {
         if (!Active) return;
-        Point point = e.GetPosition(_view.CaptureRoot);
-        if (!Dragging && (Math.Abs(point.X - _start.X) > SystemParameters.MinimumHorizontalDragDistance
-            || Math.Abs(point.Y - _start.Y) > SystemParameters.MinimumVerticalDragDistance))
+        var point = e.GetPosition(_view.CaptureRoot);
+        if (!Dragging && (Math.Abs(point.X - _start.X) > SystemParameters.MinimumHorizontalDragDistance || Math.Abs(point.Y - _start.Y) > SystemParameters.MinimumVerticalDragDistance))
+        { Dragging = true; _scroll.Start(); _view.SetStatus("拖动中 · Esc 取消 · 松开提交"); }
+        if (Dragging) Preview(point);
+        e.Handled = true;
+    }
+    private void Preview(Point point)
+    {
+        _view.ShowGhost(_item?.Name ?? _tab!.Name, point, _item?.Visual.Image);
+        if (_tab is not null)
         {
-            Dragging = true;
-            _view.SetStatus($"正在移动 {_item!.Name} · Esc 取消");
+            int? groupSlot = _view.GroupSlotAt(point);
+            string key = "tabs:" + groupSlot;
+            if (_previewKey != key) { _previewKey = key; _view.PreviewGroupInsertion(_tab, groupSlot); }
+            return;
         }
-        if (!Dragging) return;
-        _view.ShowGhost(_item!.Name, point);
-        var tab = _view.GroupAt(point);
-        if (tab != _hoverTarget)
+        var target = _view.GroupAt(point);
+        _view.HighlightDropTab(target);
+        if (target != _hoverTarget)
         {
-            _hover.Stop();
-            _hoverTarget = tab;
-            if (tab is not null && tab != _view.SelectedGroup) _hover.Start();
+            _hover.Stop(); _hoverTarget = target;
+            if (target is not null && target != _view.SelectedGroup) _hover.Start();
         }
         int? slot = _view.SlotAt(point);
-        _view.ShowInsertion(slot);
-        e.Handled = true;
+        string preview = _view.SelectedGroup.Id + ":" + slot;
+        if (_previewKey != preview) { _previewKey = preview; _view.PreviewInsertion(_source!, _item!, slot); }
+        else _view.ShowInsertion(slot);
     }
-
     private void Up(object sender, MouseButtonEventArgs e)
     {
-        if (_item is null || _source is null) return;
-        var item = _item;
-        var source = _source;
-        Point point = e.GetPosition(_view.CaptureRoot);
+        if (!Active) return;
+        var point = e.GetPosition(_view.CaptureRoot);
+        e.Handled = true;
+        if (_tab is { } tab)
+        {
+            if (!Dragging) { bool clicked = _view.GroupAt(point) == tab; Clear(); if (clicked) _view.SelectGroup(tab); return; }
+            int? slot = _view.GroupSlotAt(point);
+            int old = _view.Groups.ToList().IndexOf(tab);
+            if (slot is null || old < 0) { Cancel(); return; }
+            try { _view.ViewModel.MoveGroup(old, ReorderMath.FinalIndex(old, slot.Value, _view.Groups.Count)); }
+            finally { Clear(); }
+            return;
+        }
+        var item = _item!; var source = _source!;
         if (!Dragging)
         {
-            bool clickedOriginal = _view.ItemAt(point)?.Id == item.Id;
-            Clear();
-            if (clickedOriginal) _ = _view.LaunchAsync(item);
+            bool launch = _view.ItemAt(point)?.Id == item.Id; Clear();
+            if (launch) _ = _view.LaunchAsync(item);
+            return;
         }
-        else
+        try
         {
-            var targetTab = _view.GroupAt(point);
-            var target = targetTab ?? _view.SelectedGroup;
-            int? slot = targetTab is not null ? target.Items.Count : _view.SlotAt(point);
-            int oldIndex = source.Items.IndexOf(item);
-            if (slot is null || oldIndex < 0) Cancel();
+            LaunchGroup? target;
+            if (_view.IsAddGroupAt(point)) target = _view.MoveToNewGroup(source, item);
             else
             {
-                try
-                {
-                    if (target == source)
-                    {
-                        int index = ReorderMath.FinalIndex(oldIndex, slot.Value, source.Items.Count);
-                        if (index != oldIndex) source.Items.Move(oldIndex, index);
-                    }
-                    else
-                    {
-                        source.Items.RemoveAt(oldIndex);
-                        try { target.Items.Insert(slot.Value, item); }
-                        catch { source.Items.Insert(oldIndex, item); throw; }
-                    }
-                    _view.Log.Write("drag.commit", new { item.Id, source = source.Name, target = target.Name, slot });
-                    _view.ViewModel.CommitGroup(_view.SelectedGroup.Id);
-                    _view.SetStatus($"已移动 {item.Name}，将自动保存");
-                }
-                finally { Clear(); }
+                var tabTarget = _view.GroupAt(point); target = tabTarget ?? _view.SelectedGroup;
+                int? slot = tabTarget is not null ? target.Items.Count : _view.SlotAt(point);
+                if (slot is null) { Cancel(); return; }
+                if (!_view.ViewModel.MoveItem(source, target, item, slot.Value))
+                { Cancel(); _view.SetStatus("未移动：目标已有相同条目或源条目已变化。"); return; }
             }
+            if (target is null) { Cancel(); return; }
+            _view.ViewModel.CommitGroup(_view.SelectedGroup.Id);
+            _view.Log.Write("drag.commit", new { item.Id, source = source.Name, target = target.Name });
+            _view.SetStatus($"已移动 {item.Name}，将自动保存。");
+            Clear(keepGhost: true); _view.FlyGhostTo(item, target);
         }
-        e.Handled = true;
+        catch (Exception ex) { Cancel(); _view.SetStatus($"移动失败：{ex.Message}"); }
     }
-
     public void Cancel()
     {
         if (!Active) return;
-        var source = _source;
-        Clear();
-        if (source is not null) _view.SelectGroup(source, preview: true);
-        _view.Log.Write("drag.cancel");
-        _view.SetStatus("已取消移动，数据未改变");
+        var original = _startGroup; Clear();
+        if (original is not null && _view.Groups.Contains(original)) _view.SelectGroup(original, preview: true);
+        _view.Log.Write("drag.cancel"); _view.SetStatus("已取消移动，原顺序不变。");
     }
-
-    private void Clear()
+    private void Clear(bool keepGhost = false)
     {
         _ending = true;
-        _hover.Stop();
-        _hoverTarget = null;
-        _item = null;
-        _source = null;
-        Dragging = false;
+        _hover.Stop(); _scroll.Stop(); _hoverTarget = null; _previewKey = null;
+        _item = null; _source = _tab = _startGroup = null; Dragging = false;
+        _view.ClearPreview(); _view.HighlightDropTab(null); _view.ShowInsertion(null);
         if (Mouse.Captured == _view.CaptureRoot) _view.CaptureRoot.ReleaseMouseCapture();
-        _view.HideGhost();
-        _view.ShowInsertion(null);
-        _ending = false;
+        if (!keepGhost) _view.HideGhost();
+        _ending = false; _done?.TrySetResult(); _view.AfterDrag();
     }
 }

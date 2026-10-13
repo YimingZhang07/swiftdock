@@ -1,0 +1,20 @@
+<Window x:Class="QuickLaunch.Views.EditItemDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Width="540" SizeToContent="Height" ResizeMode="NoResize" ShowInTaskbar="False" WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource WindowBrush}" Foreground="{DynamicResource TextBrush}">
+    <StackPanel Margin="22">
+        <TextBlock Text="名称" /><TextBox x:Name="NameBox" Margin="0,6,0,12" MaxLength="160" />
+        <TextBlock Text="程序、文件、文件夹或 http/https 网址" />
+        <TextBox x:Name="PathBox" Margin="0,6,0,4" TextChanged="PathChanged" />
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+            <Button Content="选择文件…" Click="ChooseFile" /><Button Content="选择文件夹…" Click="ChooseFolder" />
+        </StackPanel>
+        <TextBlock Text="启动参数（快捷方式使用其自身参数）" />
+        <TextBox x:Name="ArgumentsBox" Margin="0,6,0,12" />
+        <TextBlock Text="工作目录（可留空）" /><TextBox x:Name="WorkingBox" Margin="0,6,0,12" />
+        <CheckBox x:Name="ElevateBox" Content="以管理员身份启动此应用" Foreground="{DynamicResource TextBrush}" Margin="0,0,0,12" />
+        <TextBlock x:Name="Error" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap" Margin="0,0,0,12" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="SaveButton" Content="保存" IsDefault="True" Click="SaveClick" /><Button Content="取消" IsCancel="True" />
+        </StackPanel>
+    </StackPanel>
+</Window>

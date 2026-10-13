@@ -4,6 +4,9 @@ namespace QuickLaunch.Services;
 
 public sealed record DataPaths(string ConfigDirectory, string LogDirectory, bool Portable)
 {
+    public string IconDirectory => Portable ? Path.Combine(ConfigDirectory, "icons") : Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "QuickLaunch", "icons",
+        Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(ConfigDirectory.ToUpperInvariant())))[..24]);
     public static string DefaultConfigDirectory => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "QuickLaunch");
     public static DataPaths Resolve(string? explicitConfig, string? explicitLogs)
     {

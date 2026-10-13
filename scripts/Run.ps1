@@ -8,7 +8,7 @@ $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 $env:DOTNET_NOLOGO = '1'
 $exe = Join-Path $repoRoot 'QuickLaunch/bin/Release/net10.0-windows10.0.19041.0/win-x64/QuickLaunch.exe'
 if (-not (Test-Path -LiteralPath $exe)) { throw 'Build Release with scripts/dotnet.ps1 first.' }
-$diagnostics = Join-Path $repoRoot 'artifacts/m1'
+$diagnostics = Join-Path $repoRoot 'artifacts/validation'
 $appArguments = '--diagnostics-dir "' + $diagnostics + '"'
 if ($Smoke) {
     if ($ConfigDirectory) { throw 'Smoke tests always use a fresh isolated profile; omit ConfigDirectory.' }

@@ -4,6 +4,28 @@ namespace QuickLaunch.Interop;
 
 internal static partial class NativeMethods
 {
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct MemoryCounters
+    {
+        public uint Size, PageFaultCount;
+        public nuint PeakWorkingSet, WorkingSet, PeakPagedPool, PagedPool, PeakNonPagedPool, NonPagedPool;
+        public nuint PagefileUsage, PeakPagefileUsage, PrivateUsage, PrivateWorkingSet;
+        public ulong SharedCommitUsage;
+    }
+    // EX2 is supported by current Windows 11; failure is reported as unavailable, never zero.
+    [LibraryImport("psapi.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GetProcessMemoryInfo(nint process, ref MemoryCounters counters, uint size);
+    // Image factory returns an owned IUnknown pointer; caller releases it and every returned HBITMAP.
+    [LibraryImport("shell32.dll", StringMarshalling = StringMarshalling.Utf16)]
+    internal static partial int SHCreateItemFromParsingName(string path, nint bindContext, in Guid iid, out nint result);
+    [LibraryImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool DeleteObject(nint handle);
+    [LibraryImport("ole32.dll")]
+    internal static partial int OleInitialize(nint reserved);
+    [LibraryImport("ole32.dll")]
+    internal static partial void OleUninitialize();
     internal const int WmHotkey = 0x0312;
     internal const int WmDpiChanged = 0x02E0;
     internal const uint ModAlt = 0x0001, ModNoRepeat = 0x4000;
@@ -33,6 +55,11 @@ internal static partial class NativeMethods
     internal static partial bool SetForegroundWindow(nint hwnd);
     [LibraryImport("user32.dll")]
     internal static partial nint GetForegroundWindow();
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool IsWindowVisible(nint hwnd);
+    [LibraryImport("user32.dll")]
+    internal static partial int GetSystemMetrics(int index);
     // A user-invoked secondary process may grant foreground permission to the primary.
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

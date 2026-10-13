@@ -24,6 +24,9 @@ public partial class App : Application
     private SingleInstanceService? _instance;
     private ConfigService? _store;
     private MainViewModel? _viewModel;
+    private IconService? _icons;
+    private ThemeService? _theme;
+    private StartupService? _startup;
     private volatile bool _exiting;
     private bool _pendingShow, _smoke;
     public int InstanceShowRequests { get; private set; }
@@ -31,7 +34,9 @@ public partial class App : Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        _smoke = e.Args.Contains("--smoke-test");
+        bool benchmark = e.Args.Contains("--benchmark");
+        bool startupProbe = e.Args.Contains("--startup-probe");
+        _smoke = e.Args.Contains("--smoke-test") || benchmark || startupProbe;
         try
         {
             string? explicitConfig = Argument(e.Args, "--config-dir");
@@ -76,34 +81,59 @@ public partial class App : Application
                 _log = new(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "QuickLaunch", "logs"));
                 _log.Write("log.fallback", new { ex.Message });
             }
+            if (benchmark)
+            {
+                string file = Path.Combine(paths.ConfigDirectory, "config.json");
+                if (File.Exists(file)) throw new InvalidOperationException("性能检查必须使用新的空配置目录。");
+                new AtomicConfigWriter().Write(file, System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+                    BenchmarkRunner.CreateConfig(paths.ConfigDirectory, e.Args.Contains("--single-group")), ConfigJsonContext.Default.AppConfig));
+            }
             _store = ConfigService.Open(paths.ConfigDirectory, readOnly);
             _viewModel = new(_store);
-            _window = new(_log, _viewModel) { ExitRequested = () => _ = ExitAsync(), SettingsRequested = OpenSettings };
+            _theme = new(Dispatcher);
+            _startup = new(Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "QuickLaunch.exe"), paths.ConfigDirectory);
+            _icons = new(_smoke ? Path.Combine(paths.LogDirectory, "icons") : paths.IconDirectory, _log);
+            _window = new(_log, _viewModel, _icons) { ExitRequested = () => _ = ExitAsync(), SettingsRequested = OpenSettings };
             MainWindow = _window;
             _window.InitializeNative();
             _hotkey = new(new WindowInteropHelper(_window).Handle, () =>
             {
+                if (_exiting) return;
                 if (_settings?.IsVisible == true) _settings.Activate();
                 else _window.Toggle();
             }, _viewModel.Hotkey);
             _log.Write("hotkey.registered", new { _hotkey.Registered, _hotkey.Error, hotkey = _viewModel.HotkeyDisplay });
             CreateTray();
+            _ = _window.LoadIconsAsync();
             using var identity = WindowsIdentity.GetCurrent();
+            using var process = System.Diagnostics.Process.GetCurrentProcess();
             bool elevated = new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
             _log.Write("startup", new { runtime = Environment.Version.ToString(), os = Environment.OSVersion.VersionString,
-                elevated, milestone = "M1", configDirectory = paths.ConfigDirectory, _store.IsReadOnly, _store.Notice });
+                elevated, milestone = "v0.1.0", processToReadyMs = (DateTime.UtcNow - process.StartTime.ToUniversalTime()).TotalMilliseconds,
+                configDirectory = paths.ConfigDirectory, _store.IsReadOnly, _store.Notice });
             var notices = new List<string>();
             if (_store.Notice is not null) notices.Add(_store.Notice);
             if (elevated) notices.Add("当前以管理员权限运行；请用普通权限重启以接收外部拖入。");
             if (!_hotkey.Registered) notices.Add($"{_viewModel.HotkeyDisplay} 注册失败（{_hotkey.Error}），请从设置修改热键；托盘仍可呼出。");
             if (notices.Count > 0) _window.SetStatus(string.Join("\n", notices));
             SessionEnding += OnSessionEnding;
-            if (_smoke)
+            if (startupProbe)
+            {
+                await ExitAsync();
+            }
+            else if (benchmark)
+            {
+                int idle = int.TryParse(Argument(e.Args, "--idle-seconds"), out int seconds) ? Math.Clamp(seconds, 0, 300) : 0;
+                await BenchmarkRunner.RunAsync(_window, paths.LogDirectory, idle, e.Args.Contains("--benchmark-interactive"), e.Args.Contains("--prewarm"));
+                await ExitAsync();
+            }
+            else if (_smoke)
             {
                 bool passed = await PrototypeSmoke.RunAsync(_window, _hotkey, _store, this, paths.LogDirectory);
                 await ExitAsync(passed ? 0 : 1);
             }
             else if (!e.Args.Contains("--silent") || _pendingShow) ShowMain(_pendingShow ? "pending-instance" : "startup");
+            else _ = Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ContextIdle, () => _ = _window.PrewarmAsync());
             _pendingShow = false;
         }
         catch (Exception ex)
@@ -124,6 +154,7 @@ public partial class App : Application
 
     private void ShowMain(string source)
     {
+        if (_exiting) return;
         if (_settings?.IsVisible == true) _settings.Activate();
         else _window?.ShowPanel(source);
     }
@@ -131,6 +162,7 @@ public partial class App : Application
     public void OpenSettings()
     {
         if (_exiting || _window is null || _viewModel is null || _store is null || _hotkey is null) return;
+        if (_window.HasOpenEditor) { _window.ShowPanel("existing-editor"); return; }
         if (_settings is not null) { _settings.Activate(); return; }
         if (!_window.IsVisible) _window.ShowPanel("settings");
         _window.SetSettingsOpen(true);
@@ -144,7 +176,7 @@ public partial class App : Application
                 UpdateTrayText();
                 _log?.Write("hotkey.changed", new { hotkey = candidate.Display });
                 return "已应用，配置将自动保存。";
-            }) { Owner = _window };
+            }, _startup!) { Owner = _window };
         _settings.Closed += (_, _) => { _settings = null; _window.SetSettingsOpen(false); };
         _settings.Show();
     }
@@ -166,6 +198,17 @@ public partial class App : Application
         menu.Items.Add(new MenuItem { Header = "保持显示以添加", Command = new RelayCommand(() => { _window!.Pinned = true; ShowMain("tray-add"); }) });
         menu.Items.Add(new MenuItem { Header = "打开配置目录", Command = new RelayCommand(() =>
             _ = LaunchService.StartAsync(new("配置目录", _store!.DirectoryPath, LaunchKind.Folder))) });
+        var startupItem = new MenuItem { Header = "登录时自动启动", IsCheckable = true, IsEnabled = _viewModel!.CanEdit };
+        menu.Opened += (_, _) =>
+        {
+            try { startupItem.IsChecked = _startup!.IsEnabled; } catch (Exception ex) { _window!.SetStatus(ex.Message); }
+        };
+        startupItem.Click += (_, _) =>
+        {
+            try { _startup!.SetEnabled(startupItem.IsChecked); }
+            catch (Exception ex) { startupItem.IsChecked = false; _window!.SetStatus($"自启设置失败：{ex.Message}"); ShowMain("startup-error"); }
+        };
+        menu.Items.Add(startupItem);
         menu.Items.Add(new Separator());
         menu.Items.Add(new MenuItem { Header = "退出", Command = new RelayCommand(() => _ = ExitAsync()) });
         _tray = new TaskbarIcon { IconSource = icon, ContextMenu = menu,
@@ -203,6 +246,8 @@ public partial class App : Application
         }
         _hotkey?.Dispose();
         _tray?.Dispose();
+        _icons?.Dispose();
+        _theme?.Dispose();
         if (_store is not null) await _store.DisposeAsync();
         if (_instance is not null) await _instance.DisposeAsync();
         if (_log is not null)

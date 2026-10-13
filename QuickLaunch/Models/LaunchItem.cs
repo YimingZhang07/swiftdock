@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using QuickLaunch.ViewModels;
 
 namespace QuickLaunch.Models;
 
@@ -11,8 +12,10 @@ public sealed record LaunchItem([property: JsonRequired] string Name, [property:
     [JsonRequired] public string Id { get; init; } = Guid.NewGuid().ToString("N");
     public long LaunchCount { get; init; }
     [JsonIgnore] public string? ErrorMessage { get; init; }
+    [JsonIgnore] public IconVisual Visual { get; init; } = new();
+    [JsonIgnore] public bool IsPending { get; init; }
     [JsonIgnore] public string ToolTip => ErrorMessage is null ? Path : $"{Path}\n{ErrorMessage}";
-    [JsonIgnore] public string Glyph => ErrorMessage is not null ? "!" : Kind switch
+    [JsonIgnore] public string Glyph => IsPending ? "…" : ErrorMessage is not null ? "!" : Kind switch
     {
         LaunchKind.Folder => "▤", LaunchKind.Url => "↗", LaunchKind.File => "▧", _ => "▣"
     };

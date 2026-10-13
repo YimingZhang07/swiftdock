@@ -43,6 +43,7 @@ public class PrototypeTests
         Assert.Throws<InvalidDataException>(() => DropParser.DecodeUrl([200], false));
         Assert.Throws<InvalidDataException>(() => DropParser.DecodeUrl(new byte[DropParser.MaxPayloadBytes + 2], true));
         Assert.Null(DropParser.DescriptorTitle([1, 0, 0, 0]));
+        Assert.Equal("https://example.com/A", DropParser.DecodeUrl(Encoding.Unicode.GetBytes("\uFEFFhttps://example.com/A\0padding"), true));
     }
 
     [Fact]
