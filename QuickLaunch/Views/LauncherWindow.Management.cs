@@ -27,6 +27,7 @@ public partial class LauncherWindow
         {
             var tab = new Button { DataContext = group, Tag = group, MinWidth = 70, MaxWidth = 190, BorderThickness = new Thickness(0, 0, 0, 2), ToolTip = group.Name };
             tab.SetBinding(ContentControl.ContentProperty, new Binding(nameof(LaunchGroup.Name)));
+            tab.SetBinding(ToolTipProperty, new Binding(nameof(LaunchGroup.Name)));
             tab.Click += (_, _) => { if (!DragSession.Active) { SelectGroup(group); FocusFirst(); } };
             var menu = new ContextMenu();
             var rename = new MenuItem { Header = "重命名分组", IsEnabled = CanEdit };

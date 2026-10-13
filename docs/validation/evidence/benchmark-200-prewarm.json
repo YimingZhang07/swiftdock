@@ -1,0 +1,67 @@
+{
+  "dataset": [
+    200
+  ],
+  "firstShowProxyMs": null,
+  "firstRenderOnlyMs": 44.9587,
+  "prewarm": true,
+  "prewarmCompleted": true,
+  "firstGroupRenderProxyMs": [
+    1.9907
+  ],
+  "warmRenderOnlyMs": {
+    "samples": 100,
+    "p50": 3.5583,
+    "p95": 4.7314,
+    "max": 6.3426
+  },
+  "interactive": false,
+  "warmShowProxyMs": {
+    "samples": 0,
+    "p50": null,
+    "p95": null,
+    "max": null
+  },
+  "hideCallMs": {
+    "samples": 100,
+    "p50": 2.2636,
+    "p95": 3.0853,
+    "max": 6.3285
+  },
+  "groupRenderProxyMs": {
+    "samples": 100,
+    "p50": 0.0882,
+    "p95": 0.1545,
+    "max": 0.2029
+  },
+  "failures": 100,
+  "idleSeconds": 0,
+  "idleShowProxyMs": null,
+  "beforeIdle": {
+    "privateWorkingSetBytes": 84070400,
+    "privateBytes": 151097344,
+    "workingSetBytes": 216182784,
+    "managedHeapBytes": 25828296
+  },
+  "afterIdle": {
+    "privateWorkingSetBytes": 84111360,
+    "privateBytes": 151113728,
+    "workingSetBytes": 216358912,
+    "managedHeapBytes": 25844744
+  },
+  "icons": {
+    "MemoryHits": 160,
+    "DiskHits": 0,
+    "Extractions": 5,
+    "CachedCount": 5
+  },
+  "runtime": "10.0.12",
+  "os": "Microsoft Windows NT 10.0.26200.0",
+  "logicalCpu": 28,
+  "dpi": 192,
+  "animations": true,
+  "nativeR2R": false,
+  "physicalPresentationMeasured": false,
+  "realHotkeyMeasured": false,
+  "note": "100 warm samples; first/idle are single observations; single-group switch data is a control, not a cross-group claim. No explicit GC or working-set trimming."
+}

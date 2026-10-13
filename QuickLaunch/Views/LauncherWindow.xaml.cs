@@ -22,6 +22,7 @@ public partial class LauncherWindow : Window
     private readonly DispatcherTimer _dropWait = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private readonly DispatcherTimer _externalWatch = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private Point _externalPoint;
+    private bool _externalAccepts;
     private bool _externalDrag, _menuOpen, _closing, _awaitingDrop;
     private int _ownedWindows;
     private CancellationTokenSource? _importStop;
@@ -89,7 +90,7 @@ public partial class LauncherWindow : Window
                 _externalWatch.Stop(); _externalDrag = false;
                 ShowInsertion(null); HighlightDropTab(null); MaybeHide();
             }
-            else { AutoScroll(_externalPoint); ShowInsertion(SlotAt(_externalPoint)); }
+            else if (_externalAccepts) { AutoScroll(_externalPoint); ShowInsertion(SlotAt(_externalPoint)); }
         };
         SetStatus(viewModel.IsReadOnly ? "当前为只读配置，可启动项目，不能添加或排序。" : "添加和排序会自动保存；热键可在设置中修改。");
     }
@@ -366,6 +367,7 @@ public partial class LauncherWindow : Window
         HighlightDropTab(GroupAt(point));
         bool target = GroupAt(point) is not null || SlotAt(point) is not null;
         e.Effects = CanEdit && !DragSession.Active && !Importing && target && DropParser.Supports(e.Data) ? Allowed(e) : DragDropEffects.None;
+        _externalAccepts = e.Effects != DragDropEffects.None;
         ShowInsertion(e.Effects != DragDropEffects.None ? SlotAt(point) : null);
         e.Handled = true;
     }
@@ -514,6 +516,7 @@ public partial class LauncherWindow : Window
         DragSession.Cancel();
         CancelMeasurement();
         _dropWait.Stop();
+        _externalWatch.Stop();
     }
     public void ResumeAfterExitFailure()
     {
