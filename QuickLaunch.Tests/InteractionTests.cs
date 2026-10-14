@@ -4,12 +4,31 @@ using Microsoft.Win32;
 using QuickLaunch.Models;
 using QuickLaunch.Services;
 using QuickLaunch.ViewModels;
+using QuickLaunch.Views;
 using Xunit;
 
 namespace QuickLaunch.Tests;
 
 public sealed class InteractionTests
 {
+    [Theory]
+    [InlineData(1, true)] [InlineData(2, false)] [InlineData(3, false)]
+    public void HeaderMoveHandlesClicksWithoutMovingOnDoubleClick(int clickCount, bool move) =>
+        Assert.Equal((true, move), LauncherWindow.WindowDragDecision(clickCount, false, false, false, false, false));
+
+    [Theory]
+    [InlineData(true, false, false, false, false)]
+    [InlineData(false, true, false, false, false)]
+    [InlineData(false, false, true, false, false)]
+    [InlineData(false, false, false, true, false)]
+    [InlineData(false, false, false, false, true)]
+    [InlineData(true, true, true, true, true)]
+    public void HeaderMoveGuardsIgnoreMouseDown(bool closing, bool movingWindow, bool sizeMove, bool dragActive, bool externalDrag)
+    {
+        foreach (int clicks in new[] { 1, 2 })
+            Assert.Equal((false, false), LauncherWindow.WindowDragDecision(clicks, closing, movingWindow, sizeMove, dragActive, externalDrag));
+    }
+
     [Theory]
     [InlineData(32, 1, 40)] [InlineData(40, 1, 48)] [InlineData(48, 1, 48)]
     [InlineData(48, -1, 40)] [InlineData(40, -1, 32)] [InlineData(32, -1, 32)]

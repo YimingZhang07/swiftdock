@@ -24,12 +24,7 @@ internal static class WindowLayoutSmoke
             && window.WindowDragArea.ActualHeight == WindowPlacement.HeaderHeight && chrome?.CaptionHeight == 0
             && chrome.GlassFrameThickness == new Thickness(-1) && window.WindowStyle == WindowStyle.None && !window.AllowsTransparency);
         double width = window.ActualWidth;
-        var edges = new[]
-        {
-            new Point(9, 22), new Point(width - 9, 22), new Point(width / 2, 40)
-        };
-        check("titlebar-draggable-beyond-resize-band", edges.All(point =>
-            window.IsWindowDragSource(window.InputHitTest(point) as DependencyObject)));
+        WindowDragSmoke.Run(window, check);
 
         Point Center(FrameworkElement element) => element.TranslatePoint(new Point(element.ActualWidth / 2, element.ActualHeight / 2), window.CaptureRoot);
         var controls = new[] { window.HidePanelButton, window.AddItemButton, window.SettingsButton, window.AddGroupButton };

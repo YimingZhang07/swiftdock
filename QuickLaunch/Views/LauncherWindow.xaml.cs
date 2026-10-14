@@ -57,6 +57,7 @@ public partial class LauncherWindow : Window
     public bool Importing { get; private set; }
     public Action? SettingsRequested { get; set; }
     public string StatusText { get; private set; } = "";
+    internal Action<MouseButtonEventArgs> StartWindowMove { get; set; }
 
     public LauncherWindow(DiagnosticLog log, MainViewModel viewModel, IconService icons)
         : this(log, viewModel, icons, LaunchService.StartAsync) { }
@@ -65,6 +66,8 @@ public partial class LauncherWindow : Window
         Func<LaunchItem, bool, Task<LaunchResult>> startLaunch)
     {
         InitializeComponent();
+        StartWindowMove = e => { if (e.LeftButton == MouseButtonState.Pressed) DragMove(); };
+        WindowDragArea.AddHandler(MouseLeftButtonDownEvent, new MouseButtonEventHandler(WindowDragMouseDown), handledEventsToo: true);
         Log = log;
         ViewModel = viewModel;
         Icons = icons;
@@ -344,18 +347,27 @@ public partial class LauncherWindow : Window
     private void WindowDragMouseDown(object sender, MouseButtonEventArgs e)
     {
         if (!IsWindowDragSource(e.OriginalSource as DependencyObject)) return;
-        if (e.LeftButton != MouseButtonState.Pressed || _closing || _movingWindow || _sizeMove || DragSession.Active || _externalDrag || _ownedWindows > 0) return;
+        var decision = WindowDragDecision(e.ClickCount, _closing, _movingWindow, _sizeMove, DragSession.Active, _externalDrag);
+        if (!decision.Handled) return;
         e.Handled = true;
+        if (!decision.Move) return;
         _movingWindow = true;
         try
         {
             // Native movement also handles monitor and DPI transitions.
-            DragMove();
+            StartWindowMove(e);
         }
         finally
         {
             _movingWindow = false;
         }
+    }
+
+    internal static (bool Handled, bool Move) WindowDragDecision(int clickCount, bool closing, bool movingWindow,
+        bool sizeMove, bool dragActive, bool externalDrag)
+    {
+        bool handled = !(closing || movingWindow || sizeMove || dragActive || externalDrag);
+        return (handled, handled && clickCount <= 1);
     }
 
     internal bool IsWindowDragSource(DependencyObject? source) => source is Visual

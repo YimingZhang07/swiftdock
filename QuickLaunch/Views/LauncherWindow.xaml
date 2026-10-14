@@ -131,7 +131,7 @@
     </Window.Resources>
     <Grid x:Name="Root" Background="{DynamicResource WindowBrush}">
         <Grid.RowDefinitions><RowDefinition Height="{x:Static services:WindowPlacement.HeaderRowHeight}" /><RowDefinition Height="*" /></Grid.RowDefinitions>
-        <Border x:Name="WindowDragArea" Background="Transparent" Padding="12,0" MouseLeftButtonDown="WindowDragMouseDown">
+        <Border x:Name="WindowDragArea" Background="Transparent" Padding="12,0">
             <DockPanel LastChildFill="True">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
                     <TextBlock x:Name="StorageNotice" Text="{Binding StorageWarning}" Foreground="{DynamicResource TertiaryBrush}" FontSize="12"
@@ -145,13 +145,14 @@
                     <Button x:Name="HidePanelButton" Style="{StaticResource IconButton}" Content="&#xE8BB;" FontSize="10" AutomationProperties.Name="隐藏面板" Click="HideClick"
                             ToolTip="{Binding HotkeyDisplay, StringFormat=隐藏 (Esc)  ·  {0} 呼出}" />
                 </StackPanel>
-                <ScrollViewer x:Name="TabsViewport" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" PreviewMouseWheel="TabsMouseWheel" VerticalAlignment="Center">
+                <ScrollViewer x:Name="TabsViewport" DockPanel.Dock="Left" Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" PreviewMouseWheel="TabsMouseWheel" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
                         <StackPanel x:Name="Tabs" Orientation="Horizontal" />
                         <Button x:Name="AddGroupButton" Style="{StaticResource IconButton}" Content="&#xE710;" FontSize="12" Foreground="{DynamicResource MutedBrush}" ToolTip="新建分组；也可把条目拖到这里"
                                 AutomationProperties.Name="新建分组" Click="AddGroupClick" IsEnabled="{Binding CanEdit}" />
                     </StackPanel>
                 </ScrollViewer>
+                <Border Background="Transparent" />
             </DockPanel>
         </Border>
         <Grid Grid.Row="1" Margin="{x:Static services:WindowPlacement.ContentMargin}" ClipToBounds="True">

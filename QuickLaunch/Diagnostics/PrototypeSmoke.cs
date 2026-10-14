@@ -85,6 +85,7 @@ internal static class PrototypeSmoke
         await Task.Delay(80);
         var settings = Application.Current.Windows.OfType<SettingsWindow>().Single();
         Check("settings-owned-and-visible", settings.IsVisible && settings.Owner == window && window.IsVisible);
+        Check("header-routed-move-with-settings-open", WindowDragSmoke.RequestsMove(window, new Point(window.ActualWidth / 2, 22)));
         long settingsRevision = window.ViewModel.Revision;
         settings.ApplyButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Check("settings-applied", window.ViewModel.Revision > settingsRevision);
