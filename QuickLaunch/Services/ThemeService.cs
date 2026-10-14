@@ -40,6 +40,8 @@ public sealed class ThemeService : IDisposable
         void Brush(string key, Color color) { var brush = new SolidColorBrush(color); brush.Freeze(); resources[key] = brush; }
         Color Parse(string value) => (Color)ColorConverter.ConvertFromString(value);
         Brush("WindowBrush", highContrast ? SystemColors.WindowColor : Parse(dark ? "#202124" : "#F7F7F8"));
+        Brush("TitleBarBrush", highContrast ? SystemColors.WindowColor : Parse(dark ? "#303946" : "#E2E8F0"));
+        Brush("ToolbarBrush", highContrast ? SystemColors.WindowColor : Parse(dark ? "#262B33" : "#EDF1F5"));
         Brush("PanelBrush", highContrast ? SystemColors.WindowColor : Parse(dark ? "#30343B" : "#E9EDF1"));
         Brush("HoverBrush", highContrast ? SystemColors.HighlightColor : Parse(dark ? "#414954" : "#D7E4E9"));
         Brush("TextBrush", highContrast ? SystemColors.WindowTextColor : Parse(dark ? "#F0F3F7" : "#20262D"));

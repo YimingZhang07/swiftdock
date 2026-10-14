@@ -5,6 +5,8 @@
     <Application.Resources>
         <SolidColorBrush x:Key="AccentBrush" Color="#75DBC5" />
         <SolidColorBrush x:Key="WindowBrush" Color="#202124" />
+        <SolidColorBrush x:Key="TitleBarBrush" Color="#303946" />
+        <SolidColorBrush x:Key="ToolbarBrush" Color="#262B33" />
         <SolidColorBrush x:Key="PanelBrush" Color="#30343B" />
         <SolidColorBrush x:Key="HoverBrush" Color="#414954" />
         <SolidColorBrush x:Key="TextBrush" Color="#F0F3F7" />

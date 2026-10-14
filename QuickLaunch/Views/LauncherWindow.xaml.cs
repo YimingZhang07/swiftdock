@@ -229,12 +229,13 @@ public partial class LauncherWindow : Window
 
     private void WindowDragMouseDown(object sender, MouseButtonEventArgs e)
     {
+        if (!IsWindowDragSource(e.OriginalSource as DependencyObject)) return;
         if (e.LeftButton != MouseButtonState.Pressed || _closing || _movingWindow || DragSession.Active || _externalDrag || _ownedWindows > 0) return;
         e.Handled = true;
         _movingWindow = true;
         try
         {
-            // This region excludes toolbar buttons, tabs and tiles. Let Windows move
+            // Only the title bar's non-button surface moves the window. Let Windows move
             // the native window so dragging also works across monitors and DPI scales.
             DragMove();
         }
@@ -243,6 +244,10 @@ public partial class LauncherWindow : Window
             _movingWindow = false;
         }
     }
+
+    internal bool IsWindowDragSource(DependencyObject? source) => source is Visual
+        && (ReferenceEquals(source, WindowDragArea) || WindowDragArea.IsAncestorOf(source))
+        && Ancestor<System.Windows.Controls.Primitives.ButtonBase>(source) is null;
 
     public void SelectGroup(LaunchGroup group, bool preview = false)
     {

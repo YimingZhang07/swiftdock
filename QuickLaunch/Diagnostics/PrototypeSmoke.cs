@@ -57,11 +57,8 @@ internal static class PrototypeSmoke
         Check("group-preview-does-not-mutate-items", window.Groups.Select((g, i) => g.Items.Select(x => x.Id).SequenceEqual(before[i])).All(x => x));
         window.SelectGroup(window.Groups[0]);
         window.UpdateLayout();
-        var image = new RenderTargetBitmap((int)window.ActualWidth, (int)window.ActualHeight, 96, 96, PixelFormats.Pbgra32);
-        image.Render(window);
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(image));
-        using (var output = File.Create(Path.Combine(directory, "window.png"))) encoder.Save(output);
+        WindowLayoutSmoke.Run(window, Check);
+        SaveSnapshot(window, Path.Combine(directory, "window.png"));
         window.HidePanel();
         Check("hide-retains-hwnd", !window.IsVisible && new WindowInteropHelper(window).Handle == handle);
         window.ShowPanel("smoke-reshow");
@@ -107,11 +104,12 @@ internal static class PrototypeSmoke
         try { editorAccepted = window.ShowEditor(editor); } finally { editorTimeout.Stop(); }
         Check("edit-dialog-produces-valid-url", editorAccepted && editor.Result?.Kind == LaunchKind.Url && editor.Result.Name == "测试网页");
 
-        var oldBrushes = new[] { "WindowBrush", "PanelBrush", "HoverBrush", "TextBrush", "MutedBrush", "BorderBrush", "AccentBrush", "ErrorBrush" }
+        var oldBrushes = new[] { "WindowBrush", "TitleBarBrush", "ToolbarBrush", "PanelBrush", "HoverBrush", "TextBrush", "MutedBrush", "BorderBrush", "AccentBrush", "ErrorBrush" }
             .ToDictionary(key => key, key => Application.Current.Resources[key]);
         ThemeService.ApplyPalette(Application.Current.Resources, false, Colors.Teal);
         await BenchmarkRunner.NextFrame();
         Check("theme-resource-update-reaches-window", window.Background is SolidColorBrush brush && brush.Color == (Color)ColorConverter.ConvertFromString("#F7F7F8"));
+        SaveSnapshot(window, Path.Combine(directory, "window-light.png"));
         foreach (var pair in oldBrushes) Application.Current.Resources[pair.Key] = pair.Value;
 
         var temporary = window.ViewModel.AddGroup("校验分组"); window.SelectGroup(temporary);
@@ -171,5 +169,15 @@ internal static class PrototypeSmoke
         await File.WriteAllTextAsync(Path.Combine(directory, "smoke-result.json"), JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
         window.Log.Write("smoke.complete", new { passed });
         return passed;
+    }
+
+    private static void SaveSnapshot(LauncherWindow window, string path)
+    {
+        var image = new RenderTargetBitmap((int)window.ActualWidth, (int)window.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+        image.Render(window);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(image));
+        using var output = File.Create(path);
+        encoder.Save(output);
     }
 }

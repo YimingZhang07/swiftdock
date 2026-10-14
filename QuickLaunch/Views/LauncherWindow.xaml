@@ -43,51 +43,66 @@
             </DataTemplate.Triggers>
         </DataTemplate>
     </Window.Resources>
-    <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="16">
-        <Grid x:Name="Root" Background="Transparent">
+        <Grid x:Name="Root" Background="{DynamicResource WindowBrush}">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
-                <RowDefinition Height="*" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                <RowDefinition Height="52" /><RowDefinition Height="Auto" />
+                <RowDefinition Height="*" /><RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
-            <DockPanel Margin="0,0,0,12">
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
-                    <Button Content="添加" Click="AddItemClick" IsEnabled="{Binding CanEdit}" />
-                    <Button Content="设置" Click="SettingsClick" />
-                    <Button Content="隐藏" Click="HideClick" /><Button Content="退出" Click="ExitClick" />
-                </StackPanel>
-                <Border x:Name="WindowDragArea" Background="Transparent" Cursor="SizeAll"
-                        ToolTip="拖动此处移动窗口" MouseLeftButtonDown="WindowDragMouseDown">
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="QuickLaunch" FontSize="22" FontWeight="SemiBold" />
-                        <TextBlock Text="{Binding StorageStatus}" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="0,3,0,0" />
+            <Border x:Name="WindowDragArea" Background="{DynamicResource TitleBarBrush}" Cursor="SizeAll"
+                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" CornerRadius="12,12,0,0"
+                    ToolTip="拖动标题栏移动窗口" MouseLeftButtonDown="WindowDragMouseDown">
+                <DockPanel>
+                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="0,0,12,0">
+                        <Button x:Name="HidePanelButton" Content="隐藏" Background="Transparent" Click="HideClick" ToolTip="隐藏到托盘" />
+                        <Button x:Name="ExitPanelButton" Content="退出" Background="Transparent" Click="ExitClick" ToolTip="退出 QuickLaunch" />
                     </StackPanel>
-                </Border>
-            </DockPanel>
-            <DockPanel Grid.Row="1" Margin="0,0,0,10">
-                <Button x:Name="AddGroupButton" DockPanel.Dock="Right" Content="+" ToolTip="新建分组；也可拖动条目到此处" Click="AddGroupClick" IsEnabled="{Binding CanEdit}" />
-                <ScrollViewer x:Name="TabsViewport" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                    <StackPanel x:Name="Tabs" Orientation="Horizontal" />
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="17,0,0,0">
+                        <TextBlock Text="QuickLaunch" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <TextBlock Text="拖动窗口" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="14,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+            <Border Grid.Row="1" Background="{DynamicResource ToolbarBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="17,10">
+                <DockPanel>
+                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" Margin="10,0,0,0">
+                        <Button x:Name="AddItemButton" Content="添加" Click="AddItemClick" IsEnabled="{Binding CanEdit}" />
+                        <Button x:Name="SettingsButton" Content="设置" Click="SettingsClick" />
+                    </StackPanel>
+                    <DockPanel>
+                        <TextBlock Text="分组" Foreground="{DynamicResource MutedBrush}" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <Button x:Name="AddGroupButton" DockPanel.Dock="Right" Content="+" ToolTip="新建分组；也可拖动条目到此处" Click="AddGroupClick" IsEnabled="{Binding CanEdit}" />
+                        <ScrollViewer x:Name="TabsViewport" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                            <StackPanel x:Name="Tabs" Orientation="Horizontal" />
+                        </ScrollViewer>
+                    </DockPanel>
+                </DockPanel>
+            </Border>
+            <Grid Grid.Row="2" Margin="17,14" ClipToBounds="True">
+                <ScrollViewer x:Name="Viewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <Grid x:Name="GroupHost" MinHeight="100" Background="Transparent" />
                 </ScrollViewer>
-            </DockPanel>
-            <ScrollViewer x:Name="Viewer" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <Grid x:Name="GroupHost" MinHeight="100" Background="Transparent" />
-            </ScrollViewer>
-            <Border x:Name="Insertion" Grid.Row="2" HorizontalAlignment="Left" VerticalAlignment="Top"
-                    Width="3" Height="78" Background="{DynamicResource AccentBrush}" Visibility="Collapsed" IsHitTestVisible="False" />
-            <StackPanel Grid.Row="3" Margin="0,12,0,0">
-                <TextBlock Text="可从资源管理器或浏览器拖入添加" Foreground="{DynamicResource MutedBrush}" Margin="4,4,0,8" />
-                <Button x:Name="CancelImportButton" Content="取消导入" Click="CancelImportClick" Visibility="Collapsed" HorizontalAlignment="Left" />
-                <TextBlock x:Name="Status" Foreground="{DynamicResource AccentBrush}" TextWrapping="Wrap" FontSize="12" Margin="4,0" />
-            </StackPanel>
-            <TextBlock Grid.Row="4" Foreground="{DynamicResource MutedBrush}" FontSize="10" Margin="4,12,0,0" TextWrapping="Wrap">
-                <Run Text="{Binding HotkeyDisplay, Mode=OneWay}" /><Run Text=" 呼出 / 隐藏    ·    Enter 启动    ·    Esc 取消" />
-            </TextBlock>
-            <Canvas Grid.RowSpan="5" IsHitTestVisible="False" ClipToBounds="True">
+                <Border x:Name="Insertion" HorizontalAlignment="Left" VerticalAlignment="Top"
+                        Width="3" Height="78" Background="{DynamicResource AccentBrush}" Visibility="Collapsed" IsHitTestVisible="False" />
+            </Grid>
+            <Border Grid.Row="3" Background="{DynamicResource ToolbarBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="17,10,17,12">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,6">
+                        <TextBlock Text="{Binding StorageStatus}" DockPanel.Dock="Right" Foreground="{DynamicResource MutedBrush}" FontSize="11" Margin="12,0,0,0" />
+                        <TextBlock Text="拖入文件或网址添加" Foreground="{DynamicResource MutedBrush}" FontSize="11" />
+                    </DockPanel>
+                    <Button x:Name="CancelImportButton" Content="取消导入" Click="CancelImportClick" Visibility="Collapsed" HorizontalAlignment="Left" />
+                    <TextBlock x:Name="Status" Foreground="{DynamicResource AccentBrush}" TextWrapping="Wrap" FontSize="12" />
+                    <TextBlock Foreground="{DynamicResource MutedBrush}" FontSize="10" Margin="0,8,0,0" TextWrapping="Wrap">
+                        <Run Text="{Binding HotkeyDisplay, Mode=OneWay}" /><Run Text=" 呼出 / 隐藏    ·    Enter 启动    ·    Esc 取消" />
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+            <Canvas Grid.RowSpan="4" IsHitTestVisible="False" ClipToBounds="True">
                 <Border x:Name="Ghost" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" Opacity="0.85" Padding="10" CornerRadius="8" Visibility="Collapsed">
                     <Border.RenderTransform><ScaleTransform ScaleX="1.1" ScaleY="1.1" /></Border.RenderTransform>
                     <StackPanel Orientation="Horizontal"><Image x:Name="GhostImage" Width="40" Height="40" Margin="0,0,8,0" /><TextBlock x:Name="GhostText" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center" /></StackPanel>
                 </Border>
             </Canvas>
+            <Border Grid.RowSpan="4" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="12" IsHitTestVisible="False" />
         </Grid>
-    </Border>
 </Window>
