@@ -110,7 +110,7 @@ internal static class DialogAppearanceSmoke
                 new StartupService(Environment.ProcessPath!, readOnlyStore.DirectoryPath), () => { }, () => { });
             try
             {
-                check("settings-read-only-disables-edits", !readOnly.IconSizes.IsEnabled && !readOnly.ApplyButton.IsEnabled && !readOnly.ResetSizeButton.IsEnabled && !readOnly.StartupBox.IsEnabled);
+                check("settings-read-only-disables-edits", !readOnly.IconSizes.IsEnabled && !readOnly.Placements.IsEnabled && !readOnly.ApplyButton.IsEnabled && !readOnly.ResetSizeButton.IsEnabled && !readOnly.StartupBox.IsEnabled && !readOnly.WebsiteIconsBox.IsEnabled);
             }
             finally { readOnly.Close(); readOnlyModel.Suspend(true); }
         }
@@ -126,6 +126,9 @@ internal static class DialogAppearanceSmoke
     private static void CheckTitleBar(Window dialog, bool dark, string phase, Action<string, bool> check)
     {
         nint hwnd = new WindowInteropHelper(dialog).Handle;
+        check($"{dialog.GetType().Name}-no-icons-{phase}", Enumerable.Range(0, 3).All(kind => NativeMethods.SendMessage(hwnd, NativeMethods.WmGetIcon, kind, 0) == 0));
+        check($"{dialog.GetType().Name}-dialog-frame-{phase}", (NativeMethods.GetWindowLongPtr(hwnd, NativeMethods.GwlExStyle) & NativeMethods.WsExDlgModalFrame) != 0);
+        check($"{dialog.GetType().Name}-keeps-close-button-{phase}", (NativeMethods.GetWindowLongPtr(hwnd, NativeMethods.GwlStyle) & NativeMethods.WsSysMenu) != 0);
         check($"{dialog.GetType().Name}-titlebar-{phase}", NativeMethods.DwmGetWindowAttribute(hwnd, 20, out int value, sizeof(int)) >= 0 && value == (dark ? 1 : 0));
     }
 

@@ -27,9 +27,12 @@ public sealed class MainViewModel : ObservableObject
     public string HotkeyDisplay => Hotkey.Display;
     public int Columns => _settings.Columns;
     public int IconSize => _settings.IconSize;
+    public bool AutoFetchWebsiteIcons => _settings.AutoFetchWebsiteIcons ?? true;
     public double CellSize => Math.Max(84, IconSize + 52);
     public double TileSize => CellSize - 4;
     public Size? WindowSize => _settings.WindowWidth is { } width && _settings.WindowHeight is { } height ? new(width, height) : null;
+    public Point? WindowPosition => _settings.WindowLeft is { } left && _settings.WindowTop is { } top ? new(left, top) : null;
+    public string Placement => _settings.Placement ?? "lastPosition";
     public long Revision => _revision;
     public string LastGroupId => _lastGroupId;
     public string StorageStatus
@@ -88,6 +91,14 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(HotkeyDisplay));
         Changed();
     }
+    public void SetAutoFetchWebsiteIcons(bool enabled)
+    {
+        _owner.VerifyAccess();
+        if (!CanEdit || AutoFetchWebsiteIcons == enabled) return;
+        _settings = _settings with { AutoFetchWebsiteIcons = enabled ? null : false };
+        OnPropertyChanged(nameof(AutoFetchWebsiteIcons));
+        Changed();
+    }
     public void SetIconSize(int size)
     {
         _owner.VerifyAccess();
@@ -106,6 +117,23 @@ public sealed class MainViewModel : ObservableObject
         if (_suspended || WindowSize == size) return;
         // Read-only profiles keep the size for this session; Changed() will not save it.
         _settings = _settings with { WindowWidth = size?.Width, WindowHeight = size?.Height };
+        Changed();
+    }
+    public void SetWindowPosition(Point? position)
+    {
+        _owner.VerifyAccess();
+        if (_suspended || WindowPosition == position) return;
+        _settings = _settings with { WindowLeft = (int?)position?.X, WindowTop = (int?)position?.Y };
+        Changed();
+    }
+    public void SetPlacement(string placement)
+    {
+        _owner.VerifyAccess();
+        if (!CanEdit) return;
+        string? value = placement == "cursor" ? "cursor" : null;
+        if (_settings.Placement == value) return;
+        _settings = _settings with { Placement = value };
+        OnPropertyChanged(nameof(Placement));
         Changed();
     }
     public AppConfig Snapshot()
@@ -211,7 +239,7 @@ public sealed class MainViewModel : ObservableObject
         int index = group.Items.ToList().FindIndex(i => i.Id == original.Id);
         if (!Groups.Contains(group) || index < 0 || original.IsPending) throw new InvalidOperationException("条目已不存在。");
         if (IsDuplicate(group, edited, original.Id)) throw new InvalidOperationException("该组已有相同的启动条目。");
-        bool iconChanged = original.Path != edited.Path || original.Kind != edited.Kind;
+        bool iconChanged = original.Path != edited.Path || original.Kind != edited.Kind || original.Icon != edited.Icon;
         Mutate(() => group.Items[index] = edited with { Id = original.Id, LaunchCount = original.LaunchCount,
             ErrorMessage = null, Visual = iconChanged ? new() : original.Visual });
     }

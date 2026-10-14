@@ -9,6 +9,7 @@
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
   <ItemGroup>
+    <None Include="../QuickLaunch/Assets/QuickLaunch.ico" Link="Assets/QuickLaunch.ico" CopyToOutputDirectory="PreserveNewest" />
     <EmbeddedResource Include="../QuickLaunch/**/*.xaml" Exclude="../QuickLaunch/bin/**;../QuickLaunch/obj/**" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageReference Include="xunit" Version="2.9.3" />

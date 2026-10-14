@@ -74,10 +74,12 @@
         </Style>
         <Style TargetType="Separator">
             <Setter Property="Height" Value="9" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Separator">
                 <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="8,0" VerticalAlignment="Center" />
             </ControlTemplate></Setter.Value></Setter>
         </Style>
+        <Style x:Key="{x:Static MenuItem.SeparatorStyleKey}" TargetType="Separator" BasedOn="{StaticResource {x:Type Separator}}" />
         <Style TargetType="ToolTip">
             <Setter Property="Background" Value="{DynamicResource LayerBrush}" /><Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" /><Setter Property="BorderThickness" Value="1" />

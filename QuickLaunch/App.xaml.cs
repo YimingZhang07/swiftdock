@@ -3,7 +3,6 @@ using System.Security.Principal;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
-using System.Windows.Media;
 using CommunityToolkit.Mvvm.Input;
 using H.NotifyIcon;
 using QuickLaunch.Diagnostics;
@@ -21,6 +20,7 @@ public partial class App : Application
     private SettingsWindow? _settings;
     private HotkeyService? _hotkey;
     private TaskbarIcon? _tray;
+    private System.Drawing.Icon? _trayIcon;
     private SingleInstanceService? _instance;
     private ConfigService? _store;
     private MainViewModel? _viewModel;
@@ -30,6 +30,7 @@ public partial class App : Application
     private volatile bool _exiting;
     private bool _pendingShow, _smoke;
     public int InstanceShowRequests { get; private set; }
+    internal TaskbarIcon? Tray => _tray;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -92,7 +93,7 @@ public partial class App : Application
             _viewModel = new(_store);
             _theme = new(Dispatcher);
             _startup = new(Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "QuickLaunch.exe"), paths.ConfigDirectory);
-            _icons = new(_smoke ? Path.Combine(paths.LogDirectory, "icons") : paths.IconDirectory, _log);
+            _icons = new(_smoke ? Path.Combine(paths.LogDirectory, "icons") : paths.IconDirectory, _log, _smoke ? new FaviconFixtureHandler() : null);
             _window = new(_log, _viewModel, _icons) { SettingsRequested = OpenSettings };
             MainWindow = _window;
             _window.InitializeNative(_theme);
@@ -193,11 +194,6 @@ public partial class App : Application
     }
     private void CreateTray()
     {
-        var icon = new GeneratedIconSource
-        {
-            Text = "Q", FontSize = 32, Foreground = new SolidColorBrush(Color.FromRgb(117, 219, 197)),
-            Background = new SolidColorBrush(Color.FromRgb(23, 29, 39))
-        };
         var menu = new ContextMenu();
         menu.Items.Add(new MenuItem { Header = "显示 QuickLaunch", Command = new RelayCommand(() => ShowMain("tray-menu")) });
         menu.Items.Add(new MenuItem { Header = "设置", Command = new RelayCommand(OpenSettings) });
@@ -216,11 +212,44 @@ public partial class App : Application
         menu.Items.Add(startupItem);
         menu.Items.Add(new Separator());
         menu.Items.Add(new MenuItem { Header = "退出", Command = new RelayCommand(() => _ = ExitAsync()) });
-        _tray = new TaskbarIcon { IconSource = icon, ContextMenu = menu,
+        _tray = new TaskbarIcon { ContextMenu = menu,
             LeftClickCommand = new RelayCommand(() => ShowMain("tray")) };
+        UpdateTrayIcon();
+        _tray.TrayIcon.MessageWindow.DpiChanged += TrayDisplayChanged;
+        _tray.TrayIcon.MessageWindow.TaskbarCreated += TrayDisplayChanged;
+        Microsoft.Win32.SystemEvents.DisplaySettingsChanged += TrayDisplayChanged;
         UpdateTrayText();
         _tray.ForceCreate(enablesEfficiencyMode: false);
         _log!.Write("tray.created");
+    }
+
+    private void UpdateTrayIcon()
+    {
+        if (_exiting || _tray is null) return;
+        var icon = AppIcon.Load(AppIcon.TrayPixelSize());
+        var previous = _trayIcon;
+        _tray.Icon = icon;
+        _trayIcon = icon;
+        previous?.Dispose();
+    }
+
+    private void TrayDisplayChanged(object? sender, EventArgs e)
+    {
+        if (!_exiting && !Dispatcher.HasShutdownStarted) Dispatcher.BeginInvoke(UpdateTrayIcon);
+    }
+
+    private void DisposeTray()
+    {
+        Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= TrayDisplayChanged;
+        if (_tray is not null)
+        {
+            _tray.TrayIcon.MessageWindow.DpiChanged -= TrayDisplayChanged;
+            _tray.TrayIcon.MessageWindow.TaskbarCreated -= TrayDisplayChanged;
+            _tray.Dispose();
+            _tray = null;
+        }
+        _trayIcon?.Dispose();
+        _trayIcon = null;
     }
 
     private async Task ExitAsync(int code = 0)
@@ -250,7 +279,7 @@ public partial class App : Application
             }
         }
         _hotkey?.Dispose();
-        _tray?.Dispose();
+        DisposeTray();
         _icons?.Dispose();
         _theme?.Dispose();
         if (_store is not null) await _store.DisposeAsync();
@@ -282,7 +311,7 @@ public partial class App : Application
             catch (Exception ex) { _log?.Write("session-ending.failed", new { ex.Message }); }
         }
         _hotkey?.Dispose();
-        _tray?.Dispose();
+        DisposeTray();
         // Do not cancel OS shutdown or await IPC/logging indefinitely; OS releases remaining handles.
     }
 }

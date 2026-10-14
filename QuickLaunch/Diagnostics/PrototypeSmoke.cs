@@ -32,6 +32,12 @@ internal static class PrototypeSmoke
             }, new JsonSerializerOptions { WriteIndented = true }));
         }
         Check("tray-created", trayAvailable);
+        Check("tray-uses-ico", app.Tray is { Icon: not null } && app.Tray.IconSource is not H.NotifyIcon.GeneratedIconSource);
+        using (var expected = AppIcon.Load(AppIcon.TrayPixelSize()))
+            Check("tray-icon-matches-taskbar-dpi", SameIcon(app.Tray?.Icon, expected));
+        using (var executable = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!))
+        using (var expected = AppIcon.Load(executable?.Width ?? 32))
+            Check("exe-uses-app-ico", SameIcon(executable, expected));
         // A user's running launcher may own Alt+Space. Only this isolated smoke
         // profile switches to an available combination; leave that instance alone.
         if (!hotkey.Registered)
@@ -51,8 +57,13 @@ internal static class PrototypeSmoke
         Check("two-groups", window.Groups.Count == 2);
         await window.LoadIconsAsync().WaitAsync(TimeSpan.FromSeconds(10));
         Check("real-frozen-icons-loaded", window.Groups[0].Items.All(i => i.Visual.Image is { IsFrozen: true }));
+        await LauncherInputSmoke.RunAsync(window, directory, store.DirectoryPath, app.Tray?.ContextMenu, Check);
+        await EditItemDialogSmoke.RunAsync(window, directory, store.DirectoryPath, Check);
+        await IconPickerSmoke.RunAsync(window, directory, Check);
+        await FaviconSmoke.RunAsync(window, directory, store.DirectoryPath, Check);
         nint handle = new WindowInteropHelper(window).Handle;
         Check("native-hwnd", handle != 0 && NativeMethods.GetWindowRect(handle, out _));
+        await WindowPositionSmoke.RunAsync(window, store.DirectoryPath, Check);
         var before = window.Groups.Select(g => g.Items.Select(i => i.Id).ToArray()).ToArray();
         bool captured = window.CaptureRoot.CaptureMouse();
         Check("root-capture-acquired", captured);
@@ -89,17 +100,6 @@ internal static class PrototypeSmoke
         long settingsRevision = window.ViewModel.Revision;
         settings.ApplyButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Check("settings-applied", window.ViewModel.Revision > settingsRevision);
-        window.ViewModel.SetWindowSize(new(window.Width + 100, window.Height + 100));
-        WindowPlacement.AtCursor(window, savedSize: window.ViewModel.WindowSize);
-        NativeMethods.GetWindowRect(handle, out var beforeReset);
-        settings.ResetSizeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-        window.UpdateLayout();
-        NativeMethods.GetWindowRect(handle, out var afterReset);
-        var autoSize = WindowPlacement.ResolveSize(null, new(window.MaxWidth, window.MaxHeight), new(window.MinWidth, window.MinHeight),
-            window.ViewModel.Columns, window.CellSize, window.SelectedGroup.Items.Count, WindowPlacement.HorizontalChrome);
-        Check("settings-reset-resizes-visible-panel-immediately", window.ViewModel.WindowSize is null
-            && Math.Abs(window.Width - autoSize.Width) < .5 && Math.Abs(window.Height - autoSize.Height) < .5);
-        Check("settings-reset-preserves-top-left", beforeReset.Left == afterReset.Left && beforeReset.Top == afterReset.Top);
         settings.Close();
         Check("settings-close-keeps-main-alive", window.IsVisible && new WindowInteropHelper(window).Handle == handle);
         group.Items.Move(0, group.Items.Count - 1);
@@ -180,6 +180,17 @@ internal static class PrototypeSmoke
         await File.WriteAllTextAsync(Path.Combine(directory, "smoke-result.json"), JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
         window.Log.Write("smoke.complete", new { passed });
         return passed;
+    }
+
+    private static bool SameIcon(System.Drawing.Icon? actual, System.Drawing.Icon expected)
+    {
+        if (actual is null || actual.Size != expected.Size) return false;
+        using var left = actual.ToBitmap();
+        using var right = expected.ToBitmap();
+        for (int y = 0; y < left.Height; y++)
+            for (int x = 0; x < left.Width; x++)
+                if (left.GetPixel(x, y) != right.GetPixel(x, y)) return false;
+        return true;
     }
 
     internal static void SaveSnapshot(FrameworkElement window, string path)

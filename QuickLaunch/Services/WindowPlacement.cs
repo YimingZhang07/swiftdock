@@ -7,6 +7,13 @@ namespace QuickLaunch.Services;
 
 public static class WindowPlacement
 {
+    public readonly record struct Monitor(Rect Bounds, Rect WorkArea, double Dpi)
+    {
+        public double Scale => Dpi > 0 ? Dpi / 96 : 1;
+        public Size WorkSize => new(WorkArea.Width / Scale, WorkArea.Height / Scale);
+    }
+    internal sealed record Desktop(IReadOnlyList<Monitor> Monitors, Point Cursor);
+
     public const double HeaderHeight = 44, ContentPadding = 12, ScrollBarWidth = 12;
     public static GridLength HeaderRowHeight => new(HeaderHeight);
     public static Thickness ContentMargin => new(ContentPadding);
@@ -30,27 +37,106 @@ public static class WindowPlacement
 
     public static void AtCursor(Window window, int columns = 6, double cellSize = 84, int itemCount = 1, Size? savedSize = null)
     {
-        var hwnd = new WindowInteropHelper(window).EnsureHandle();
+        PlacePanel(window, ReadDesktop(new WindowInteropHelper(window).EnsureHandle()), "cursor", null, columns, cellSize, itemCount, savedSize);
+    }
+
+    public static Rect ResolvePlacement(string? mode, Point? savedPosition, Size desiredSize, IReadOnlyList<Monitor> monitors, Point cursor)
+    {
+        var (monitor, position) = SelectMonitor(mode, savedPosition, desiredSize, monitors, cursor);
+        return PlaceOnMonitor(monitor, position, desiredSize);
+    }
+
+    private static (Monitor Monitor, Point? Position) SelectMonitor(string? mode, Point? savedPosition, Size desiredSize,
+        IReadOnlyList<Monitor> monitors, Point cursor)
+    {
+        if (monitors.Count == 0) throw new ArgumentException("至少需要一个显示器。", nameof(monitors));
+        if (mode != "cursor" && savedPosition is { } position)
+        {
+            var origin = monitors.MinBy(m => DistanceSquared(position, m.Bounds));
+            // Reconstruct the saved rectangle at its origin's DPI, then compare physical intersections.
+            var rect = new Rect(position, new Size(Math.Round(desiredSize.Width * origin.Scale), Math.Round(desiredSize.Height * origin.Scale)));
+            double largest = 0;
+            Monitor? target = null;
+            foreach (var monitor in monitors)
+            {
+                double area = IntersectionArea(rect, monitor.Bounds);
+                if (area > largest) { largest = area; target = monitor; }
+            }
+            if (target is { } savedMonitor) return (savedMonitor, position);
+        }
+        return (monitors.MinBy(m => DistanceSquared(cursor, m.Bounds)), null);
+    }
+
+    private static double IntersectionArea(Rect first, Rect second)
+    {
+        var intersection = Rect.Intersect(first, second);
+        return intersection.IsEmpty ? 0 : intersection.Width * intersection.Height;
+    }
+
+    private static double DistanceSquared(Point point, Rect bounds)
+    {
+        double x = point.X - Math.Clamp(point.X, bounds.Left, bounds.Right - 1);
+        double y = point.Y - Math.Clamp(point.Y, bounds.Top, bounds.Bottom - 1);
+        return x * x + y * y;
+    }
+
+    private static Rect PlaceOnMonitor(Monitor monitor, Point? position, Size size)
+    {
+        var work = monitor.WorkArea;
+        double width = Math.Min(work.Width, Math.Round(size.Width * monitor.Scale));
+        double height = Math.Min(work.Height, Math.Round(size.Height * monitor.Scale));
+        double x = position?.X ?? work.Left + Math.Floor((work.Width - width) / 2);
+        double y = position?.Y ?? work.Top + Math.Floor(work.Height / 4);
+        return new(Math.Clamp(x, work.Left, work.Right - width), Math.Clamp(y, work.Top, work.Bottom - height), width, height);
+    }
+
+    internal static (Rect Bounds, Monitor Monitor, Size Size) ResolvePanel(string? mode, Point? position, Size? savedSize,
+        Size minimum, int columns, double cellSize, int itemCount, Desktop desktop)
+    {
+        var origin = desktop.Monitors.MinBy(m => DistanceSquared(mode != "cursor" && position is { } saved ? saved : desktop.Cursor, m.Bounds));
+        var desired = savedSize ?? ResolveSize(null, origin.WorkSize, minimum, columns, cellSize, itemCount, HorizontalChrome);
+        var (monitor, savedPosition) = SelectMonitor(mode, position, desired, desktop.Monitors, desktop.Cursor);
+        var size = ResolveSize(savedSize, monitor.WorkSize, minimum, columns, cellSize, itemCount, HorizontalChrome);
+        return (PlaceOnMonitor(monitor, savedPosition, size), monitor, size);
+    }
+
+    internal static void PlacePanel(Window window, Desktop desktop, string? mode, Point? position, int columns,
+        double cellSize, int itemCount, Size? savedSize, bool currentMonitor = false)
+    {
+        if (desktop.Monitors.Count == 0) return;
+        nint hwnd = new WindowInteropHelper(window).EnsureHandle();
+        if (currentMonitor && NativeMethods.GetWindowRect(hwnd, out var currentRect))
+        {
+            var rect = ToRect(currentRect);
+            var monitor = desktop.Monitors.MaxBy(m => IntersectionArea(rect, m.Bounds));
+            desktop = desktop with { Cursor = new(monitor.Bounds.Left + monitor.Bounds.Width / 2, monitor.Bounds.Top + monitor.Bounds.Height / 2) };
+        }
+        var placement = ResolvePanel(mode, position, savedSize, new(window.MinWidth, window.MinHeight), columns, cellSize, itemCount, desktop);
+        window.MaxWidth = placement.Monitor.WorkSize.Width; window.MaxHeight = placement.Monitor.WorkSize.Height;
+        window.Width = placement.Size.Width; window.Height = placement.Size.Height;
+        var bounds = placement.Bounds;
+        NativeMethods.SetWindowPos(hwnd, 0, (int)bounds.X, (int)bounds.Y, (int)bounds.Width, (int)bounds.Height, 0x0014);
+    }
+
+    internal static Desktop ReadDesktop(nint hwnd)
+    {
         if (!NativeMethods.GetCursorPos(out var point) && NativeMethods.GetWindowRect(hwnd, out var current))
             point = new() { X = (current.Left + current.Right) / 2, Y = (current.Top + current.Bottom) / 2 };
-        var monitor = NativeMethods.MonitorFromPoint(point, 2);
-        var info = new NativeMethods.MonitorInfo { Size = Marshal.SizeOf<NativeMethods.MonitorInfo>() };
-        if (!NativeMethods.GetMonitorInfo(monitor, ref info)) return;
-        double scale = NativeMethods.GetDpiForMonitor(monitor, 0, out var dpi, out _) == 0
-            ? dpi / 96.0 : NativeMethods.GetDpiForWindow(hwnd) / 96.0;
-        if (scale <= 0) scale = 1;
-        var work = info.Work;
-        var workArea = new Size((work.Right - work.Left) / scale, (work.Bottom - work.Top) / scale);
-        window.MaxWidth = workArea.Width; window.MaxHeight = workArea.Height;
-        Size size = ResolveSize(savedSize, workArea, new(window.MinWidth, window.MinHeight), columns, cellSize, itemCount,
-            HorizontalChrome);
-        window.Width = size.Width; window.Height = size.Height;
-        var width = (int)Math.Round(window.Width * scale);
-        var height = (int)Math.Round(window.Height * scale);
-        int x = work.Left + Math.Max(0, (work.Right - work.Left - width) / 2);
-        int y = Math.Clamp(work.Top + (work.Bottom - work.Top) / 4, work.Top, Math.Max(work.Top, work.Bottom - height));
-        NativeMethods.SetWindowPos(hwnd, 0, x, y, width, height, 0x0014); // NOZORDER | NOACTIVATE
+        List<Monitor> monitors = [];
+        NativeMethods.EnumDisplayMonitors(0, 0, (nint monitor, nint dc, ref NativeMethods.Rect rect, nint data) =>
+        {
+            var info = new NativeMethods.MonitorInfo { Size = Marshal.SizeOf<NativeMethods.MonitorInfo>() };
+            if (NativeMethods.GetMonitorInfo(monitor, ref info))
+            {
+                double dpi = NativeMethods.GetDpiForMonitor(monitor, 0, out var value, out _) == 0 ? value : NativeMethods.GetDpiForWindow(hwnd);
+                monitors.Add(new(ToRect(info.Monitor), ToRect(info.Work), dpi));
+            }
+            return true;
+        }, 0);
+        return new(monitors, new(point.X, point.Y));
     }
+
+    internal static Rect ToRect(NativeMethods.Rect rect) => new(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top);
     public static void UpdateWorkAreaLimits(Window window)
     {
         nint hwnd = new WindowInteropHelper(window).Handle;

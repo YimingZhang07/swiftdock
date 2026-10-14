@@ -268,7 +268,7 @@ internal static class LauncherAppearanceSmoke
                         && label.ActualWidth <= tile.ActualWidth - 8 && label.TextWrapping == TextWrapping.Wrap;
                 }));
                 check($"tile-error-opacity-and-no-effects-{iconSize}", Math.Abs(tiles[0].Opacity - .55) < .01
-                    && tiles.All(t => t.Effect is null && t.FocusVisualStyle == probe.FindResource("KeyboardFocus")));
+                    && tiles.All(t => t.Effect is null && t.FocusVisualStyle is null));
                 PrototypeSmoke.SaveSnapshot(probe, Path.Combine(directory, $"tiles-{iconSize}.png"));
                 await probe.LaunchAsync(model.Groups[0].Items[0]);
                 check($"successful-launch-is-silent-and-updates-status-{iconSize}", probe.Toast.Visibility == Visibility.Collapsed && probe.StatusText.Contains(result.Message));

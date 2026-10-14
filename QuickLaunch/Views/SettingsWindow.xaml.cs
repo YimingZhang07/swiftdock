@@ -31,10 +31,13 @@ public partial class SettingsWindow : Window
         MainKey.SelectedItem = hotkey.Key;
         SetResult(model.CanEdit ? registration : "当前配置只读，不能修改。", !model.CanEdit || registrationError);
         DirectoryLabel.Text = $"配置目录：{directory}";
-        foreach (Control control in new Control[] { Alt, Control, Shift, Windows, MainKey, ApplyButton, ResetSizeButton, StartupBox })
+        foreach (Control control in new Control[] { Alt, Control, Shift, Windows, MainKey, ApplyButton, ResetSizeButton, StartupBox, WebsiteIconsBox })
             control.IsEnabled = model.CanEdit;
         IconSizes.IsEnabled = model.CanEdit;
+        Placements.IsEnabled = model.CanEdit;
         SyncIconSize();
+        SyncPlacement();
+        WebsiteIconsBox.IsChecked = model.AutoFetchWebsiteIcons;
         _model.PropertyChanged += ModelChanged;
         Closed += (_, _) => _model.PropertyChanged -= ModelChanged;
         try { StartupBox.IsChecked = _startup.IsEnabled; }
@@ -49,7 +52,10 @@ public partial class SettingsWindow : Window
     private void ModelChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(MainViewModel.IconSize)) SyncIconSize();
+        if (e.PropertyName == nameof(MainViewModel.Placement)) SyncPlacement();
+        if (e.PropertyName == nameof(MainViewModel.AutoFetchWebsiteIcons)) WebsiteIconsBox.IsChecked = _model.AutoFetchWebsiteIcons;
     }
+    private void WebsiteIconsClick(object sender, RoutedEventArgs e) => _model.SetAutoFetchWebsiteIcons(WebsiteIconsBox.IsChecked == true);
     private void SyncIconSize()
     {
         _syncing = true;
@@ -61,10 +67,21 @@ public partial class SettingsWindow : Window
         if (_syncing || sender is not RadioButton { Tag: string size } || !_model.CanEdit) return;
         _model.SetIconSize(int.Parse(size));
     }
-    private void IconSizeKeyDown(object sender, KeyEventArgs e)
+    private void SyncPlacement()
+    {
+        _syncing = true;
+        foreach (var button in Placements.Children.OfType<RadioButton>()) button.IsChecked = (string)button.Tag == _model.Placement;
+        _syncing = false;
+    }
+    private void PlacementChanged(object sender, RoutedEventArgs e)
+    {
+        if (_syncing || sender is not RadioButton { Tag: string placement } || !_model.CanEdit) return;
+        _model.SetPlacement(placement);
+    }
+    private void SegmentKeyDown(object sender, KeyEventArgs e)
     {
         if (!_model.CanEdit || e.OriginalSource is not RadioButton current || e.Key is not (Key.Left or Key.Right or Key.Up or Key.Down)) return;
-        var buttons = IconSizes.Children.OfType<RadioButton>().ToArray();
+        var buttons = ((StackPanel)sender).Children.OfType<RadioButton>().ToArray();
         int step = e.Key is Key.Left or Key.Up ? -1 : 1;
         var next = buttons[(Array.IndexOf(buttons, current) + step + buttons.Length) % buttons.Length];
         next.IsChecked = true; next.Focus(); e.Handled = true;
@@ -81,7 +98,8 @@ public partial class SettingsWindow : Window
     private void ExitClick(object sender, RoutedEventArgs e) => _exit();
     private void ResetSizeClick(object sender, RoutedEventArgs e)
     {
-        try { _resetSize(); SetResult("已恢复默认窗口大小，配置将自动保存。"); }
+        if (!_model.CanEdit) return;
+        try { _resetSize(); SetResult("已恢复默认位置和大小，配置将自动保存。"); }
         catch (Exception ex) { SetResult(ex.Message, true); }
     }
     private void StartupClick(object sender, RoutedEventArgs e)

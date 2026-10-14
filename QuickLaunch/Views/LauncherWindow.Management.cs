@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using QuickLaunch.Models;
+using QuickLaunch.Services;
 
 namespace QuickLaunch.Views;
 
@@ -50,7 +51,8 @@ public partial class LauncherWindow
         var grid = new ItemsControl
         {
             ItemsSource = group.Items, ItemTemplate = (DataTemplate)FindResource("TileTemplate"),
-            ItemsPanel = (ItemsPanelTemplate)FindResource("TilePanel"), Visibility = Visibility.Collapsed, Focusable = true
+            ItemsPanel = (ItemsPanelTemplate)FindResource("TilePanel"), Visibility = Visibility.Collapsed,
+            Focusable = false, FocusVisualStyle = null
         };
         KeyboardNavigation.SetDirectionalNavigation(grid, KeyboardNavigationMode.Contained);
         _grids.Add(group, grid); GroupHost.Children.Add(grid);
@@ -63,10 +65,10 @@ public partial class LauncherWindow
         finally { _editor = null; SetSettingsOpen(false); }
     }
     private void AddItemClick(object sender, RoutedEventArgs e) => EditItem(null);
-    public void EditItem(LaunchItem? original)
+    public void EditItem(LaunchItem? original, bool openIconPicker = false)
     {
         if (!CanEdit || DragSession.Active || original?.IsPending == true) return;
-        var group = SelectedGroup; var dialog = new EditItemDialog(original, _theme);
+        var group = SelectedGroup; var dialog = new EditItemDialog(original, _theme, Icons, openIconPicker);
         if (!ShowEditor(dialog) || dialog.Result is not { } result || !Groups.Contains(group)) return;
         try
         {
@@ -119,6 +121,7 @@ public partial class LauncherWindow
     }
     private LaunchItem? MenuItemData(object sender) => sender is MenuItem { Parent: ContextMenu { PlacementTarget: Button { DataContext: LaunchItem item } } } ? item : null;
     private void EditMenuClick(object sender, RoutedEventArgs e) { if (MenuItemData(sender) is { } item) EditItem(item); }
+    private void ChangeIconMenuClick(object sender, RoutedEventArgs e) { if (MenuItemData(sender) is { } item) EditItem(item, openIconPicker: true); }
     private void RenameMenuClick(object sender, RoutedEventArgs e) { if (MenuItemData(sender) is { } item) RenameItem(item); }
     private void DeleteMenuClick(object sender, RoutedEventArgs e) { if (MenuItemData(sender) is { } item) DeleteItem(item); }
     private async void LocationMenuClick(object sender, RoutedEventArgs e)
@@ -137,7 +140,16 @@ public partial class LauncherWindow
     }
     private void RefreshIconMenuClick(object sender, RoutedEventArgs e)
     {
-        if (MenuItemData(sender) is { } item) { Icons.Refresh(item); item.Visual.Image = null; _ = LoadIconsAsync(); }
+        if (MenuItemData(sender) is { } item) RefreshItemIcon(item);
+    }
+    internal void RefreshItemIcon(LaunchItem item)
+    {
+        Icons.Refresh(item);
+        var affected = IconService.UsesFavicon(item) && FaviconService.TryUrl(item.Path, out var url)
+            ? Groups.SelectMany(g => g.Items).Where(i => IconService.UsesFavicon(i) && FaviconService.TryUrl(i.Path, out var other)
+                && FaviconParser.Origin(url) == FaviconParser.Origin(other)) : [item];
+        foreach (var current in affected) { current.Visual.BeginRequest(0); current.Visual.Image = null; }
+        _ = LoadIconsAsync();
     }
     private void FocusItem(string id)
     {

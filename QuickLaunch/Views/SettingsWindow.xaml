@@ -23,15 +23,27 @@
             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
             <TextBlock Text="图标大小" FontSize="13" VerticalAlignment="Center" />
             <Border Grid.Column="1" Background="{DynamicResource LayerBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="3">
-                <StackPanel x:Name="IconSizes" Orientation="Horizontal" KeyboardNavigation.TabNavigation="Once" KeyboardNavigation.DirectionalNavigation="Cycle" PreviewKeyDown="IconSizeKeyDown">
+                <StackPanel x:Name="IconSizes" Orientation="Horizontal" KeyboardNavigation.TabNavigation="Once" KeyboardNavigation.DirectionalNavigation="Cycle" PreviewKeyDown="SegmentKeyDown">
                     <RadioButton x:Name="SmallIcons" Content="小" Tag="32" GroupName="IconSize" Style="{StaticResource IconSizeSegment}" Checked="IconSizeChanged" ToolTip="32 DIP" />
                     <RadioButton x:Name="MediumIcons" Content="中" Tag="40" GroupName="IconSize" Style="{StaticResource IconSizeSegment}" Checked="IconSizeChanged" ToolTip="40 DIP" />
                     <RadioButton x:Name="LargeIcons" Content="大" Tag="48" GroupName="IconSize" Style="{StaticResource IconSizeSegment}" Checked="IconSizeChanged" ToolTip="48 DIP" />
                 </StackPanel>
             </Border>
         </Grid>
-        <Button x:Name="ResetSizeButton" Content="恢复默认窗口大小" HorizontalAlignment="Left" Click="ResetSizeClick" />
-        <TextBlock Text="拖动面板边缘可调整大小" Foreground="{DynamicResource TertiaryBrush}" FontSize="12" Margin="0,8,0,0" />
+        <Grid Margin="0,0,0,12">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <TextBlock Text="呼出位置" FontSize="13" VerticalAlignment="Center" />
+            <Border Grid.Column="1" Background="{DynamicResource LayerBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="3">
+                <StackPanel x:Name="Placements" Orientation="Horizontal" KeyboardNavigation.TabNavigation="Once" KeyboardNavigation.DirectionalNavigation="Cycle" PreviewKeyDown="SegmentKeyDown">
+                    <RadioButton x:Name="LastPosition" Content="上次位置" Tag="lastPosition" GroupName="Placement" Style="{StaticResource IconSizeSegment}" Checked="PlacementChanged" />
+                    <RadioButton x:Name="FollowMouse" Content="跟随鼠标" Tag="cursor" GroupName="Placement" Style="{StaticResource IconSizeSegment}" Checked="PlacementChanged" />
+                </StackPanel>
+            </Border>
+        </Grid>
+        <CheckBox x:Name="WebsiteIconsBox" Content="自动获取网站图标" Margin="0,0,0,12" Click="WebsiteIconsClick"
+                  ToolTip="直接联系网址所在的网站获取图标" />
+        <Button x:Name="ResetSizeButton" Content="恢复默认位置和大小" HorizontalAlignment="Left" Click="ResetSizeClick" />
+        <TextBlock Text="拖动顶栏移动，拖动边缘调整大小" Foreground="{DynamicResource TertiaryBrush}" FontSize="12" Margin="0,8,0,0" />
         <TextBlock Text="启动" FontSize="14" FontWeight="SemiBold" Margin="0,20,0,12" />
         <CheckBox x:Name="StartupBox" Content="登录 Windows 时自动启动" Click="StartupClick" />
         <TextBlock x:Name="Result" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource AccentBrush}" Margin="0,20,0,16" />

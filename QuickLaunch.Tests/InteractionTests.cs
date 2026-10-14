@@ -11,6 +11,26 @@ namespace QuickLaunch.Tests;
 
 public sealed class InteractionTests
 {
+    [Fact]
+    public async Task CustomIconSurvivesEditRenameMovesDeleteUndoAndPersistence() => await OnSta(vm =>
+    {
+        var group = vm.Groups[0]; var original = group.Items[0];
+        vm.UpdateItem(group, original, original with { Icon = "glyph:E943:#2F6FDB" });
+        var item = group.Items[0]; Assert.NotSame(original.Visual, item.Visual);
+        Assert.True(vm.IsDuplicate(group, item with { Icon = "glyph:E735:#0F7B6C" }));
+        vm.UpdateItem(group, item, item with { Name = "renamed", Arguments = "--test" });
+        Assert.Same(item.Visual, group.Items[0].Visual); item = group.Items[0];
+        Assert.True(vm.MoveItem(group, group, item, group.Items.Count));
+        Assert.True(vm.MoveItem(group, vm.Groups[1], item, 0));
+        var target = vm.MoveToNewGroup(vm.Groups[1], item, "custom")!;
+        vm.DeleteItem(target, target.Items[0]); Assert.True(vm.UndoDelete());
+        Assert.Equal(item.Icon, target.Items[0].Icon); Assert.Equal(item.Id, target.Items[0].Id);
+        var loaded = ConfigValidation.Parse(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(vm.Snapshot(), ConfigJsonContext.Default.AppConfig));
+        Assert.Equal(item.Icon, loaded.Groups.Single(g => g.Id == target.Id).Items[0].Icon);
+        vm.UpdateItem(target, target.Items[0], target.Items[0] with { Icon = null });
+        Assert.Null(target.Items[0].Icon); Assert.NotSame(item.Visual, target.Items[0].Visual);
+    });
+
     [Theory]
     [InlineData(1, true)] [InlineData(2, false)] [InlineData(3, false)]
     public void HeaderMoveHandlesClicksWithoutMovingOnDoubleClick(int clickCount, bool move) =>

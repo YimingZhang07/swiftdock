@@ -6,29 +6,47 @@
         Title="QuickLaunch" Width="620" Height="500" WindowStyle="None"
         ResizeMode="CanResize" AllowsTransparency="False" ShowInTaskbar="False" Topmost="True"
         Background="{DynamicResource WindowBrush}" Foreground="{DynamicResource TextBrush}" FontFamily="Segoe UI, Microsoft YaHei UI"
-        UseLayoutRounding="True" AllowDrop="True">
+        UseLayoutRounding="True" AllowDrop="True" Focusable="False" FocusVisualStyle="{x:Null}">
     <WindowChrome.WindowChrome>
         <WindowChrome ResizeBorderThickness="6" CaptionHeight="0" GlassFrameThickness="-1"
                       UseAeroCaptionButtons="False" CornerRadius="0" />
     </WindowChrome.WindowChrome>
     <Window.Resources>
-        <Style x:Key="KeyboardFocus" TargetType="Control">
-            <Setter Property="Template">
-                <Setter.Value><ControlTemplate><Border BorderBrush="{DynamicResource AccentBrush}" BorderThickness="2" CornerRadius="6" /></ControlTemplate></Setter.Value>
-            </Setter>
+        <Style TargetType="ScrollViewer">
+            <Setter Property="Focusable" Value="False" /><Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        </Style>
+        <Style TargetType="Thumb">
+            <Setter Property="Focusable" Value="False" /><Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        </Style>
+        <Style x:Key="KeyboardFocusRing" TargetType="Border">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="BorderThickness" Value="2" /><Setter Property="CornerRadius" Value="6" />
+            <Setter Property="IsHitTestVisible" Value="False" /><Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsKeyboardFocused, RelativeSource={RelativeSource TemplatedParent}}" Value="True" />
+                        <Condition Binding="{Binding KeyboardCues, RelativeSource={RelativeSource AncestorType=local:LauncherWindow}}" Value="True" />
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Visibility" Value="Visible" />
+                </MultiDataTrigger>
+            </Style.Triggers>
         </Style>
         <Style x:Key="IconButton" TargetType="Button">
             <Setter Property="Width" Value="32" /><Setter Property="Height" Value="32" />
             <Setter Property="Margin" Value="0" /><Setter Property="Padding" Value="0" />
             <Setter Property="Background" Value="Transparent" /><Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
             <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" /><Setter Property="FontSize" Value="14" />
-            <Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocus}" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="4">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
+                        <Grid>
+                            <Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="4">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <Border x:Name="FocusRing" Style="{StaticResource KeyboardFocusRing}" />
+                        </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="{DynamicResource SubtleFillBrush}" /></Trigger>
                             <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Background" Value="{DynamicResource SubtlePressedBrush}" /></Trigger>
@@ -41,7 +59,7 @@
         <Style x:Key="TabButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent" /><Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
             <Setter Property="FontSize" Value="13" /><Setter Property="Padding" Value="10,6" /><Setter Property="Margin" Value="0" />
-            <Setter Property="FontWeight" Value="Normal" /><Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocus}" />
+            <Setter Property="FontWeight" Value="Normal" /><Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -51,6 +69,7 @@
                             </Border>
                             <Border x:Name="Underline" Width="16" Height="3" CornerRadius="1.5" Background="{DynamicResource AccentBrush}"
                                     HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,2" Visibility="Collapsed" />
+                            <Border x:Name="FocusRing" Style="{StaticResource KeyboardFocusRing}" />
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -68,13 +87,16 @@
         <Style x:Key="TileButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent" /><Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
             <Setter Property="Margin" Value="2" /><Setter Property="Padding" Value="4" />
-            <Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocus}" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center" />
-                        </Border>
+                        <Grid>
+                            <Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center" />
+                            </Border>
+                            <Border x:Name="FocusRing" Style="{StaticResource KeyboardFocusRing}" />
+                        </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="{DynamicResource SubtleFillBrush}" /></Trigger>
                             <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Background" Value="{DynamicResource SubtlePressedBrush}" /></Trigger>
@@ -86,9 +108,12 @@
         <Style x:Key="ToastLink" TargetType="Button">
             <Setter Property="Background" Value="Transparent" /><Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
             <Setter Property="Margin" Value="10,0,0,0" /><Setter Property="Padding" Value="0" /><Setter Property="Cursor" Value="Hand" />
-            <Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocus}" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
-                <Border Background="Transparent"><ContentPresenter VerticalAlignment="Center" /></Border>
+                <Grid>
+                    <Border Background="Transparent"><ContentPresenter VerticalAlignment="Center" /></Border>
+                    <Border x:Name="FocusRing" Style="{StaticResource KeyboardFocusRing}" />
+                </Grid>
             </ControlTemplate></Setter.Value></Setter>
         </Style>
         <ItemsPanelTemplate x:Key="TilePanel"><WrapPanel HorizontalAlignment="Left" ItemWidth="{Binding DataContext.CellSize, RelativeSource={RelativeSource AncestorType=Window}}" ItemHeight="{Binding DataContext.CellSize, RelativeSource={RelativeSource AncestorType=Window}}" /></ItemsPanelTemplate>
@@ -97,6 +122,7 @@
             <MenuItem Header="以管理员身份运行" Click="AdminMenuClick" />
             <MenuItem Header="打开所在位置" Click="LocationMenuClick" />
             <MenuItem Header="编辑…" Tag="edit" Click="EditMenuClick" />
+            <MenuItem Header="更换图标…" Tag="edit" Click="ChangeIconMenuClick" />
             <MenuItem Header="重命名" Tag="edit" Click="RenameMenuClick" />
             <MenuItem Header="删除" Tag="edit" Foreground="{DynamicResource ErrorBrush}" Click="DeleteMenuClick" />
             <Separator /><MenuItem Header="刷新图标" Click="RefreshIconMenuClick" />
@@ -129,9 +155,9 @@
             </DataTemplate.Triggers>
         </DataTemplate>
     </Window.Resources>
-    <Grid x:Name="Root" Background="{DynamicResource WindowBrush}">
+    <Grid x:Name="Root" Background="{DynamicResource WindowBrush}" Focusable="False">
         <Grid.RowDefinitions><RowDefinition Height="{x:Static services:WindowPlacement.HeaderRowHeight}" /><RowDefinition Height="*" /></Grid.RowDefinitions>
-        <Border x:Name="WindowDragArea" Background="Transparent" Padding="12,0">
+        <Border x:Name="WindowDragArea" Background="Transparent" Padding="12,0" Focusable="False">
             <DockPanel LastChildFill="True">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
                     <TextBlock x:Name="StorageNotice" Text="{Binding StorageWarning}" Foreground="{DynamicResource TertiaryBrush}" FontSize="12"
@@ -147,7 +173,7 @@
                 </StackPanel>
                 <ScrollViewer x:Name="TabsViewport" DockPanel.Dock="Left" Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" PreviewMouseWheel="TabsMouseWheel" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
-                        <StackPanel x:Name="Tabs" Orientation="Horizontal" />
+                        <StackPanel x:Name="Tabs" Orientation="Horizontal" Focusable="False" />
                         <Button x:Name="AddGroupButton" Style="{StaticResource IconButton}" Content="&#xE710;" FontSize="12" Foreground="{DynamicResource MutedBrush}" ToolTip="新建分组；也可把条目拖到这里"
                                 AutomationProperties.Name="新建分组" Click="AddGroupClick" IsEnabled="{Binding CanEdit}" />
                     </StackPanel>
@@ -156,8 +182,8 @@
             </DockPanel>
         </Border>
         <Grid Grid.Row="1" Margin="{x:Static services:WindowPlacement.ContentMargin}" ClipToBounds="True">
-            <ScrollViewer x:Name="Viewer" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PreviewMouseWheel="IconsMouseWheel">
-                <Grid x:Name="GroupHost" Background="Transparent" />
+            <ScrollViewer x:Name="Viewer" Focusable="False" FocusVisualStyle="{x:Null}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PreviewMouseWheel="IconsMouseWheel">
+                <Grid x:Name="GroupHost" Background="Transparent" Focusable="False" />
             </ScrollViewer>
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
                 <StackPanel.Style><Style TargetType="StackPanel">

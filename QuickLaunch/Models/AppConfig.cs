@@ -31,11 +31,20 @@ public sealed record AppConfig
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool HideOnDeactivate { get; init; }
     public int IconSize { get; init; } = 32;
+    // Null is the default (on); only an explicit opt-out is written.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? AutoFetchWebsiteIcons { get; init; }
     public int Columns { get; init; } = 6;
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public double? WindowWidth { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public double? WindowHeight { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? WindowLeft { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? WindowTop { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Placement { get; init; }
     public string? LastGroupId { get; init; }
     [JsonRequired] public List<GroupConfig> Groups { get; init; } = [];
 

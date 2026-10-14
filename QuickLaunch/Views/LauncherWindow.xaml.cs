@@ -32,6 +32,7 @@ public partial class LauncherWindow : Window
     private bool _externalDrag, _menuOpen, _closing, _movingWindow;
     private bool _sizeMove, _sizing;
     private Size? _sizeBeforeMove;
+    private Point? _positionBeforeMove;
     private int _ownedWindows;
     private CancellationTokenSource? _importStop;
     private int _showGeneration;
@@ -53,11 +54,16 @@ public partial class LauncherWindow : Window
     public static readonly DependencyProperty SelectedGroupProperty = DependencyProperty.Register(
         nameof(SelectedGroup), typeof(LaunchGroup), typeof(LauncherWindow));
     public LaunchGroup SelectedGroup { get => (LaunchGroup)GetValue(SelectedGroupProperty); private set => SetValue(SelectedGroupProperty, value); }
+    public static readonly DependencyProperty KeyboardCuesProperty = DependencyProperty.Register(
+        nameof(KeyboardCues), typeof(bool), typeof(LauncherWindow), new PropertyMetadata(false));
+    public bool KeyboardCues { get => (bool)GetValue(KeyboardCuesProperty); private set => SetValue(KeyboardCuesProperty, value); }
     public DragCoordinator DragSession { get; }
     public bool Importing { get; private set; }
     public Action? SettingsRequested { get; set; }
     public string StatusText { get; private set; } = "";
     internal Action<MouseButtonEventArgs> StartWindowMove { get; set; }
+    internal Func<nint, WindowPlacement.Desktop> GetPlacementDesktop { get; set; } = WindowPlacement.ReadDesktop;
+    internal Func<Button, bool> FocusButton { get; set; } = button => button.Focus();
 
     public LauncherWindow(DiagnosticLog log, MainViewModel viewModel, IconService icons)
         : this(log, viewModel, icons, LaunchService.StartAsync) { }
@@ -71,6 +77,7 @@ public partial class LauncherWindow : Window
         Log = log;
         ViewModel = viewModel;
         Icons = icons;
+        Icons.AutoFetchWebsiteIcons = viewModel.AutoFetchWebsiteIcons;
         _startLaunch = startLaunch;
         DataContext = viewModel;
         SelectedGroup = Groups.FirstOrDefault(g => g.Id == viewModel.LastGroupId) ?? Groups[0];
@@ -79,6 +86,7 @@ public partial class LauncherWindow : Window
         ViewModel.Groups.CollectionChanged += (_, _) => RebuildGroups();
         Loaded += (_, _) => _ = LoadIconsAsync();
         PreviewKeyDown += KeyPressed;
+        AddHandler(PreviewMouseDownEvent, new MouseButtonEventHandler((_, _) => KeyboardCues = false), handledEventsToo: true);
         PreviewGotKeyboardFocus += (_, e) =>
         {
             if (e.NewFocus is Button { DataContext: LaunchItem item }) _focusedItemId = item.Id;
@@ -112,6 +120,16 @@ public partial class LauncherWindow : Window
 
     private void ViewModelChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(MainViewModel.AutoFetchWebsiteIcons))
+        {
+            Icons.AutoFetchWebsiteIcons = ViewModel.AutoFetchWebsiteIcons;
+            foreach (var item in Groups.SelectMany(g => g.Items).Where(IconService.UsesFavicon))
+            {
+                item.Visual.BeginRequest(0); item.Visual.Image = null;
+            }
+            _ = LoadIconsAsync();
+        }
+        if (e.PropertyName == nameof(MainViewModel.Placement) && IsVisible && !_warming && !_sizeMove) PlacePanel();
         if (e.PropertyName == nameof(MainViewModel.IconSize) && IsLoaded) _ = LoadIconsAsync();
         if (e.PropertyName == nameof(MainViewModel.CellSize))
         {
@@ -132,8 +150,17 @@ public partial class LauncherWindow : Window
     {
         if (!CanEdit) return;
         ViewModel.SetWindowSize(null);
+        ViewModel.SetWindowPosition(null);
         UpdateMinimumSize();
-        if (IsVisible && !_sizeMove) WindowPlacement.ResizeInPlace(this, CellSize, SelectedGroup.Items.Count, ViewModel.Columns);
+        if (IsVisible && !_sizeMove) PlacePanel(defaultOnCurrentMonitor: true);
+    }
+
+    private void PlacePanel(bool defaultOnCurrentMonitor = false, bool followCursor = false)
+    {
+        var desktop = GetPlacementDesktop(new WindowInteropHelper(this).EnsureHandle());
+        WindowPlacement.PlacePanel(this, desktop, defaultOnCurrentMonitor || followCursor ? "cursor" : ViewModel.Placement,
+            defaultOnCurrentMonitor || followCursor ? null : ViewModel.WindowPosition, ViewModel.Columns, CellSize,
+            SelectedGroup.Items.Count, ViewModel.WindowSize, defaultOnCurrentMonitor);
     }
 
     public void InitializeNative(ThemeService? theme = null)
@@ -179,28 +206,56 @@ public partial class LauncherWindow : Window
         BackdropMode = acrylic ? "acrylic" : "solid";
     }
 
-    private nint WindowMessage(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)
+    internal nint WindowMessage(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)
     {
+        // Only the launcher suppresses native focus/access-key cues; its templates draw our own.
+        if (message is NativeMethods.WmChangeUiState or NativeMethods.WmUpdateUiState)
+        { handled = true; return 0; }
         if (message == NativeMethods.WmEnterSizeMove)
-        {
-            _sizeMove = true; _sizing = false;
-            WindowPlacement.UpdateWorkAreaLimits(this);
-            _sizeBeforeMove = NativeSize(hwnd);
-        }
-        else if (message == NativeMethods.WmSizing && _sizeMove) _sizing = true;
-        else if (message == NativeMethods.WmExitSizeMove)
-        {
-            // WM_SIZING distinguishes a resize from a move that happens to change DPI.
-            if (_sizeMove && _sizing && !_closing && _sizeBeforeMove is { } before && NativeSize(hwnd) is { } after
-                && after != before)
-                ViewModel.SetWindowSize(after);
-            _sizeMove = false; _sizing = false;
-            WindowPlacement.UpdateWorkAreaLimits(this);
-        }
+            BeginSizeMove();
+        else if (message == NativeMethods.WmSizing) MarkSizing();
+        else if (message == NativeMethods.WmExitSizeMove) CompleteSizeMove();
         // WPF handles the native suggested rectangle; log the actual post-change DPI.
         if (message == NativeMethods.WmDpiChanged)
-            Dispatcher.BeginInvoke(() => { WindowPlacement.UpdateWorkAreaLimits(this); Log.Write("window.dpi", new { dpi = NativeMethods.GetDpiForWindow(hwnd), Left, Top, ActualWidth, ActualHeight }); _ = LoadIconsAsync(); });
+            Dispatcher.BeginInvoke(RefreshDpi);
         return 0;
+    }
+
+    internal void RefreshDpi()
+    {
+        WindowPlacement.UpdateWorkAreaLimits(this);
+        Log.Write("window.dpi", new { dpi = NativeMethods.GetDpiForWindow(new WindowInteropHelper(this).Handle), Left, Top, ActualWidth, ActualHeight });
+        _ = LoadIconsAsync();
+    }
+
+    internal void BeginSizeMove()
+    {
+        _sizeMove = true; _sizing = false;
+        WindowPlacement.UpdateWorkAreaLimits(this);
+        nint hwnd = new WindowInteropHelper(this).Handle;
+        _sizeBeforeMove = NativeSize(hwnd);
+        _positionBeforeMove = NativeMethods.GetWindowRect(hwnd, out var rect) ? new(rect.Left, rect.Top) : null;
+    }
+
+    internal void MarkSizing() { if (_sizeMove) _sizing = true; }
+
+    internal void CompleteSizeMove()
+    {
+        nint hwnd = new WindowInteropHelper(this).Handle;
+        if (_sizeMove && !_closing && !_warming)
+        {
+            // WM_SIZING distinguishes a resize from a move that happens to change DPI.
+            var size = NativeSize(hwnd);
+            bool resized = _sizing && _sizeBeforeMove is { } before && size is { } after && after != before;
+            if (resized) ViewModel.SetWindowSize(size);
+            if (NativeMethods.GetWindowRect(hwnd, out var rect))
+            {
+                var position = new Point(rect.Left, rect.Top);
+                if (resized || _positionBeforeMove is { } previous && previous != position) ViewModel.SetWindowPosition(position);
+            }
+        }
+        _sizeMove = false; _sizing = false;
+        WindowPlacement.UpdateWorkAreaLimits(this);
     }
 
     private static Size? NativeSize(nint hwnd)
@@ -233,6 +288,7 @@ public partial class LauncherWindow : Window
     {
         if (_closing || _sizeMove || _movingWindow) return;
         if (_editor?.IsVisible == true) { _editor.Activate(); return; }
+        KeyboardCues = false;
         if (_warming && source != "prewarm") RestoreWarmupState();
         var watch = Stopwatch.StartNew();
         CancelMeasurement();
@@ -240,7 +296,7 @@ public partial class LauncherWindow : Window
         _renderCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         int generation = ++_showGeneration;
         ShowActivated = !forDrop;
-        if (source != "prewarm") WindowPlacement.AtCursor(this, ViewModel.Columns, CellSize, SelectedGroup.Items.Count, ViewModel.WindowSize);
+        if (source != "prewarm") PlacePanel();
         Show();
         nint hwnd = new WindowInteropHelper(this).Handle;
         if (!forDrop)
@@ -250,7 +306,9 @@ public partial class LauncherWindow : Window
         }
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
         {
-            if (generation != _showGeneration || !IsVisible || forDrop || !IsActive) return;
+            if (generation != _showGeneration || !IsVisible) return;
+            _ = LoadIconsAsync(); // Revisit expired favicon entries lazily after the window is shown.
+            if (forDrop) return;
             FocusFirst();
         });
         _renderHandler = (_, _) =>
@@ -303,7 +361,7 @@ public partial class LauncherWindow : Window
         _warming = true; UpdateBackdrop(); Opacity = 0;
         var cancellation = new CancellationTokenSource(); _warmupStop = cancellation;
         var watch = Stopwatch.StartNew();
-        WindowPlacement.AtCursor(this, ViewModel.Columns, CellSize, SelectedGroup.Items.Count, ViewModel.WindowSize);
+        PlacePanel(followCursor: true);
         nint handle = new WindowInteropHelper(this).Handle;
         int width = (int)Math.Ceiling(Width * VisualTreeHelper.GetDpi(this).DpiScaleX);
         NativeMethods.SetWindowPos(handle, 0, NativeMethods.GetSystemMetrics(76) - width - 64,
@@ -393,42 +451,97 @@ public partial class LauncherWindow : Window
     {
         var grid = _grids[SelectedGroup];
         grid.UpdateLayout();
-        var buttons = Descendants<Button>(grid).ToList();
+        var buttons = Descendants<Button>(grid).Where(b => b.IsEnabled && b.Focusable).ToList();
         var first = buttons.FirstOrDefault(b => b.DataContext is LaunchItem item && item.Id == _focusedItemId) ?? buttons.FirstOrDefault();
-        if (first is not null) { first.Focus(); first.BringIntoView(); } else grid.Focus();
+        first ??= Tabs.Children.OfType<Button>().FirstOrDefault(b => b.Tag == SelectedGroup);
+        if (first is not null) FocusAndReveal(first);
+    }
+
+    private void FocusAndReveal(Button button)
+    {
+        if (FocusButton(button) && button.DataContext is LaunchItem item) _focusedItemId = item.Id;
+        button.BringIntoView();
+    }
+
+    private void NavigateTiles(Button? current, Key key)
+    {
+        var grid = _grids[SelectedGroup];
+        grid.UpdateLayout();
+        var buttons = Descendants<Button>(grid).ToList();
+        int index = current is null ? -1 : buttons.IndexOf(current);
+        if (index < 0) { FocusFirst(); return; }
+        int columns = Math.Max(1, (int)(Viewer.ViewportWidth / CellSize));
+        int page = Math.Max(1, (int)(Viewer.ViewportHeight / CellSize)) * columns;
+        int target = key switch
+        {
+            Key.Left => index - 1, Key.Right => index + 1,
+            Key.Up => index - columns, Key.Down => index + columns,
+            Key.Home => 0, Key.End => buttons.Count - 1,
+            Key.PageUp => index - page, Key.PageDown => index + page,
+            _ => index
+        };
+        target = Math.Clamp(target, 0, buttons.Count - 1);
+        int step = key is Key.Left or Key.Up or Key.End or Key.PageUp ? -1 : 1;
+        while (target >= 0 && target < buttons.Count)
+        {
+            if (buttons[target].IsEnabled && buttons[target].Focusable) { FocusAndReveal(buttons[target]); return; }
+            target += step;
+        }
     }
 
     private void KeyPressed(object sender, KeyEventArgs e)
     {
         if (e.OriginalSource is System.Windows.Controls.Primitives.TextBoxBase || _editor?.IsVisible == true) return;
-        var focused = Keyboard.FocusedElement as DependencyObject;
-        var item = focused is null ? null : Ancestor<Button>(focused)?.DataContext as LaunchItem;
-        if (e.Key == Key.Escape)
+        // Routed key events originate at the focused control. Using their device/source also
+        // lets diagnostics exercise this path without foreground permission or native input.
+        var focused = e.OriginalSource as DependencyObject;
+        var button = focused is null ? null : Ancestor<Button>(focused);
+        var item = button?.DataContext as LaunchItem;
+        var modifiers = e.KeyboardDevice.Modifiers;
+        if (!DragSession.Active && IsKeyboardNavigation(e.Key, modifiers)) KeyboardCues = true;
+        if (!DragSession.Active && IsKeyboardNavigation(e.Key, modifiers)
+            && e.Key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Home or Key.End or Key.PageUp or Key.PageDown)
+        {
+            NavigateTiles(button, e.Key);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape)
         {
             if (_menuOpen) return; // Let the menu consume Esc before the panel's hide shortcut.
             if (DragSession.Active) DragSession.Cancel(); else HidePanel();
             e.Handled = true;
         }
-        else if (e.Key == Key.Tab && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && !DragSession.Active)
+        else if (e.Key == Key.Tab && modifiers.HasFlag(ModifierKeys.Control) && !DragSession.Active)
         {
-            int step = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) ? -1 : 1;
+            int step = modifiers.HasFlag(ModifierKeys.Shift) ? -1 : 1;
             SelectGroup(Groups[(Groups.ToList().IndexOf(SelectedGroup) + step + Groups.Count) % Groups.Count]);
             FocusFirst();
             e.Handled = true;
         }
-        else if (Keyboard.Modifiers == ModifierKeys.Control && e.Key >= Key.D1 && e.Key <= Key.D9 && !DragSession.Active)
+        else if (modifiers == ModifierKeys.Control && e.Key >= Key.D1 && e.Key <= Key.D9 && !DragSession.Active)
         {
             int index = e.Key - Key.D1;
             if (index < Groups.Count) { SelectGroup(Groups[index]); FocusFirst(); }
             e.Handled = true;
         }
-        else if (e.Key == Key.Z && Keyboard.Modifiers == ModifierKeys.Control && !DragSession.Active)
+        else if (e.Key == Key.Z && modifiers == ModifierKeys.Control && !DragSession.Active)
         { SetStatus(ViewModel.UndoDelete() ? "已恢复删除的条目。" : "没有可恢复的删除记录，或已超过 5 秒。"); e.Handled = true; }
-        else if (e.Key == Key.F2 && item is not null && !DragSession.Active) { RenameItem(item); e.Handled = true; }
-        else if (e.Key == Key.Delete && item is not null && !DragSession.Active) { DeleteItem(item); e.Handled = true; }
+        else if (e.Key == Key.F2 && item is not null && !DragSession.Active)
+        { if (KeyboardCues) RenameItem(item); e.Handled = true; }
+        else if (e.Key == Key.Delete && item is not null && !DragSession.Active)
+        { if (KeyboardCues) DeleteItem(item); e.Handled = true; }
         else if (e.Key == Key.Enter && item is not null && !DragSession.Active)
-        { _ = LaunchAsync(item); e.Handled = true; }
+        {
+            if (KeyboardCues) { if (!e.IsRepeat) _ = LaunchAsync(item); }
+            else KeyboardCues = true;
+            e.Handled = true;
+        }
     }
+
+    internal static bool IsKeyboardNavigation(Key key, ModifierKeys modifiers) =>
+        (modifiers & (ModifierKeys.Alt | ModifierKeys.Windows)) == 0
+        && (key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Tab or Key.Home or Key.End or Key.PageUp or Key.PageDown
+            || modifiers == ModifierKeys.Control && key >= Key.D1 && key <= Key.D9);
 
     private void TabsMouseWheel(object sender, MouseWheelEventArgs e)
     {
@@ -644,8 +757,16 @@ public partial class LauncherWindow : Window
         {
             try
             {
-                if (item.Visual.Image is not null && item.Visual.RequestedPixels == pixels) return;
+                if (item.Visual.Image is not null && item.Visual.RequestedPixels == pixels
+                    && (!IconService.UsesFavicon(item) || !Icons.AutoFetchWebsiteIcons || item.Visual.WebsiteIconExpires > DateTimeOffset.UtcNow)) return;
                 int generation = item.Visual.BeginRequest(pixels);
+                if (IconService.UsesFavicon(item))
+                {
+                    item.Visual.Complete(generation, IconService.Globe(pixels));
+                    item.Visual.BeginWebsiteIcon();
+                    _ = ApplyFaviconAsync(item, pixels, generation, cancellation);
+                    return;
+                }
                 var image = await Icons.GetAsync(item, pixels, cancellation);
                 if (_closing || cancellation.IsCancellationRequested) return;
                 item.Visual.Complete(generation, image);
@@ -653,6 +774,17 @@ public partial class LauncherWindow : Window
             catch (OperationCanceledException) { }
             catch (ObjectDisposedException) { }
         }));
+    }
+    private async Task ApplyFaviconAsync(LaunchItem item, int pixels, int generation, CancellationToken cancellation)
+    {
+        try
+        {
+            var image = await Icons.GetFaviconAsync(item, pixels, cancellation);
+            if (!_closing && !cancellation.IsCancellationRequested && Icons.AutoFetchWebsiteIcons)
+                item.Visual.CompleteWebsiteIcon(generation, image, Icons.FaviconExpires(item, pixels));
+        }
+        catch (OperationCanceledException) { }
+        catch (ObjectDisposedException) { }
     }
     public static T? Ancestor<T>(DependencyObject? value) where T : DependencyObject
     {

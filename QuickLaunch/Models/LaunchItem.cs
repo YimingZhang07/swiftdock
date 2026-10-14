@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using QuickLaunch.Services;
 using QuickLaunch.ViewModels;
 
 namespace QuickLaunch.Models;
@@ -11,6 +12,8 @@ public sealed record LaunchItem([property: JsonRequired] string Name, [property:
 {
     [JsonRequired] public string Id { get; init; } = Guid.NewGuid().ToString("N");
     public long LaunchCount { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull), JsonConverter(typeof(IconValueConverter))]
+    public string? Icon { get; init; }
     [JsonIgnore] public string? ErrorMessage { get; init; }
     [JsonIgnore] public IconVisual Visual { get; init; } = new();
     [JsonIgnore] public bool IsPending { get; init; }

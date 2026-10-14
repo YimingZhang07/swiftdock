@@ -20,9 +20,77 @@ public sealed class ConfigTests : IDisposable
         string json = Encoding.UTF8.GetString(bytes);
         Assert.DoesNotContain("windowWidth", json);
         Assert.DoesNotContain("windowHeight", json);
+        Assert.DoesNotContain("windowLeft", json);
+        Assert.DoesNotContain("windowTop", json);
+        Assert.DoesNotContain("placement", json);
         var loaded = ConfigValidation.Parse(bytes);
         Assert.Null(loaded.WindowWidth); Assert.Null(loaded.WindowHeight);
         Assert.Equal(bytes, JsonSerializer.SerializeToUtf8Bytes(loaded, ConfigJsonContext.Default.AppConfig));
+    }
+
+    [Theory]
+    [InlineData(-1920, 0, null)]
+    [InlineData(100000, -100000, "cursor")]
+    [InlineData(null, null, "cursor")]
+    public void PositionAndPlacementRoundtrip(int? left, int? top, string? placement)
+    {
+        var original = AppConfig.CreateDefault() with { WindowLeft = left, WindowTop = top, Placement = placement };
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(original, ConfigJsonContext.Default.AppConfig);
+        var loaded = ConfigValidation.Parse(bytes);
+        Assert.Equal(left, loaded.WindowLeft); Assert.Equal(top, loaded.WindowTop); Assert.Equal(placement, loaded.Placement);
+        Assert.Equal(bytes, JsonSerializer.SerializeToUtf8Bytes(loaded, ConfigJsonContext.Default.AppConfig));
+    }
+
+    [Theory]
+    [InlineData(null, 10)] [InlineData(10, null)]
+    [InlineData(-100001, 0)] [InlineData(100001, 0)]
+    [InlineData(0, -100001)] [InlineData(0, 100001)]
+    public void InvalidPositionClearsBothCoordinates(int? left, int? top)
+    {
+        var original = AppConfig.CreateDefault() with { WindowLeft = left, WindowTop = top, Placement = "cursor", WindowWidth = 600, WindowHeight = 400 };
+        var expected = original with { WindowLeft = null, WindowTop = null };
+        Assert.Equal(expected, ConfigValidation.Normalize(original));
+        var loaded = ConfigValidation.Parse(JsonSerializer.SerializeToUtf8Bytes(original, ConfigJsonContext.Default.AppConfig));
+        Assert.Equal(JsonSerializer.Serialize(expected, ConfigJsonContext.Default.AppConfig), JsonSerializer.Serialize(loaded, ConfigJsonContext.Default.AppConfig));
+    }
+
+    [Theory]
+    [InlineData("lastPosition")] [InlineData("unknown")] [InlineData("")] [InlineData("Cursor")]
+    public void DefaultOrUnknownPlacementNormalizesToOmittedDefault(string placement)
+    {
+        var original = AppConfig.CreateDefault() with { Placement = placement, WindowLeft = -200, WindowTop = 0 };
+        var loaded = ConfigValidation.Parse(JsonSerializer.SerializeToUtf8Bytes(original, ConfigJsonContext.Default.AppConfig));
+        Assert.Null(loaded.Placement);
+        Assert.Equal(-200, loaded.WindowLeft); Assert.Equal(0, loaded.WindowTop);
+        Assert.DoesNotContain("placement", JsonSerializer.Serialize(loaded, ConfigJsonContext.Default.AppConfig));
+    }
+
+    [Fact]
+    public void OldConfigRemainsByteIdentical()
+    {
+        const string json = """
+            {
+              "version": 1,
+              "hotkey": {
+                "modifiers": [
+                  "Alt"
+                ],
+                "key": "Space"
+              },
+              "iconSize": 32,
+              "columns": 6,
+              "lastGroupId": "0123456789abcdef0123456789abcdef",
+              "groups": [
+                {
+                  "id": "0123456789abcdef0123456789abcdef",
+                  "name": "Apps",
+                  "items": []
+                }
+              ]
+            }
+            """;
+        byte[] bytes = Encoding.UTF8.GetBytes(json.Replace("\r\n", "\n").Replace("\n", Environment.NewLine));
+        Assert.Equal(bytes, JsonSerializer.SerializeToUtf8Bytes(ConfigValidation.Parse(bytes), ConfigJsonContext.Default.AppConfig));
     }
 
     [Fact]

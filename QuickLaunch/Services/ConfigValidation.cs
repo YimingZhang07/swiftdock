@@ -66,9 +66,16 @@ public static class ConfigValidation
             }
         }
         var groups = config.Groups.Count == 0 ? new List<GroupConfig> { new() } : config.Groups;
+        // Keep the original graph when no icons need normalizing (including legacy configurations).
+        if (groups.Any(g => g.Items.Any(i => i.Icon != IconSpec.Normalize(i.Icon))))
+            groups = groups.Select(g => g with { Items = g.Items.Select(i => i with { Icon = IconSpec.Normalize(i.Icon) }).ToList() }).ToList();
         static bool ValidSize(double? value) => value is > 0 and <= 10000 && double.IsFinite(value.Value);
         bool sized = ValidSize(config.WindowWidth) && ValidSize(config.WindowHeight);
-        return config with { HideOnDeactivate = false, WindowWidth = sized ? config.WindowWidth : null,
+        bool positioned = config.WindowLeft is >= -100000 and <= 100000 && config.WindowTop is >= -100000 and <= 100000;
+        return config with { HideOnDeactivate = false, AutoFetchWebsiteIcons = config.AutoFetchWebsiteIcons == false ? false : null,
+            WindowWidth = sized ? config.WindowWidth : null,
+            WindowLeft = positioned ? config.WindowLeft : null, WindowTop = positioned ? config.WindowTop : null,
+            Placement = config.Placement == "cursor" ? "cursor" : null,
             WindowHeight = sized ? config.WindowHeight : null, Groups = groups, LastGroupId = groups.Any(g => g.Id == config.LastGroupId)
             ? config.LastGroupId : groups[0].Id };
     }

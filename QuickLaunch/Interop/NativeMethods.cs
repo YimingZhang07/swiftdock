@@ -19,6 +19,15 @@ internal static partial class NativeMethods
     // Image factory returns an owned IUnknown pointer; caller releases it and every returned HBITMAP.
     [LibraryImport("shell32.dll", StringMarshalling = StringMarshalling.Utf16)]
     internal static partial int SHCreateItemFromParsingName(string path, nint bindContext, in Guid iid, out nint result);
+    // PrivateExtractIcons returns owned HICONs at the requested physical size; negative indices address resource IDs.
+    [LibraryImport("user32.dll", EntryPoint = "PrivateExtractIconsW", StringMarshalling = StringMarshalling.Utf16)]
+    internal static partial uint PrivateExtractIcons(string path, int index, int width, int height, out nint icon, out uint resourceId, uint count, uint flags);
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool DestroyIcon(nint icon);
+    // Known-folder paths are allocated by the Shell and freed with CoTaskMemFree.
+    [LibraryImport("shell32.dll")]
+    internal static partial int SHGetKnownFolderPath(in Guid id, uint flags, nint token, out nint path);
     [LibraryImport("gdi32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool DeleteObject(nint handle);
@@ -28,8 +37,12 @@ internal static partial class NativeMethods
     internal static partial void OleUninitialize();
     internal const int WmHotkey = 0x0312;
     internal const int WmDpiChanged = 0x02E0;
+    internal const int WmChangeUiState = 0x0127, WmUpdateUiState = 0x0128;
     internal const int WmEnterSizeMove = 0x0231, WmExitSizeMove = 0x0232, WmSizing = 0x0214;
     internal const int WmNcHitTest = 0x0084;
+    internal const int WmGetIcon = 0x007F, WmSetIcon = 0x0080;
+    internal const int GwlStyle = -16, GwlExStyle = -20, WsExDlgModalFrame = 0x0001;
+    internal const int WsSysMenu = 0x00080000;
     internal const uint ModAlt = 0x0001, ModNoRepeat = 0x4000;
 
     [StructLayout(LayoutKind.Sequential)]
@@ -73,6 +86,12 @@ internal static partial class NativeMethods
     internal static partial short GetAsyncKeyState(int key);
     [LibraryImport("user32.dll")]
     internal static partial nint MonitorFromPoint(Point point, uint flags);
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal delegate bool MonitorEnumProc(nint monitor, nint dc, ref Rect rect, nint data);
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool EnumDisplayMonitors(nint dc, nint clip, MonitorEnumProc callback, nint data);
     [LibraryImport("user32.dll", EntryPoint = "GetMonitorInfoW", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool GetMonitorInfo(nint monitor, ref MonitorInfo info);
@@ -85,6 +104,16 @@ internal static partial class NativeMethods
     internal static partial bool GetWindowRect(nint hwnd, out Rect rect);
     [LibraryImport("user32.dll")]
     internal static partial uint GetDpiForWindow(nint hwnd);
+    [LibraryImport("user32.dll")]
+    internal static partial uint GetDpiForSystem();
+    [LibraryImport("user32.dll")]
+    internal static partial int GetSystemMetricsForDpi(int index, uint dpi);
+    [LibraryImport("user32.dll", EntryPoint = "FindWindowW", StringMarshalling = StringMarshalling.Utf16)]
+    internal static partial nint FindWindow(string className, string? windowName);
+    [LibraryImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+    internal static partial nint GetWindowLongPtr(nint hwnd, int index);
+    [LibraryImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
+    internal static partial nint SetWindowLongPtr(nint hwnd, int index, nint value);
     [LibraryImport("user32.dll", EntryPoint = "SendMessageW")]
     internal static partial nint SendMessage(nint hwnd, int message, nint wParam, nint lParam);
     [LibraryImport("shcore.dll")]
