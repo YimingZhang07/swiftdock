@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using QuickLaunch.DragDrop;
 using QuickLaunch.Interop;
@@ -21,9 +22,16 @@ public partial class LauncherWindow : Window
     private CancellationTokenSource _shutdown = new();
     private readonly Func<LaunchItem, bool, Task<LaunchResult>> _startLaunch;
     private readonly DispatcherTimer _externalWatch = new() { Interval = TimeSpan.FromMilliseconds(100) };
+    private readonly DispatcherTimer _toastTimer = new(DispatcherPriority.Normal);
+    private readonly DispatcherTimer _toastCollapse = new(DispatcherPriority.Normal) { Interval = TimeSpan.FromMilliseconds(150) };
+    private ThemeService? _theme;
+    private int _cornerHresult;
+    public string BackdropMode { get; private set; } = "solid";
     private Point _externalPoint;
     private bool _externalAccepts;
     private bool _externalDrag, _menuOpen, _closing, _movingWindow;
+    private bool _sizeMove, _sizing;
+    private Size? _sizeBeforeMove;
     private int _ownedWindows;
     private CancellationTokenSource? _importStop;
     private int _showGeneration;
@@ -42,12 +50,13 @@ public partial class LauncherWindow : Window
     public IconService Icons { get; }
     public IReadOnlyList<LaunchGroup> Groups => ViewModel.Groups;
     public bool CanEdit => ViewModel.CanEdit;
-    public LaunchGroup SelectedGroup { get; private set; }
+    public static readonly DependencyProperty SelectedGroupProperty = DependencyProperty.Register(
+        nameof(SelectedGroup), typeof(LaunchGroup), typeof(LauncherWindow));
+    public LaunchGroup SelectedGroup { get => (LaunchGroup)GetValue(SelectedGroupProperty); private set => SetValue(SelectedGroupProperty, value); }
     public DragCoordinator DragSession { get; }
     public bool Importing { get; private set; }
-    public Action? ExitRequested { get; set; }
     public Action? SettingsRequested { get; set; }
-    public string StatusText => Status.Text;
+    public string StatusText { get; private set; } = "";
 
     public LauncherWindow(DiagnosticLog log, MainViewModel viewModel, IconService icons)
         : this(log, viewModel, icons, LaunchService.StartAsync) { }
@@ -85,37 +94,141 @@ public partial class LauncherWindow : Window
             }
             else if (_externalAccepts) { AutoScroll(_externalPoint); ShowInsertion(SlotAt(_externalPoint)); }
         };
-        SetStatus(viewModel.IsReadOnly ? "当前为只读配置，可启动项目，不能添加或排序。" : "添加和排序会自动保存；热键可在设置中修改。");
+        _toastTimer.Tick += (_, _) => { _toastTimer.Stop(); if (!Importing) ShowToast(false); };
+        _toastCollapse.Tick += (_, _) => { _toastCollapse.Stop(); Toast.Visibility = Visibility.Collapsed; };
+        if (viewModel.IsReadOnly) SetStatus("当前为只读配置，可启动项目，不能添加或排序。");
+        UpdateMinimumSize();
+        ViewModel.PropertyChanged += ViewModelChanged;
+        Closed += (_, _) =>
+        {
+            ViewModel.PropertyChanged -= ViewModelChanged;
+            if (_theme is not null) _theme.Changed -= UpdateBackdrop;
+            _toastTimer.Stop(); _toastCollapse.Stop();
+        };
     }
 
-    public void InitializeNative()
+    private void ViewModelChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainViewModel.IconSize) && IsLoaded) _ = LoadIconsAsync();
+        if (e.PropertyName == nameof(MainViewModel.CellSize))
+        {
+            UpdateMinimumSize();
+            if (IsVisible && !_sizeMove && ViewModel.WindowSize is null)
+                WindowPlacement.ResizeInPlace(this, CellSize, SelectedGroup.Items.Count, ViewModel.Columns);
+        }
+    }
+
+    private void UpdateMinimumSize()
+    {
+        var size = WindowPlacement.MinimumSize(CellSize);
+        MinWidth = Math.Min(size.Width, ViewModel.WindowSize?.Width ?? size.Width);
+        MinHeight = Math.Min(size.Height, ViewModel.WindowSize?.Height ?? size.Height);
+    }
+
+    public void ResetWindowSize()
+    {
+        if (!CanEdit) return;
+        ViewModel.SetWindowSize(null);
+        UpdateMinimumSize();
+        if (IsVisible && !_sizeMove) WindowPlacement.ResizeInPlace(this, CellSize, SelectedGroup.Items.Count, ViewModel.Columns);
+    }
+
+    public void InitializeNative(ThemeService? theme = null)
     {
         nint hwnd = new WindowInteropHelper(this).EnsureHandle();
         int rounded = 2;
-        int result = NativeMethods.DwmSetWindowAttribute(hwnd, 33, in rounded, sizeof(int));
-        HwndSource.FromHwnd(hwnd)?.AddHook(DpiMessage);
-        Log.Write("window.initialized", new { cornerHresult = result, dpi = NativeMethods.GetDpiForWindow(hwnd) });
+        _cornerHresult = NativeMethods.DwmSetWindowAttribute(hwnd, 33, in rounded, sizeof(int));
+        _theme = theme;
+        if (_theme is not null) _theme.Changed += UpdateBackdrop;
+        UpdateBackdrop();
+        HwndSource.FromHwnd(hwnd)?.AddHook(WindowMessage);
+        Log.Write("window.initialized", new { cornerHresult = _cornerHresult, backdrop = BackdropMode, dpi = NativeMethods.GetDpiForWindow(hwnd) });
     }
 
-    private nint DpiMessage(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)
+    private void UpdateBackdrop()
     {
+        var preferences = _theme is null ? ThemeService.ReadPreferences() : (_theme.IsDark, _theme.HighContrast, _theme.TransparencyEnabled);
+        ApplyBackdrop(preferences.Item1, preferences.Item2, preferences.Item3);
+    }
+
+    internal void ApplyBackdrop(bool dark, bool highContrast, bool transparency)
+    {
+        nint hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == 0) return;
+        int immersive = dark ? 1 : 0;
+        int darkResult = NativeMethods.DwmSetWindowAttribute(hwnd, 20, in immersive, sizeof(int));
+        bool supported = OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22621);
+        bool acrylic = supported && !highContrast && transparency && !_warming && _cornerHresult >= 0 && darkResult >= 0;
+        int backdrop = acrylic ? 3 : 1;
+        int result = supported ? NativeMethods.DwmSetWindowAttribute(hwnd, 38, in backdrop, sizeof(int)) : -1;
+        acrylic &= result >= 0;
+        if (acrylic)
+        {
+            Background = Brushes.Transparent; Root.Background = Brushes.Transparent;
+        }
+        else
+        {
+            SetResourceReference(BackgroundProperty, "WindowBrush"); Root.SetResourceReference(Panel.BackgroundProperty, "WindowBrush");
+            if (supported && backdrop != 1) { int none = 1; NativeMethods.DwmSetWindowAttribute(hwnd, 38, in none, sizeof(int)); }
+        }
+        if (HwndSource.FromHwnd(hwnd)?.CompositionTarget is { } target)
+            target.BackgroundColor = acrylic ? Colors.Transparent : ((SolidColorBrush)FindResource("WindowBrush")).Color;
+        BackdropMode = acrylic ? "acrylic" : "solid";
+    }
+
+    private nint WindowMessage(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)
+    {
+        if (message == NativeMethods.WmEnterSizeMove)
+        {
+            _sizeMove = true; _sizing = false;
+            WindowPlacement.UpdateWorkAreaLimits(this);
+            _sizeBeforeMove = NativeSize(hwnd);
+        }
+        else if (message == NativeMethods.WmSizing && _sizeMove) _sizing = true;
+        else if (message == NativeMethods.WmExitSizeMove)
+        {
+            // WM_SIZING distinguishes a resize from a move that happens to change DPI.
+            if (_sizeMove && _sizing && !_closing && _sizeBeforeMove is { } before && NativeSize(hwnd) is { } after
+                && after != before)
+                ViewModel.SetWindowSize(after);
+            _sizeMove = false; _sizing = false;
+            WindowPlacement.UpdateWorkAreaLimits(this);
+        }
         // WPF handles the native suggested rectangle; log the actual post-change DPI.
         if (message == NativeMethods.WmDpiChanged)
-            Dispatcher.BeginInvoke(() => { Log.Write("window.dpi", new { dpi = NativeMethods.GetDpiForWindow(hwnd), Left, Top, ActualWidth, ActualHeight }); _ = LoadIconsAsync(); });
+            Dispatcher.BeginInvoke(() => { WindowPlacement.UpdateWorkAreaLimits(this); Log.Write("window.dpi", new { dpi = NativeMethods.GetDpiForWindow(hwnd), Left, Top, ActualWidth, ActualHeight }); _ = LoadIconsAsync(); });
         return 0;
+    }
+
+    private static Size? NativeSize(nint hwnd)
+    {
+        if (!NativeMethods.GetWindowRect(hwnd, out var rect)) return null;
+        double scale = Math.Max(1, NativeMethods.GetDpiForWindow(hwnd)) / 96.0;
+        return new Size((rect.Right - rect.Left) / scale, (rect.Bottom - rect.Top) / scale);
+    }
+
+    protected override void OnStateChanged(EventArgs e)
+    {
+        if (WindowState == WindowState.Maximized) { _sizing = false; WindowState = WindowState.Normal; }
+        base.OnStateChanged(e);
+    }
+
+    public void FitContent()
+    {
+        if (!_sizeMove) WindowPlacement.FitContent(this, CellSize, SelectedGroup.Items.Count, ViewModel.WindowSize);
     }
 
     public void Toggle()
     {
         if (_ownedWindows > 0) { OwnedWindows.Cast<Window>().LastOrDefault(w => w.IsVisible)?.Activate(); return; }
-        if (DragSession.Active || _menuOpen || _movingWindow) return;
+        if (DragSession.Active || _menuOpen || _movingWindow || _sizeMove) return;
         if (IsVisible && IsActive) HidePanel();
         else ShowPanel("hotkey", (NativeMethods.GetAsyncKeyState(1) & 0x8000) != 0);
     }
 
     public void ShowPanel(string source, bool forDrop = false)
     {
-        if (_closing) return;
+        if (_closing || _sizeMove || _movingWindow) return;
         if (_editor?.IsVisible == true) { _editor.Activate(); return; }
         if (_warming && source != "prewarm") RestoreWarmupState();
         var watch = Stopwatch.StartNew();
@@ -124,7 +237,7 @@ public partial class LauncherWindow : Window
         _renderCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         int generation = ++_showGeneration;
         ShowActivated = !forDrop;
-        if (source != "prewarm") WindowPlacement.AtCursor(this, ViewModel.Columns, CellSize, SelectedGroup.Items.Count);
+        if (source != "prewarm") WindowPlacement.AtCursor(this, ViewModel.Columns, CellSize, SelectedGroup.Items.Count, ViewModel.WindowSize);
         Show();
         nint hwnd = new WindowInteropHelper(this).Handle;
         if (!forDrop)
@@ -172,6 +285,7 @@ public partial class LauncherWindow : Window
 
     public void HidePanel()
     {
+        if (_sizeMove || _movingWindow) return;
         ++_showGeneration;
         CancelMeasurement();
         _externalWatch.Stop();
@@ -183,10 +297,10 @@ public partial class LauncherWindow : Window
     public async Task<bool> PrewarmAsync()
     {
         if (_closing || IsVisible || _warming) return false;
-        _warming = true; Opacity = 0;
+        _warming = true; UpdateBackdrop(); Opacity = 0;
         var cancellation = new CancellationTokenSource(); _warmupStop = cancellation;
         var watch = Stopwatch.StartNew();
-        WindowPlacement.AtCursor(this, ViewModel.Columns, CellSize, SelectedGroup.Items.Count);
+        WindowPlacement.AtCursor(this, ViewModel.Columns, CellSize, SelectedGroup.Items.Count, ViewModel.WindowSize);
         nint handle = new WindowInteropHelper(this).Handle;
         int width = (int)Math.Ceiling(Width * VisualTreeHelper.GetDpi(this).DpiScaleX);
         NativeMethods.SetWindowPos(handle, 0, NativeMethods.GetSystemMetrics(76) - width - 64,
@@ -224,19 +338,18 @@ public partial class LauncherWindow : Window
     }
     private void RestoreWarmupState()
     {
-        _warming = false; _warmupStop?.Cancel(); Opacity = 1;
+        _warming = false; _warmupStop?.Cancel(); Opacity = 1; UpdateBackdrop();
     }
 
     private void WindowDragMouseDown(object sender, MouseButtonEventArgs e)
     {
         if (!IsWindowDragSource(e.OriginalSource as DependencyObject)) return;
-        if (e.LeftButton != MouseButtonState.Pressed || _closing || _movingWindow || DragSession.Active || _externalDrag || _ownedWindows > 0) return;
+        if (e.LeftButton != MouseButtonState.Pressed || _closing || _movingWindow || _sizeMove || DragSession.Active || _externalDrag || _ownedWindows > 0) return;
         e.Handled = true;
         _movingWindow = true;
         try
         {
-            // Only the title bar's non-button surface moves the window. Let Windows move
-            // the native window so dragging also works across monitors and DPI scales.
+            // Native movement also handles monitor and DPI transitions.
             DragMove();
         }
         finally
@@ -256,16 +369,11 @@ public partial class LauncherWindow : Window
         SelectedGroup = group;
         foreach (var pair in _grids) pair.Value.Visibility = pair.Key == group ? Visibility.Visible : Visibility.Collapsed;
         foreach (Button tab in Tabs.Children)
-        {
-            bool selected = (LaunchGroup)tab.Tag == group;
-            tab.SetResourceReference(ForegroundProperty, selected ? "AccentBrush" : "TextBrush");
-            tab.FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal;
-            if (selected) tab.SetResourceReference(BorderBrushProperty, "AccentBrush"); else tab.BorderBrush = Brushes.Transparent;
-        }
+            TabState.SetIsSelected(tab, tab.Tag == group);
         Tabs.Children.OfType<Button>().FirstOrDefault(b => b.Tag == group)?.BringIntoView();
         Viewer.ScrollToTop();
         if (!preview) ViewModel.CommitGroup(group.Id);
-        if (IsVisible && !DragSession.Active) WindowPlacement.FitContent(this, CellSize, group.Items.Count);
+        if (IsVisible && !DragSession.Active) FitContent();
         if (IsLoaded) _ = LoadIconsAsync();
     }
 
@@ -310,7 +418,58 @@ public partial class LauncherWindow : Window
         { _ = LaunchAsync(item); e.Handled = true; }
     }
 
-    public void SetStatus(string text) => Status.Text = text;
+    private void TabsMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        TabsViewport.ScrollToHorizontalOffset(TabsViewport.HorizontalOffset - e.Delta);
+        e.Handled = true;
+    }
+
+    private void IconsMouseWheel(object sender, MouseWheelEventArgs e) => HandleIconSizeWheel(e, Keyboard.Modifiers);
+
+    internal void HandleIconSizeWheel(MouseWheelEventArgs e, ModifierKeys modifiers)
+    {
+        if (!modifiers.HasFlag(ModifierKeys.Control) || !CanEdit || DragSession.Active || _externalDrag || e.Delta == 0) return;
+        var focused = Keyboard.FocusedElement as FrameworkElement;
+        ViewModel.SetIconSize(IconSizePresets.Step(ViewModel.IconSize, e.Delta));
+        e.Handled = true;
+        if (focused?.DataContext is LaunchItem && focused.IsDescendantOf(GroupHost))
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => { if (focused.IsKeyboardFocusWithin) focused.BringIntoView(); });
+    }
+
+    public void SetStatus(string text, bool toast = true)
+    {
+        StatusText = text;
+        if (!toast) return;
+        Status.Text = text;
+        ShowToast(true);
+        RestartToastTimer();
+    }
+    private void RestartToastTimer()
+    {
+        _toastTimer.Stop();
+        if (Importing || _closing) return;
+        _toastTimer.Interval = TimeSpan.FromSeconds(new[] { "失败", "错误", "无法", "未能", "尚未保存", "不可", "不能" }.Any(Status.Text.Contains) ? 6 : 4);
+        _toastTimer.Start();
+    }
+    internal void SetImporting(bool value)
+    {
+        Importing = value;
+        CancelImportButton.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
+        RestartToastTimer();
+    }
+    private void ShowToast(bool visible)
+    {
+        _toastCollapse.Stop();
+        double from = Toast.Opacity;
+        Toast.BeginAnimation(OpacityProperty, null);
+        Toast.Opacity = visible ? 1 : 0;
+        if (visible) Toast.Visibility = Visibility.Visible;
+        if (!SystemParameters.ClientAreaAnimation) { Toast.Visibility = visible ? Visibility.Visible : Visibility.Collapsed; return; }
+        var fade = new DoubleAnimation(from, visible ? 1 : 0, TimeSpan.FromMilliseconds(150)) { FillBehavior = FillBehavior.Stop };
+        Toast.BeginAnimation(OpacityProperty, fade);
+        // Animation completion can pause for an occluded HWND; expiry must still collapse the toast.
+        if (!visible) _toastCollapse.Start();
+    }
     public async Task LaunchAsync(LaunchItem item, bool elevate = false)
     {
         if (item.IsPending) return;
@@ -319,14 +478,13 @@ public partial class LauncherWindow : Window
         await DragSession.WhenIdle;
         if (_closing) return;
         ViewModel.RecordLaunch(item, result);
-        SetStatus($"{item.Name}：{result.Message}");
+        SetStatus($"{item.Name}：{result.Message}", toast: !result.Accepted || result.Cancelled);
         Log.Write("launch.result", new { item.Kind, result.Accepted, result.Cancelled, result.Message });
     }
 
     private void ItemClick(object sender, RoutedEventArgs e)
     { if (!DragSession.Active && sender is Button { DataContext: LaunchItem item }) _ = LaunchAsync(item); }
     private void HideClick(object sender, RoutedEventArgs e) => HidePanel();
-    private void ExitClick(object sender, RoutedEventArgs e) => ExitRequested?.Invoke();
     private void SettingsClick(object sender, RoutedEventArgs e) => SettingsRequested?.Invoke();
     public void SetSettingsOpen(bool value)
     {
@@ -396,8 +554,7 @@ public partial class LauncherWindow : Window
             var snapshot = DropParser.Capture(e.Data);
             Log.Write("drop.capture", new { snapshot.Formats, paths = snapshot.Paths.Length, milliseconds = watch.Elapsed.TotalMilliseconds });
             e.Effects = Allowed(e);
-            Importing = true;
-            CancelImportButton.Visibility = Visibility.Visible;
+            SetImporting(true);
             pending = ViewModel.BeginImport(target, slot.Value, Math.Max(1, snapshot.Paths.Length));
             SetStatus("正在解析拖入项目…");
             _externalDrag = false;
@@ -408,7 +565,7 @@ public partial class LauncherWindow : Window
             await DragSession.WhenIdle.WaitAsync(cancellation);
             if (_closing || cancellation.IsCancellationRequested) return;
             var committed = ViewModel.CompleteImport(target, pending, resolution.Items);
-            if (target == SelectedGroup) WindowPlacement.FitContent(this, CellSize, target.Items.Count);
+            if (target == SelectedGroup) FitContent();
             _ = LoadIconsAsync();
             if (committed.Duplicate is not null && target == SelectedGroup) FlashDuplicate(committed.Duplicate);
             SetStatus($"已添加 {committed.Added} 项。{(committed.Duplicate is null ? "" : "重复项目已跳过。")} {string.Join("；", resolution.Errors)}");
@@ -420,7 +577,7 @@ public partial class LauncherWindow : Window
         finally
         {
             ViewModel.CancelImport(target, pending); _importStop?.Dispose(); _importStop = null;
-            Importing = false; CancelImportButton.Visibility = Visibility.Collapsed;
+            SetImporting(false);
             _externalDrag = false; ShowInsertion(null);
         }
     }
@@ -514,6 +671,7 @@ public partial class LauncherWindow : Window
         DragSession.Cancel();
         CancelMeasurement();
         _externalWatch.Stop();
+        _toastTimer.Stop(); _toastCollapse.Stop();
     }
     public void ResumeAfterExitFailure()
     {

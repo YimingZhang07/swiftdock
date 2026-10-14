@@ -48,6 +48,8 @@ internal static class WindowVisibilitySmoke
                 completion.SetResult(result);
                 await launch.WaitAsync(TimeSpan.FromSeconds(2));
                 check($"launch-{name}-completion-keeps-panel-visible", Visible() && probe.StatusText.Contains(result.Message));
+                check($"launch-{name}-toast-policy", result.Accepted && !result.Cancelled
+                    ? probe.Toast.Visibility == System.Windows.Visibility.Collapsed : probe.Toast.IsVisible);
             }
 
             completion = new(TaskCreationOptions.RunContinuationsAsynchronously);

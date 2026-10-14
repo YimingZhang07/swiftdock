@@ -1,25 +1,29 @@
 # QuickLaunch
 
-Windows x64 常驻启动器，C# / .NET 10 / WPF。v0.1.3 已实现计划中的图标缓存、导入、拖拽、编辑、撤销、自启和主题跟随；标题栏、分组工具栏、图标区和状态栏分区显示，整条标题栏可拖动窗口，启动项目或失去焦点后面板保持显示。性能目标与人工验收状态单独记录，不把“功能已实现”等同于“全部指标达标”。
+Windows x64 常驻启动器，C# / .NET 10 / WPF。v0.1.3 已实现计划中的图标缓存、导入、拖拽、编辑、撤销、自启和主题跟随；面板只有单行分组页签和图标区，顶栏空白处可拖动窗口，启动项目或失去焦点后面板保持显示。性能目标与人工验收状态单独记录，不把“功能已实现”等同于“全部指标达标”。
 
 ## 使用
 
 推荐使用 `artifacts/releases/` 中的 **standalone** 发布包，解压后运行 `QuickLaunch.exe`，无需另装 .NET。详细操作见 [使用说明](docs/QUICKSTART.zh-CN.md)。
 
 - 默认 `Alt+Space` 呼出/隐藏，热键可在“设置”修改，冲突时保留旧组合。
+- 拖动面板边缘或四角可调整窗口大小，大小会自动记住。
+- 顶栏左侧切换分组，滚轮可横向滚动；右侧添加项目图标、齿轮打开设置、× 隐藏面板。设置底部“退出 QuickLaunch”或托盘菜单“退出”可结束程序。
+- 图标默认小尺寸（32 DIP），设置中可选小 / 中 / 大（32 / 40 / 48 DIP）；在图标区按住 Ctrl 滚动鼠标滚轮也可调整，自动保存。已记住的窗口大小保持不变，图标按新尺寸重排；未手动调整过的窗口自动适配。
+- 删除、撤销、导入和错误显示为短暂提示条，导入期间可点击“取消”；成功启动、编辑和正常保存保持安静。设置中的“恢复默认窗口大小”会立即调整可见面板。
 - 添加 exe、lnk、文件、文件夹或 http/https 网址；也可从桌面、Explorer、浏览器拖入。
 - 高 DPI Shell 图标，内存/磁盘缓存，右键可刷新；网址使用内置地球图标。
 - 条目排序、悬停标签跨组移动、拖到“+”新建组、标签排序、边缘滚动、预览/飞入动画；Esc 或窗外松开取消。
 - 编辑名称/路径/参数/工作目录，打开所在位置，单条提权启动；删除后 5 秒内 Ctrl+Z 撤销最近一次删除。
 - 分组新建、双击重命名、非空删除确认；方向键、Enter、Ctrl+Tab / Ctrl+Shift+Tab、Ctrl+1…9、F2、Delete。
-- 跟随系统深浅色和强调色；设置/托盘可管理当前配置的登录自启。
+- 跟随系统深浅色和强调色；Windows 11 22621 及以上且开启透明效果时使用 Acrylic，否则使用实体背景；高对比度使用系统颜色。设置/托盘可管理当前配置的登录自启。
 - 单实例定向唤出、原子配置保存、备份恢复、损坏原件保留、未知版本只读。
 
 ## 配置
 
 默认数据为 `%APPDATA%\QuickLaunch\config.json`；图标和日志在 `%LOCALAPPDATA%\QuickLaunch`。exe 同目录放置 `portable.flag` 可使用便携数据目录。`--config-dir <绝对目录>` 可选择独立配置。
 
-修改后 500ms 防抖保存，退出时保存最后修改。顶栏显示保存状态；保存失败不会覆盖原文件，退出时可重试、放弃未保存修改或返回。另一个登录会话占用写锁时只读启动。
+修改后 500ms 防抖保存，退出时保存最后修改。顶栏只提示只读或尚未保存的错误；保存失败不会覆盖原文件，退出时可重试、放弃未保存修改或返回。另一个登录会话占用写锁时只读启动。
 
 手工编辑 JSON 前先退出应用，暂不支持运行中热重载。单条删除撤销不涵盖整组删除。移动便携目录前应先关闭自启，移动后重新开启。
 
@@ -53,6 +57,6 @@ SDK 10.0.401 和 NuGet 缓存位于忽略的 `.tools/`，不会替换系统安�
 
 基准会重复显示/隐藏窗口，使用专用生成数据，不启动条目。后台运行可能没有前台权限；这种情况下焦点确认失败单列，渲染耗时不能冒充完整呼出耗时。首次、预热后、闲置恢复及首次/已访问分组分开记录；不强制 GC 或修剪工作集。
 
-日志和产物：`artifacts/tests/launcher.trx`、`artifacts/validation/smoke-result.json`、`artifacts/validation/window.png`、`artifacts/benchmarks/`、`artifacts/startup/`、`artifacts/releases/`。窗口 PNG 为 WPF 渲染快照，不是物理屏幕呈现证据。
+日志和产物：`artifacts/tests/launcher.trx`、`artifacts/validation/smoke-result.json`、`artifacts/validation/window.png`、`artifacts/validation/settings.png`、`artifacts/validation/settings-light.png`、`artifacts/validation/edit-dialog.png`、`artifacts/benchmarks/`、`artifacts/startup/`、`artifacts/releases/`。窗口 PNG 为 WPF 渲染快照，不含原生标题栏或物理屏幕呈现证据。
 
 当前结果、预算未达项和未验证场景见 [M2–M5 实施与验证](docs/validation/M2-M5.md)。[M0](docs/validation/M0.md) 和 [M1](docs/validation/M1.md) 是历史记录。

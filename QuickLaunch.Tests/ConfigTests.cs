@@ -13,6 +13,54 @@ public sealed class ConfigTests : IDisposable
     private string ConfigPath => Path.Combine(_directory, "config.json");
 
     [Fact]
+    public void ConfigWithoutWindowSizeRoundtripsUnchanged()
+    {
+        var original = AppConfig.CreateDefault();
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(original, ConfigJsonContext.Default.AppConfig);
+        string json = Encoding.UTF8.GetString(bytes);
+        Assert.DoesNotContain("windowWidth", json);
+        Assert.DoesNotContain("windowHeight", json);
+        var loaded = ConfigValidation.Parse(bytes);
+        Assert.Null(loaded.WindowWidth); Assert.Null(loaded.WindowHeight);
+        Assert.Equal(bytes, JsonSerializer.SerializeToUtf8Bytes(loaded, ConfigJsonContext.Default.AppConfig));
+    }
+
+    [Fact]
+    public void ConfigWithWindowSizeRoundtrips()
+    {
+        var original = AppConfig.CreateDefault() with { WindowWidth = 725.5, WindowHeight = 480.25 };
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(original, ConfigJsonContext.Default.AppConfig);
+        var loaded = ConfigValidation.Parse(bytes);
+        Assert.Equal(original.WindowWidth, loaded.WindowWidth);
+        Assert.Equal(original.WindowHeight, loaded.WindowHeight);
+        Assert.Equal(bytes, JsonSerializer.SerializeToUtf8Bytes(loaded, ConfigJsonContext.Default.AppConfig));
+    }
+
+    [Theory]
+    [InlineData(null, 400d)]
+    [InlineData(600d, null)]
+    [InlineData(0d, 400d)]
+    [InlineData(600d, -1d)]
+    [InlineData(10001d, 400d)]
+    [InlineData(600d, 10001d)]
+    [InlineData(double.NaN, 400d)]
+    [InlineData(600d, double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity, 400d)]
+    public void InvalidWindowSizeClearsBothDimensionsAndPreservesConfig(double? width, double? height)
+    {
+        var original = AppConfig.CreateDefault() with { Columns = 4, IconSize = 64, WindowWidth = width, WindowHeight = height };
+        var normalized = ConfigValidation.Normalize(original);
+        Assert.Equal(original with { WindowWidth = null, WindowHeight = null }, normalized);
+        string json = JsonSerializer.Serialize(normalized, ConfigJsonContext.Default.AppConfig);
+        Assert.DoesNotContain("windowWidth", json); Assert.DoesNotContain("windowHeight", json);
+        if ((!width.HasValue || double.IsFinite(width.Value)) && (!height.HasValue || double.IsFinite(height.Value)))
+        {
+            var loaded = ConfigValidation.Parse(JsonSerializer.SerializeToUtf8Bytes(original, ConfigJsonContext.Default.AppConfig));
+            Assert.Equal(json, JsonSerializer.Serialize(loaded, ConfigJsonContext.Default.AppConfig));
+        }
+    }
+
+    [Fact]
     public async Task SnapshotRoundtripCreatesBackupAndOmitsVolatileFields()
     {
         await using var store = ConfigService.Open(_directory);

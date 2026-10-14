@@ -28,6 +28,8 @@ internal static partial class NativeMethods
     internal static partial void OleUninitialize();
     internal const int WmHotkey = 0x0312;
     internal const int WmDpiChanged = 0x02E0;
+    internal const int WmEnterSizeMove = 0x0231, WmExitSizeMove = 0x0232, WmSizing = 0x0214;
+    internal const int WmNcHitTest = 0x0084;
     internal const uint ModAlt = 0x0001, ModNoRepeat = 0x4000;
 
     [StructLayout(LayoutKind.Sequential)]
@@ -83,9 +85,13 @@ internal static partial class NativeMethods
     internal static partial bool GetWindowRect(nint hwnd, out Rect rect);
     [LibraryImport("user32.dll")]
     internal static partial uint GetDpiForWindow(nint hwnd);
+    [LibraryImport("user32.dll", EntryPoint = "SendMessageW")]
+    internal static partial nint SendMessage(nint hwnd, int message, nint wParam, nint lParam);
     [LibraryImport("shcore.dll")]
     internal static partial int GetDpiForMonitor(nint monitor, int type, out uint dpiX, out uint dpiY);
     // DWM attributes do not allocate resources; failure simply keeps square corners.
     [LibraryImport("dwmapi.dll")]
     internal static partial int DwmSetWindowAttribute(nint hwnd, uint attribute, in int value, uint size);
+    [LibraryImport("dwmapi.dll")]
+    internal static partial int DwmGetWindowAttribute(nint hwnd, uint attribute, out int value, uint size);
 }

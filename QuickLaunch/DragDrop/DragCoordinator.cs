@@ -33,6 +33,14 @@ public sealed class DragCoordinator
         view.CaptureRoot.PreviewMouseLeftButtonUp += Up;
         view.CaptureRoot.LostMouseCapture += (_, _) => { if (!_ending && Active) Cancel(); };
     }
+    internal void BeginPendingItemForDiagnostics(LaunchItem item)
+    {
+        _view.Dispatcher.VerifyAccess();
+        if (!_view.CanEdit || Active || item.IsPending || !_view.SelectedGroup.Items.Contains(item))
+            throw new InvalidOperationException("无法开始诊断拖动。");
+        _item = item; _source = _startGroup = _view.SelectedGroup; _start = default;
+        _done = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
     private void Down(object sender, MouseButtonEventArgs e)
     {
         if (!_view.CanEdit || Active || e.OriginalSource is not DependencyObject target) return;

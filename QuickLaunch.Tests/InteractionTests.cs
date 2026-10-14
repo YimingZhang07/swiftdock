@@ -1,4 +1,5 @@
 using System.IO;
+using System.Windows;
 using Microsoft.Win32;
 using QuickLaunch.Models;
 using QuickLaunch.Services;
@@ -9,6 +10,97 @@ namespace QuickLaunch.Tests;
 
 public sealed class InteractionTests
 {
+    [Theory]
+    [InlineData(32, 1, 40)] [InlineData(40, 1, 48)] [InlineData(48, 1, 48)]
+    [InlineData(48, -1, 40)] [InlineData(40, -1, 32)] [InlineData(32, -1, 32)]
+    [InlineData(36, 1, 40)] [InlineData(36, -1, 32)] [InlineData(44, 1, 48)] [InlineData(44, -1, 40)]
+    [InlineData(16, 1, 32)] [InlineData(16, -1, 32)] [InlineData(128, 1, 48)] [InlineData(128, -1, 48)]
+    [InlineData(36, 0, 36)]
+    public void IconSizeStepsToNextPreset(int size, int direction, int expected) => Assert.Equal(expected, IconSizePresets.Step(size, direction));
+
+    [Theory]
+    [InlineData(16)] [InlineData(32)] [InlineData(36)] [InlineData(40)] [InlineData(48)] [InlineData(128)]
+    public async Task SetIconSizeNotifiesAndUsesSavePipeline(int size)
+    {
+        var writer = new RecordingWriter();
+        await OnSta(vm =>
+        {
+            var notifications = new List<string?>();
+            vm.PropertyChanged += (_, e) => notifications.Add(e.PropertyName);
+            long revision = vm.Revision;
+            vm.SetIconSize(size);
+            Assert.Equal(size, vm.IconSize); Assert.Equal(size, vm.Snapshot().IconSize);
+            Assert.Equal(Math.Max(84, size + 52), vm.CellSize); Assert.Equal(vm.CellSize - 4, vm.TileSize);
+            Assert.Equal(revision + 1, vm.Revision);
+            Assert.Equal(new[] { "IconSize", "CellSize", "TileSize" }, notifications.Where(n => n != "StorageStatus" && n != "StorageWarning"));
+            notifications.Clear(); vm.SetIconSize(size);
+            Assert.Empty(notifications); Assert.Equal(revision + 1, vm.Revision);
+            vm.FlushAsync().GetAwaiter().GetResult();
+            Assert.Equal("已保存", vm.StorageStatus);
+            Assert.Equal(size, ConfigValidation.Parse(writer.Bytes!).IconSize);
+        }, iconSize: 64, writer: writer);
+    }
+
+    [Theory]
+    [InlineData(15)] [InlineData(129)] [InlineData(int.MinValue)] [InlineData(int.MaxValue)]
+    public async Task SetIconSizeRejectsInvalidRange(int size) => await OnSta(vm =>
+    {
+        long revision = vm.Revision;
+        Assert.Throws<ArgumentOutOfRangeException>(() => vm.SetIconSize(size));
+        Assert.Equal(32, vm.IconSize); Assert.Equal(revision, vm.Revision);
+    });
+
+    [Fact]
+    public async Task ReadOnlyIconSizeIsUnchanged() => await OnSta(vm =>
+    {
+        var notifications = new List<string?>();
+        vm.PropertyChanged += (_, e) => notifications.Add(e.PropertyName);
+        long revision = vm.Revision;
+        vm.SetIconSize(48); vm.SetIconSize(129);
+        Assert.Equal(32, vm.IconSize); Assert.Equal(32, vm.Snapshot().IconSize);
+        Assert.Equal(revision, vm.Revision); Assert.Empty(notifications);
+        vm.FlushAsync().GetAwaiter().GetResult();
+    }, readOnly: true);
+
+    [Theory]
+    [InlineData(16, 84, 80)] [InlineData(32, 84, 80)] [InlineData(40, 92, 88)]
+    [InlineData(48, 100, 96)] [InlineData(128, 180, 176)]
+    public async Task TileSizingPreservesStoredIconSize(int icon, double cell, double tile) => await OnSta(vm =>
+    {
+        Assert.Equal(icon, vm.IconSize); Assert.Equal(icon, vm.Snapshot().IconSize);
+        Assert.Equal(cell, vm.CellSize); Assert.Equal(tile, vm.TileSize);
+    }, iconSize: icon);
+
+    [Fact]
+    public async Task NewProfilesUse32DipIconsAndSilentStorageStatus() => await OnSta(vm =>
+    {
+        Assert.Equal(32, vm.IconSize); Assert.Equal("", vm.StorageWarning);
+    });
+
+    [Fact]
+    public async Task WindowSizeUsesSavePipelineAndResetClearsBothDimensions() => await OnSta(vm =>
+    {
+        long revision = vm.Revision;
+        vm.SetWindowSize(new(720.5, 500.25));
+        Assert.Equal(revision + 1, vm.Revision);
+        Assert.Equal(720.5, vm.Snapshot().WindowWidth); Assert.Equal(500.25, vm.Snapshot().WindowHeight);
+        vm.SetWindowSize(new(720.5, 500.25));
+        Assert.Equal(revision + 1, vm.Revision);
+        vm.SetWindowSize(null);
+        Assert.Equal(revision + 2, vm.Revision);
+        Assert.Null(vm.WindowSize); Assert.Null(vm.Snapshot().WindowWidth); Assert.Null(vm.Snapshot().WindowHeight);
+    });
+
+    [Fact]
+    public async Task ReadOnlyWindowSizeIsSessionOnly() => await OnSta(vm =>
+    {
+        long revision = vm.Revision;
+        vm.SetWindowSize(new(720, 500));
+        Assert.Equal(new Size(720, 500), vm.WindowSize);
+        Assert.Equal(revision, vm.Revision);
+        vm.FlushAsync().GetAwaiter().GetResult();
+    }, readOnly: true);
+
     [Fact]
     public void UrlIdentityPreservesPathQueryAndFragmentCase()
     {
@@ -94,7 +186,13 @@ public sealed class InteractionTests
         }
         finally { Registry.CurrentUser.DeleteSubKey(key, throwOnMissingSubKey: false); }
     }
-    private static Task OnSta(Action<MainViewModel> action, Func<DateTimeOffset>? clock = null)
+    private sealed class RecordingWriter : IConfigWriter
+    {
+        public byte[]? Bytes { get; private set; }
+        public void Write(string path, byte[] bytes) => Bytes = bytes;
+    }
+
+    private static Task OnSta(Action<MainViewModel> action, Func<DateTimeOffset>? clock = null, bool readOnly = false, int? iconSize = null, IConfigWriter? writer = null)
     {
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var thread = new Thread(() =>
@@ -103,8 +201,17 @@ public sealed class InteractionTests
             ConfigService? store = null;
             try
             {
-                store = ConfigService.Open(directory); var vm = new MainViewModel(store, clock);
-                action(vm); store.SaveAsync(vm.Snapshot(), vm.Revision).GetAwaiter().GetResult(); vm.Suspend(true);
+                if (iconSize is { } icon)
+                {
+                    Directory.CreateDirectory(directory);
+                    new AtomicConfigWriter().Write(Path.Combine(directory, "config.json"), System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+                        AppConfig.CreateDefault() with { IconSize = icon }, ConfigJsonContext.Default.AppConfig));
+                }
+                store = ConfigService.Open(directory, readOnly: readOnly, writer: writer); var vm = new MainViewModel(store, clock);
+                action(vm);
+                if (readOnly) Assert.False(File.Exists(store.FilePath));
+                else store.SaveAsync(vm.Snapshot(), vm.Revision).GetAwaiter().GetResult();
+                vm.Suspend(true);
                 done.TrySetResult();
             }
             catch (Exception ex) { done.TrySetException(ex); }

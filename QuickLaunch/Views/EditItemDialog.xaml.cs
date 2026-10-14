@@ -11,9 +11,10 @@ public partial class EditItemDialog : Window
     private readonly LaunchItem? _original;
     private bool _closed;
     public LaunchItem? Result { get; private set; }
-    public EditItemDialog(LaunchItem? item)
+    public EditItemDialog(LaunchItem? item, ThemeService? theme = null)
     {
-        InitializeComponent(); _original = item; Title = item is null ? "添加条目" : "编辑条目";
+        InitializeComponent(); _original = item; Title = item is null ? "添加项目" : "编辑项目";
+        DialogTheme.Attach(this, theme);
         NameBox.Text = item?.Name ?? ""; PathBox.Text = item?.Path ?? "";
         ArgumentsBox.Text = item?.Arguments ?? ""; WorkingBox.Text = item?.WorkingDirectory ?? "";
         ElevateBox.IsChecked = item?.RunAsAdmin ?? false;

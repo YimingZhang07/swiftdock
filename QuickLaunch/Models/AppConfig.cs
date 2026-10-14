@@ -30,8 +30,12 @@ public sealed record AppConfig
     // Accept the retired setting when reading older profiles; normalization clears it.
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool HideOnDeactivate { get; init; }
-    public int IconSize { get; init; } = 48;
+    public int IconSize { get; init; } = 32;
     public int Columns { get; init; } = 6;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? WindowWidth { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? WindowHeight { get; init; }
     public string? LastGroupId { get; init; }
     [JsonRequired] public List<GroupConfig> Groups { get; init; } = [];
 

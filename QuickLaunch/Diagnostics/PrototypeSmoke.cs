@@ -17,7 +17,7 @@ namespace QuickLaunch.Diagnostics;
 // Runs inside the actual WPF dispatcher. No synthetic keyboard input or launches of user applications.
 internal static class PrototypeSmoke
 {
-    public static async Task<bool> RunAsync(LauncherWindow window, HotkeyService hotkey, ConfigService store, App app, string directory)
+    public static async Task<bool> RunAsync(LauncherWindow window, HotkeyService hotkey, ConfigService store, App app, string directory, bool trayAvailable)
     {
         var results = new List<object>();
         bool passed = true;
@@ -25,7 +25,13 @@ internal static class PrototypeSmoke
         {
             results.Add(new { name, passed = value });
             passed &= value;
+            window.Log.Write("smoke.check", new { name, passed = value });
+            File.WriteAllText(Path.Combine(directory, "smoke-result.json"), JsonSerializer.Serialize(new
+            {
+                passed = false, completed = false, checks = results, profileDirectory = store.DirectoryPath
+            }, new JsonSerializerOptions { WriteIndented = true }));
         }
+        Check("tray-created", trayAvailable);
         // A user's running launcher may own Alt+Space. Only this isolated smoke
         // profile switches to an available combination; leave that instance alone.
         if (!hotkey.Registered)
@@ -57,26 +63,24 @@ internal static class PrototypeSmoke
         Check("group-preview-does-not-mutate-items", window.Groups.Select((g, i) => g.Items.Select(x => x.Id).SequenceEqual(before[i])).All(x => x));
         window.SelectGroup(window.Groups[0]);
         window.UpdateLayout();
+        window.Log.Write("smoke.layout", new { window.Width, window.ActualWidth, window.Height, window.ActualHeight, window.Viewer.ViewportWidth });
+        Check("auto-width-fits-configured-columns", Math.Abs(window.ActualWidth - (window.ViewModel.Columns * window.CellSize + WindowPlacement.HorizontalChrome)) < .5);
         WindowLayoutSmoke.Run(window, Check);
-        SaveSnapshot(window, Path.Combine(directory, "window.png"));
+        await LauncherAppearanceSmoke.RunAsync(window, directory, store.DirectoryPath, Check);
         window.HidePanel();
         Check("hide-retains-hwnd", !window.IsVisible && new WindowInteropHelper(window).Handle == handle);
         window.ShowPanel("smoke-reshow");
         await Task.Delay(150);
         Check("reshow-retains-hwnd", window.IsVisible && new WindowInteropHelper(window).Handle == handle);
         window.HidePanel();
+        bool prewarmed = await window.PrewarmAsync();
+        Check("prewarm-completes-offscreen-and-restores-opacity", prewarmed && !window.IsVisible && window.Opacity == 1);
         var warming = window.PrewarmAsync();
         window.ShowPanel("smoke-interrupt-warmup");
         await warming;
         Check("user-show-invalidates-prewarm-hide", window.IsVisible && window.Opacity == 1);
         Check("configuration-writable", !store.IsReadOnly);
         var group = window.Groups[0];
-        group.Items.Move(0, group.Items.Count - 1);
-        await window.ViewModel.FlushAsync();
-        var persisted = ConfigValidation.Parse(await File.ReadAllBytesAsync(store.FilePath));
-        Check("reorder-persisted", persisted.Groups[0].Items.Select(i => i.Id).SequenceEqual(group.Items.Select(i => i.Id)));
-        Check("latest-revision-saved", store.SavedRevision == window.ViewModel.Revision);
-
         app.OpenSettings();
         await Task.Delay(80);
         var settings = Application.Current.Windows.OfType<SettingsWindow>().Single();
@@ -84,10 +88,24 @@ internal static class PrototypeSmoke
         long settingsRevision = window.ViewModel.Revision;
         settings.ApplyButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Check("settings-applied", window.ViewModel.Revision > settingsRevision);
+        window.ViewModel.SetWindowSize(new(window.Width + 100, window.Height + 100));
+        WindowPlacement.AtCursor(window, savedSize: window.ViewModel.WindowSize);
+        NativeMethods.GetWindowRect(handle, out var beforeReset);
+        settings.ResetSizeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        window.UpdateLayout();
+        NativeMethods.GetWindowRect(handle, out var afterReset);
+        var autoSize = WindowPlacement.ResolveSize(null, new(window.MaxWidth, window.MaxHeight), new(window.MinWidth, window.MinHeight),
+            window.ViewModel.Columns, window.CellSize, window.SelectedGroup.Items.Count, WindowPlacement.HorizontalChrome);
+        Check("settings-reset-resizes-visible-panel-immediately", window.ViewModel.WindowSize is null
+            && Math.Abs(window.Width - autoSize.Width) < .5 && Math.Abs(window.Height - autoSize.Height) < .5);
+        Check("settings-reset-preserves-top-left", beforeReset.Left == afterReset.Left && beforeReset.Top == afterReset.Top);
         settings.Close();
         Check("settings-close-keeps-main-alive", window.IsVisible && new WindowInteropHelper(window).Handle == handle);
+        group.Items.Move(0, group.Items.Count - 1);
         await window.ViewModel.FlushAsync();
-        persisted = ConfigValidation.Parse(await File.ReadAllBytesAsync(store.FilePath));
+        var persisted = ConfigValidation.Parse(await File.ReadAllBytesAsync(store.FilePath));
+        Check("reorder-persisted", persisted.Groups[0].Items.Select(i => i.Id).SequenceEqual(group.Items.Select(i => i.Id)));
+        Check("latest-revision-saved", store.SavedRevision == window.ViewModel.Revision);
         Check("settings-persisted", persisted.Hotkey.SameAs(window.ViewModel.Hotkey) && store.SavedRevision == window.ViewModel.Revision);
 
         var editor = new EditItemDialog(null);
@@ -103,14 +121,6 @@ internal static class PrototypeSmoke
         bool editorAccepted;
         try { editorAccepted = window.ShowEditor(editor); } finally { editorTimeout.Stop(); }
         Check("edit-dialog-produces-valid-url", editorAccepted && editor.Result?.Kind == LaunchKind.Url && editor.Result.Name == "测试网页");
-
-        var oldBrushes = new[] { "WindowBrush", "TitleBarBrush", "ToolbarBrush", "PanelBrush", "HoverBrush", "TextBrush", "MutedBrush", "BorderBrush", "AccentBrush", "ErrorBrush" }
-            .ToDictionary(key => key, key => Application.Current.Resources[key]);
-        ThemeService.ApplyPalette(Application.Current.Resources, false, Colors.Teal);
-        await BenchmarkRunner.NextFrame();
-        Check("theme-resource-update-reaches-window", window.Background is SolidColorBrush brush && brush.Color == (Color)ColorConverter.ConvertFromString("#F7F7F8"));
-        SaveSnapshot(window, Path.Combine(directory, "window-light.png"));
-        foreach (var pair in oldBrushes) Application.Current.Resources[pair.Key] = pair.Value;
 
         var temporary = window.ViewModel.AddGroup("校验分组"); window.SelectGroup(temporary);
         var pending = window.ViewModel.BeginImport(temporary, 0, 2);
@@ -157,23 +167,26 @@ internal static class PrototypeSmoke
         await WindowVisibilitySmoke.RunAsync(window, store.DirectoryPath, Check);
         var report = new
         {
-            passed, runtime = Environment.Version.ToString(), os = Environment.OSVersion.VersionString,
+            passed, completed = true, runtime = Environment.Version.ToString(), os = Environment.OSVersion.VersionString,
             hotkeyRegistration = new { hotkey.Registered, lastAttemptError = hotkey.Error }, nativeHotkeyRollback,
             foregroundObserved = NativeMethods.GetForegroundWindow() == handle, focusObserved = window.IsKeyboardFocusWithin,
             nativeVisibilityObserved = NativeMethods.IsWindowVisible(handle),
             dpi = NativeMethods.GetDpiForWindow(handle), checks = results,
             savedRevision = store.SavedRevision, profileDirectory = store.DirectoryPath,
             notCovered = new[] { "Real hotkey input", "Mouse drag event sequences", "External browser OLE", "Mixed monitor DPI", "Cross-login-session UI", "UAC", "Shell launch", "Physical presentation latency", "OS shutdown" },
-            screenshotKind = "WPF RenderTargetBitmap; not a physical-screen presentation measurement"
+            screenshotKind = "WPF RenderTargetBitmap composited on solid WindowBrush; does not capture DWM Acrylic, border or shadow"
         };
         await File.WriteAllTextAsync(Path.Combine(directory, "smoke-result.json"), JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
         window.Log.Write("smoke.complete", new { passed });
         return passed;
     }
 
-    private static void SaveSnapshot(LauncherWindow window, string path)
+    internal static void SaveSnapshot(FrameworkElement window, string path)
     {
         var image = new RenderTargetBitmap((int)window.ActualWidth, (int)window.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+        var background = new DrawingVisual();
+        using (var drawing = background.RenderOpen()) drawing.DrawRectangle((Brush)window.FindResource("WindowBrush"), null, new Rect(0, 0, window.ActualWidth, window.ActualHeight));
+        image.Render(background);
         image.Render(window);
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(image));

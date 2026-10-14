@@ -66,7 +66,10 @@ public static class ConfigValidation
             }
         }
         var groups = config.Groups.Count == 0 ? new List<GroupConfig> { new() } : config.Groups;
-        return config with { HideOnDeactivate = false, Groups = groups, LastGroupId = groups.Any(g => g.Id == config.LastGroupId)
+        static bool ValidSize(double? value) => value is > 0 and <= 10000 && double.IsFinite(value.Value);
+        bool sized = ValidSize(config.WindowWidth) && ValidSize(config.WindowHeight);
+        return config with { HideOnDeactivate = false, WindowWidth = sized ? config.WindowWidth : null,
+            WindowHeight = sized ? config.WindowHeight : null, Groups = groups, LastGroupId = groups.Any(g => g.Id == config.LastGroupId)
             ? config.LastGroupId : groups[0].Id };
     }
 }

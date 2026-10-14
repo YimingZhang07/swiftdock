@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.Windows;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using QuickLaunch.Models;
@@ -26,11 +27,17 @@ public sealed class MainViewModel : ObservableObject
     public string HotkeyDisplay => Hotkey.Display;
     public int Columns => _settings.Columns;
     public int IconSize => _settings.IconSize;
-    public double CellSize => Math.Max(88, IconSize + 36);
-    public double TileSize => CellSize - 6;
+    public double CellSize => Math.Max(84, IconSize + 52);
+    public double TileSize => CellSize - 4;
+    public Size? WindowSize => _settings.WindowWidth is { } width && _settings.WindowHeight is { } height ? new(width, height) : null;
     public long Revision => _revision;
     public string LastGroupId => _lastGroupId;
-    public string StorageStatus { get => _storageStatus; private set => SetProperty(ref _storageStatus, value); }
+    public string StorageStatus
+    {
+        get => _storageStatus;
+        private set { if (SetProperty(ref _storageStatus, value)) OnPropertyChanged(nameof(StorageWarning)); }
+    }
+    public string StorageWarning => StorageStatus.StartsWith("尚未保存", StringComparison.Ordinal) || StorageStatus == "只读配置" ? StorageStatus : "";
 
     public MainViewModel(ConfigService store, Func<DateTimeOffset>? now = null)
     {
@@ -79,6 +86,26 @@ public sealed class MainViewModel : ObservableObject
         if (!CanEdit) return;
         _settings = _settings with { Hotkey = hotkey.Copy() };
         OnPropertyChanged(nameof(HotkeyDisplay));
+        Changed();
+    }
+    public void SetIconSize(int size)
+    {
+        _owner.VerifyAccess();
+        if (!CanEdit) return;
+        if (size is < 16 or > 128) throw new ArgumentOutOfRangeException(nameof(size));
+        if (IconSize == size) return;
+        _settings = _settings with { IconSize = size };
+        OnPropertyChanged(nameof(IconSize));
+        OnPropertyChanged(nameof(CellSize));
+        OnPropertyChanged(nameof(TileSize));
+        Changed();
+    }
+    public void SetWindowSize(Size? size)
+    {
+        _owner.VerifyAccess();
+        if (_suspended || WindowSize == size) return;
+        // Read-only profiles keep the size for this session; Changed() will not save it.
+        _settings = _settings with { WindowWidth = size?.Width, WindowHeight = size?.Height };
         Changed();
     }
     public AppConfig Snapshot()

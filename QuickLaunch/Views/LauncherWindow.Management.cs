@@ -25,7 +25,7 @@ public partial class LauncherWindow
         Tabs.Children.Clear();
         foreach (var group in Groups)
         {
-            var tab = new Button { DataContext = group, Tag = group, MinWidth = 70, MaxWidth = 190, BorderThickness = new Thickness(0, 0, 0, 2), ToolTip = group.Name };
+            var tab = new Button { DataContext = group, Tag = group, MaxWidth = 190, Style = (Style)FindResource("TabButton") };
             tab.SetBinding(ContentControl.ContentProperty, new Binding(nameof(LaunchGroup.Name)));
             tab.SetBinding(ToolTipProperty, new Binding(nameof(LaunchGroup.Name)));
             tab.Click += (_, _) => { if (!DragSession.Active) { SelectGroup(group); FocusFirst(); } };
@@ -33,6 +33,7 @@ public partial class LauncherWindow
             var rename = new MenuItem { Header = "重命名分组", IsEnabled = CanEdit };
             rename.Click += (_, _) => RenameGroup(group);
             var delete = new MenuItem { Header = "删除分组…", IsEnabled = CanEdit };
+            delete.SetResourceReference(ForegroundProperty, "ErrorBrush");
             delete.Click += (_, _) => DeleteGroup(group);
             menu.Items.Add(rename); menu.Items.Add(delete);
             menu.Opened += (_, _) => _menuOpen = true;
@@ -65,27 +66,27 @@ public partial class LauncherWindow
     public void EditItem(LaunchItem? original)
     {
         if (!CanEdit || DragSession.Active || original?.IsPending == true) return;
-        var group = SelectedGroup; var dialog = new EditItemDialog(original);
+        var group = SelectedGroup; var dialog = new EditItemDialog(original, _theme);
         if (!ShowEditor(dialog) || dialog.Result is not { } result || !Groups.Contains(group)) return;
         try
         {
             if (original is not null) ViewModel.UpdateItem(group, original, result);
             else if (ViewModel.IsDuplicate(group, result)) throw new InvalidOperationException("该组已有相同的启动条目。");
             else group.Items.Add(result);
-            SetStatus("条目已更新，将自动保存。"); Services.WindowPlacement.FitContent(this, CellSize, SelectedGroup.Items.Count); _ = LoadIconsAsync(); FocusItem(original?.Id ?? result.Id);
+            SetStatus("条目已更新，将自动保存。", toast: false); FitContent(); _ = LoadIconsAsync(); FocusItem(original?.Id ?? result.Id);
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { SetStatus(ex.Message); }
     }
     public void RenameItem(LaunchItem item)
     {
         if (!CanEdit || DragSession.Active || item.IsPending) return;
-        var dialog = new NameDialog("重命名条目", item.Name);
+        var dialog = new NameDialog("重命名条目", item.Name, _theme);
         if (ShowEditor(dialog)) { ViewModel.UpdateItem(SelectedGroup, item, item with { Name = dialog.Value }); FocusItem(item.Id); }
     }
     public void DeleteItem(LaunchItem item)
     {
         if (!CanEdit || DragSession.Active || item.IsPending) return;
-        ViewModel.DeleteItem(SelectedGroup, item); SetStatus("已删除，5 秒内按 Ctrl+Z 撤销。"); Services.WindowPlacement.FitContent(this, CellSize, SelectedGroup.Items.Count); FocusFirst();
+        ViewModel.DeleteItem(SelectedGroup, item); SetStatus("已删除，5 秒内按 Ctrl+Z 撤销。"); FitContent(); FocusFirst();
     }
     private string NewGroupName()
     {
@@ -96,13 +97,13 @@ public partial class LauncherWindow
     private void AddGroupClick(object sender, RoutedEventArgs e)
     {
         if (!CanEdit || DragSession.Active) return;
-        var dialog = new NameDialog("新建分组", NewGroupName());
+        var dialog = new NameDialog("新建分组", NewGroupName(), _theme);
         if (ShowEditor(dialog)) { SelectGroup(ViewModel.AddGroup(dialog.Value)); FocusFirst(); }
     }
     public void RenameGroup(LaunchGroup group)
     {
         if (!CanEdit || DragSession.Active) return;
-        var dialog = new NameDialog("重命名分组", group.Name);
+        var dialog = new NameDialog("重命名分组", group.Name, _theme);
         if (ShowEditor(dialog)) ViewModel.RenameGroup(group, dialog.Value);
     }
     private void DeleteGroup(LaunchGroup group)
@@ -143,7 +144,8 @@ public partial class LauncherWindow
         _focusedItemId = id;
         Dispatcher.BeginInvoke(() => { if (!_closing && IsVisible) FocusFirst(); });
     }
-    public bool IsAddGroupAt(Point point) => new Rect(AddGroupButton.TranslatePoint(new Point(), Root), AddGroupButton.RenderSize).Contains(point);
+    public bool IsAddGroupAt(Point point) => new Rect(TabsViewport.TranslatePoint(new Point(), Root), TabsViewport.RenderSize).Contains(point)
+        && new Rect(AddGroupButton.TranslatePoint(new Point(), Root), AddGroupButton.RenderSize).Contains(point);
     public LaunchGroup? MoveToNewGroup(LaunchGroup source, LaunchItem item)
     {
         var group = ViewModel.MoveToNewGroup(source, item, NewGroupName());
@@ -238,8 +240,12 @@ public partial class LauncherWindow
         }
     }
     public void HighlightDropTab(LaunchGroup? group)
-    { foreach (Button tab in Tabs.Children) tab.SetResourceReference(BackgroundProperty, tab.Tag == group ? "HoverBrush" : "PanelBrush"); }
-    public void AfterDrag() => Dispatcher.BeginInvoke(() => { if (IsVisible) Services.WindowPlacement.FitContent(this, CellSize, SelectedGroup.Items.Count); });
+    {
+        foreach (Button tab in Tabs.Children)
+            if (tab.Tag == group) tab.SetResourceReference(BackgroundProperty, "SelectedFillBrush");
+            else tab.ClearValue(BackgroundProperty);
+    }
+    public void AfterDrag() => Dispatcher.BeginInvoke(() => { if (IsVisible) FitContent(); });
     public void FlyGhostTo(LaunchItem item, LaunchGroup target)
     {
         int generation = ++_ghostGeneration;

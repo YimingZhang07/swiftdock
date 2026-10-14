@@ -93,9 +93,9 @@ public partial class App : Application
             _theme = new(Dispatcher);
             _startup = new(Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "QuickLaunch.exe"), paths.ConfigDirectory);
             _icons = new(_smoke ? Path.Combine(paths.LogDirectory, "icons") : paths.IconDirectory, _log);
-            _window = new(_log, _viewModel, _icons) { ExitRequested = () => _ = ExitAsync(), SettingsRequested = OpenSettings };
+            _window = new(_log, _viewModel, _icons) { SettingsRequested = OpenSettings };
             MainWindow = _window;
-            _window.InitializeNative();
+            _window.InitializeNative(_theme);
             _hotkey = new(new WindowInteropHelper(_window).Handle, () =>
             {
                 if (_exiting) return;
@@ -103,7 +103,13 @@ public partial class App : Application
                 else _window.Toggle();
             }, _viewModel.Hotkey);
             _log.Write("hotkey.registered", new { _hotkey.Registered, _hotkey.Error, hotkey = _viewModel.HotkeyDisplay });
-            CreateTray();
+            bool trayAvailable = true;
+            try { CreateTray(); }
+            catch (InvalidOperationException ex) when (e.Args.Contains("--smoke-test"))
+            {
+                trayAvailable = false;
+                _log.Write("smoke.tray-unavailable", new { ex.Message });
+            }
             _ = _window.LoadIconsAsync();
             using var identity = WindowsIdentity.GetCurrent();
             using var process = System.Diagnostics.Process.GetCurrentProcess();
@@ -129,7 +135,7 @@ public partial class App : Application
             }
             else if (_smoke)
             {
-                bool passed = await PrototypeSmoke.RunAsync(_window, _hotkey, _store, this, paths.LogDirectory);
+                bool passed = await PrototypeSmoke.RunAsync(_window, _hotkey, _store, this, paths.LogDirectory, trayAvailable);
                 await ExitAsync(passed ? 0 : 1);
             }
             else if (!e.Args.Contains("--silent") || _pendingShow) ShowMain(_pendingShow ? "pending-instance" : "startup");
@@ -166,17 +172,17 @@ public partial class App : Application
         if (_settings is not null) { _settings.Activate(); return; }
         if (!_window.IsVisible) _window.ShowPanel("settings");
         _window.SetSettingsOpen(true);
-        _settings = new(_viewModel.Hotkey, _viewModel.CanEdit, _store.DirectoryPath,
+        _settings = new(_viewModel, _store.DirectoryPath,
             _hotkey.Registered ? $"当前已注册：{_hotkey.Current!.Display}" : $"注册失败，错误码 {_hotkey.Error}；请选择其他组合。",
             candidate =>
             {
-                if (!_viewModel.CanEdit) return "配置只读，未修改。";
-                if (!_hotkey.TryChange(candidate)) return $"新组合被占用或不可用（{_hotkey.Error}）；原有热键和配置已保留。";
+                if (!_viewModel.CanEdit) return ("配置只读，未修改。", true);
+                if (!_hotkey.TryChange(candidate)) return ($"新组合被占用或不可用（{_hotkey.Error}）；原有热键和配置已保留。", true);
                 _viewModel.ApplySettings(candidate);
                 UpdateTrayText();
                 _log?.Write("hotkey.changed", new { hotkey = candidate.Display });
-                return "已应用，配置将自动保存。";
-            }, _startup!) { Owner = _window };
+                return ("已应用，配置将自动保存。", false);
+            }, _startup!, _window.ResetWindowSize, () => _ = ExitAsync(), _theme, !_hotkey.Registered) { Owner = _window };
         _settings.Closed += (_, _) => { _settings = null; _window.SetSettingsOpen(false); };
         _settings.Show();
     }
