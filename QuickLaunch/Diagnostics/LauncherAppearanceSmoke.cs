@@ -18,15 +18,15 @@ internal static class LauncherAppearanceSmoke
     {
         window.SetSettingsOpen(true);
         var resources = Application.Current.Resources;
-        var oldBrushes = resources.Keys.OfType<string>().Where(k => resources[k] is SolidColorBrush || k == "PopupShadowOpacity").ToDictionary(k => k, k => resources[k]);
+        using var themeScope = new ThemeSmokeScope();
         var preferences = ThemeService.ReadPreferences();
         nint hwnd = new WindowInteropHelper(window).Handle;
         try
         {
             foreach (bool dark in new[] { true, false })
             {
-                ThemeService.ApplyPalette(resources, dark, Colors.Teal);
-                window.ApplyBackdrop(dark, preferences.HighContrast, preferences.Transparency);
+                ThemeSmokeScope.Apply(dark);
+                window.ApplyBackdrop(preferences.HighContrast, preferences.Transparency);
                 await BenchmarkRunner.NextFrame();
                 bool nativeDark = NativeMethods.DwmGetWindowAttribute(hwnd, 20, out int immersive, sizeof(int)) >= 0;
                 check($"theme-{(dark ? "dark" : "light")}-immersive-attribute", !nativeDark || immersive == (dark ? 1 : 0));
@@ -36,21 +36,21 @@ internal static class LauncherAppearanceSmoke
                         && backdrop == 3 && window.Background == Brushes.Transparent && window.CaptureRoot.Background == Brushes.Transparent
                         && HwndSource.FromHwnd(hwnd)?.CompositionTarget.BackgroundColor == Colors.Transparent);
                 }
-                else check("solid-theme-resource-reaches-window", window.Background == resources["WindowBrush"]);
+                else check("solid-theme-resource-reaches-window", window.Background == resources["ApplicationBackgroundBrush"]);
                 WindowLayoutSmoke.CheckResizeDirections(window, check);
                 PrototypeSmoke.SaveSnapshot(window, Path.Combine(directory, dark ? "window.png" : "window-light.png"));
             }
-            window.ApplyBackdrop(false, false, false);
-            check("transparency-off-solid-fallback", window.BackdropMode == "solid" && window.Background == resources["WindowBrush"]);
+            window.ApplyBackdrop(false, false);
+            check("transparency-off-solid-fallback", window.BackdropMode == "solid" && window.Background == resources["ApplicationBackgroundBrush"]);
             WindowLayoutSmoke.CheckResizeDirections(window, check);
-            ThemeService.ApplyPalette(resources, false, Colors.Teal, true);
-            window.ApplyBackdrop(false, true, true);
-            check("high-contrast-solid-fallback", window.BackdropMode == "solid" && window.Background == resources["WindowBrush"]);
+            ThemeSmokeScope.Apply(false, true);
+            window.ApplyBackdrop(true, true);
+            check("high-contrast-solid-fallback", window.BackdropMode == "solid" && window.Background == resources["ApplicationBackgroundBrush"]);
         }
         finally
         {
-            foreach (var (key, brush) in oldBrushes) resources[key] = brush;
-            window.ApplyBackdrop(preferences.Dark, preferences.HighContrast, preferences.Transparency);
+            themeScope.Dispose();
+            window.ApplyBackdrop(preferences.HighContrast, preferences.Transparency);
         }
 
         await DialogAppearanceSmoke.RunAsync(window, directory, profileDirectory, check);
@@ -135,10 +135,10 @@ internal static class LauncherAppearanceSmoke
             var saved = new Size(WindowPlacement.MinimumSize(model.CellSize).Width, WindowPlacement.MinimumSize(100).Height);
             model.SetWindowSize(saved); window.Width = saved.Width; window.Height = saved.Height;
             window.UpdateLayout();
-            var focused = LauncherWindow.Descendants<Button>(window.GroupHost).Last(b => b.DataContext is LaunchItem item && item.Id == added[^1].Id);
-            focused.Focus(); focused.BringIntoView(); window.UpdateLayout();
-            bool hasFocus = focused.IsKeyboardFocused;
-            check("icon-size-keyboard-focus-acquired", hasFocus);
+            var selected = LauncherWindow.Descendants<ListBoxItem>(window.GroupHost).Last(b => b.DataContext is LaunchItem item && item.Id == added[^1].Id);
+            window.SelectedList.SelectedItem = selected.DataContext;
+            window.SelectedList.RevealSelection(); window.UpdateLayout();
+            check("icon-size-selection-acquired", selected.IsSelected);
             foreach (int expected in new[] { 40, 48, 48, 40, 32, 32 })
             {
                 int delta = expected >= model.IconSize && expected != 32 ? 120 : -120;
@@ -147,14 +147,14 @@ internal static class LauncherAppearanceSmoke
                 await window.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
                 window.UpdateLayout();
                 var panel = LauncherWindow.Descendants<WrapPanel>(window.GroupHost).Single(p => p.IsVisible);
-                var tiles = LauncherWindow.Descendants<Button>(panel).Where(b => b.DataContext is LaunchItem).ToArray();
+                var tiles = LauncherWindow.Descendants<ListBoxItem>(panel).Where(b => b.DataContext is LaunchItem).ToArray();
                 check($"live-icon-size-{expected}-bindings-and-saved-window", wheel.Handled && model.IconSize == expected
                     && panel.ItemWidth == model.CellSize && panel.ItemHeight == model.CellSize
                     && tiles.All(b => b.Width == model.TileSize && b.Height == model.TileSize)
                     && tiles.All(b => LauncherWindow.Descendants<Image>(b).Single().Parent is Grid icon && icon.ActualWidth == expected && icon.ActualHeight == expected)
                     && Math.Abs(window.ActualWidth - saved.Width) < 1 && Math.Abs(window.ActualHeight - saved.Height) < 1);
-                var bounds = new Rect(focused.TranslatePoint(new Point(), window.Viewer), focused.RenderSize);
-                check($"live-icon-size-{expected}-keeps-focused-tile-visible", !hasFocus || focused.IsKeyboardFocused
+                var bounds = new Rect(selected.TranslatePoint(new Point(), window.Viewer), selected.RenderSize);
+                check($"live-icon-size-{expected}-keeps-selected-tile-visible", selected.IsSelected
                     && bounds.Top >= -.5 && bounds.Bottom <= window.Viewer.ViewportHeight + .5);
                 window.Viewer.ScrollToTop(); window.UpdateLayout();
                 int columns = Math.Max(1, (int)(window.Viewer.ViewportWidth / model.CellSize));
@@ -162,7 +162,7 @@ internal static class LauncherAppearanceSmoke
                 window.ShowInsertion(columns); window.UpdateLayout();
                 var marker = (TranslateTransform)window.Insertion.RenderTransform;
                 check($"live-icon-size-{expected}-drop-slots-and-insertion", aligned && marker.X == 0 && Math.Abs(marker.Y - model.CellSize - 4) < .5);
-                focused.BringIntoView(); window.UpdateLayout();
+                selected.BringIntoView(); window.UpdateLayout();
             }
             var plain = new MouseWheelEventArgs(Mouse.PrimaryDevice, Environment.TickCount, 120) { RoutedEvent = UIElement.PreviewMouseWheelEvent };
             window.HandleIconSizeWheel(plain, ModifierKeys.None);
@@ -259,7 +259,7 @@ internal static class LauncherAppearanceSmoke
                 check($"normal-startup-silent-{iconSize}", probe.StatusText == "" && probe.Toast.Visibility == Visibility.Collapsed);
                 probe.InitializeNative(); probe.ShowPanel("tile-layout-smoke", forDrop: true);
                 await BenchmarkRunner.NextFrame(); probe.UpdateLayout();
-                var tiles = LauncherWindow.Descendants<Button>(probe.GroupHost).Where(b => b.DataContext is LaunchItem).ToArray();
+                var tiles = LauncherWindow.Descendants<ListBoxItem>(probe.GroupHost).Where(b => b.DataContext is LaunchItem).ToArray();
                 check($"labels-fit-two-lines-{iconSize}", tiles.All(tile =>
                 {
                     var label = LauncherWindow.Descendants<TextBlock>(tile).Single(t => t.Name == "TileLabel");

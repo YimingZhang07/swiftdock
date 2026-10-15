@@ -34,12 +34,11 @@ internal static class FaviconSmoke
         var window = new LauncherWindow(main.Log, model, icons);
         var settings = new SettingsWindow(model, store.DirectoryPath, "", _ => ("", false),
             new StartupService(Environment.ProcessPath!, store.DirectoryPath), window.ResetWindowSize, () => { });
-        var resources = Application.Current.Resources;
-        var oldBrushes = resources.Keys.OfType<string>().Where(k => resources[k] is SolidColorBrush || k == "PopupShadowOpacity").ToDictionary(k => k, k => resources[k]);
+        using var themeScope = new ThemeSmokeScope();
         try
         {
-            ThemeService.ApplyPalette(resources, true, Colors.Teal);
-            window.InitializeNative(); window.ApplyBackdrop(true, false, false);
+            ThemeSmokeScope.Apply(true);
+            window.InitializeNative(); window.ApplyBackdrop(false, false);
             window.ShowPanel("favicon-smoke", forDrop: true);
             await window.LoadIconsAsync().WaitAsync(TimeSpan.FromSeconds(2));
             int pixels = IconService.PixelSize(model.IconSize, VisualTreeHelper.GetDpi(window).DpiScaleX);
@@ -56,14 +55,14 @@ internal static class FaviconSmoke
 
             int requests = handler.Requests.Count;
             settings.WebsiteIconsBox.IsChecked = false;
-            settings.WebsiteIconsBox.RaiseEvent(new RoutedEventArgs(CheckBox.ClickEvent));
+            settings.WebsiteIconsBox.RaiseEvent(new RoutedEventArgs(Wpf.Ui.Controls.ToggleSwitch.ClickEvent));
             await window.LoadIconsAsync(); await BenchmarkRunner.NextFrame();
             check("favicon-setting-off-restores-globes-with-zero-requests", !model.AutoFetchWebsiteIcons && samples.Take(3).All(i => ReferenceEquals(i.Visual.Image, globe))
                 && handler.Requests.Count == requests);
             await model.FlushAsync();
             check("favicon-setting-persists-opt-out", ConfigValidation.Parse(File.ReadAllBytes(store.FilePath)).AutoFetchWebsiteIcons == false);
             settings.WebsiteIconsBox.IsChecked = true;
-            settings.WebsiteIconsBox.RaiseEvent(new RoutedEventArgs(CheckBox.ClickEvent));
+            settings.WebsiteIconsBox.RaiseEvent(new RoutedEventArgs(Wpf.Ui.Controls.ToggleSwitch.ClickEvent));
             await BenchmarkRunner.NextFrame();
             check("favicon-setting-on-reuses-cache-lazily", !ReferenceEquals(samples[0].Visual.Image, globe) && handler.Requests.Count == requests);
             window.RefreshItemIcon(samples[0]);
@@ -75,8 +74,8 @@ internal static class FaviconSmoke
         }
         finally
         {
-            release.TrySetResult(); settings.Close(); window.PrepareExit(); window.Close(); model.Suspend(true);
-            foreach (var (key, value) in oldBrushes) resources[key] = value;
+            release.TrySetResult(); settings.Close(); WindowSmoke.Pump(); window.PrepareExit(); window.Close(); WindowSmoke.Pump(); model.Suspend(true);
+            themeScope.Dispose();
         }
     }
 }

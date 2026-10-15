@@ -11,6 +11,7 @@
   <ItemGroup>
     <None Include="../QuickLaunch/Assets/QuickLaunch.ico" Link="Assets/QuickLaunch.ico" CopyToOutputDirectory="PreserveNewest" />
     <EmbeddedResource Include="../QuickLaunch/**/*.xaml" Exclude="../QuickLaunch/bin/**;../QuickLaunch/obj/**" />
+    <EmbeddedResource Include="../QuickLaunch/**/*.cs" Exclude="../QuickLaunch/bin/**;../QuickLaunch/obj/**" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1" PrivateAssets="all" />

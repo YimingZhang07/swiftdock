@@ -8,7 +8,7 @@ using QuickLaunch.ViewModels;
 
 namespace QuickLaunch.Views;
 
-public partial class SettingsWindow : Window
+public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
 {
     private readonly Func<HotkeyConfig, (string Message, bool Error)> _apply;
     private readonly Action _resetSize, _exit;
@@ -17,10 +17,9 @@ public partial class SettingsWindow : Window
     private bool _syncing;
     public SettingsWindow(MainViewModel model, string directory, string registration,
         Func<HotkeyConfig, (string Message, bool Error)> apply, StartupService startup, Action resetSize, Action exit,
-        ThemeService? theme = null, bool registrationError = false)
+        bool registrationError = false)
     {
         InitializeComponent();
-        DialogTheme.Attach(this, theme);
         _apply = apply; _resetSize = resetSize; _exit = exit; _startup = startup; _model = model;
         var hotkey = model.Hotkey;
         Alt.IsChecked = hotkey.Modifiers.Contains("Alt");
@@ -47,7 +46,7 @@ public partial class SettingsWindow : Window
     private void SetResult(string message, bool error = false)
     {
         Result.Text = message;
-        Result.SetResourceReference(TextBlock.ForegroundProperty, error ? "ErrorBrush" : "AccentBrush");
+        Result.SetResourceReference(TextBlock.ForegroundProperty, error ? "SystemFillColorCriticalBrush" : "TextFillColorSecondaryBrush");
     }
     private void ModelChanged(object? sender, PropertyChangedEventArgs e)
     {

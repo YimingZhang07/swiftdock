@@ -58,6 +58,7 @@ internal static class PrototypeSmoke
         await window.LoadIconsAsync().WaitAsync(TimeSpan.FromSeconds(10));
         Check("real-frozen-icons-loaded", window.Groups[0].Items.All(i => i.Visual.Image is { IsFrozen: true }));
         await LauncherInputSmoke.RunAsync(window, directory, store.DirectoryPath, app.Tray?.ContextMenu, Check);
+        await DialogBehaviorSmoke.RunAsync(window, directory, store.DirectoryPath, Check);
         await EditItemDialogSmoke.RunAsync(window, directory, store.DirectoryPath, Check);
         await IconPickerSmoke.RunAsync(window, directory, Check);
         await FaviconSmoke.RunAsync(window, directory, store.DirectoryPath, Check);
@@ -93,14 +94,14 @@ internal static class PrototypeSmoke
         Check("configuration-writable", !store.IsReadOnly);
         var group = window.Groups[0];
         app.OpenSettings();
-        await Task.Delay(80);
+        WindowSmoke.Pump();
         var settings = Application.Current.Windows.OfType<SettingsWindow>().Single();
         Check("settings-owned-and-visible", settings.IsVisible && settings.Owner == window && window.IsVisible);
         Check("header-routed-move-with-settings-open", WindowDragSmoke.RequestsMove(window, new Point(window.ActualWidth / 2, 22)));
         long settingsRevision = window.ViewModel.Revision;
         settings.ApplyButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Check("settings-applied", window.ViewModel.Revision > settingsRevision);
-        settings.Close();
+        settings.Close(); WindowSmoke.Pump();
         Check("settings-close-keeps-main-alive", window.IsVisible && new WindowInteropHelper(window).Handle == handle);
         group.Items.Move(0, group.Items.Count - 1);
         await window.ViewModel.FlushAsync();
@@ -114,13 +115,14 @@ internal static class PrototypeSmoke
         editorTimeout.Tick += (_, _) => editor.Close();
         editor.Loaded += (_, _) => editor.Dispatcher.BeginInvoke(() =>
         {
+            WindowSmoke.Pump();
             editor.NameBox.Text = "测试网页"; editor.PathBox.Text = "https://example.com/download.exe";
             Check("url-disables-app-only-fields", !editor.ArgumentsBox.IsEnabled && !editor.WorkingBox.IsEnabled && !editor.ElevateBox.IsEnabled);
             editor.SaveButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         });
         editorTimeout.Start();
         bool editorAccepted;
-        try { editorAccepted = window.ShowEditor(editor); } finally { editorTimeout.Stop(); }
+        try { editorAccepted = window.ShowEditor(editor); } finally { editorTimeout.Stop(); WindowSmoke.Pump(); }
         Check("edit-dialog-produces-valid-url", editorAccepted && editor.Result?.Kind == LaunchKind.Url && editor.Result.Name == "测试网页");
 
         var temporary = window.ViewModel.AddGroup("校验分组"); window.SelectGroup(temporary);
@@ -175,7 +177,7 @@ internal static class PrototypeSmoke
             dpi = NativeMethods.GetDpiForWindow(handle), checks = results,
             savedRevision = store.SavedRevision, profileDirectory = store.DirectoryPath,
             notCovered = new[] { "Real hotkey input", "Mouse drag event sequences", "External browser OLE", "Mixed monitor DPI", "Cross-login-session UI", "UAC", "Shell launch", "Physical presentation latency", "OS shutdown" },
-            screenshotKind = "WPF RenderTargetBitmap composited on solid WindowBrush; does not capture DWM Acrylic, border or shadow"
+            screenshotKind = "WPF RenderTargetBitmap composited on solid ApplicationBackgroundBrush; does not capture DWM Acrylic, border or shadow"
         };
         await File.WriteAllTextAsync(Path.Combine(directory, "smoke-result.json"), JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
         window.Log.Write("smoke.complete", new { passed });
@@ -193,13 +195,19 @@ internal static class PrototypeSmoke
         return true;
     }
 
-    internal static void SaveSnapshot(FrameworkElement window, string path)
+    internal static void SaveSnapshot(FrameworkElement window, string path, bool includeOverflow = false)
     {
-        var image = new RenderTargetBitmap((int)window.ActualWidth, (int)window.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+        var bounds = new Rect(window.RenderSize);
+        if (includeOverflow) bounds.Union(VisualTreeHelper.GetDescendantBounds(window));
+        var image = new RenderTargetBitmap((int)Math.Ceiling(bounds.Width), (int)Math.Ceiling(bounds.Height), 96, 96, PixelFormats.Pbgra32);
         var background = new DrawingVisual();
-        using (var drawing = background.RenderOpen()) drawing.DrawRectangle((Brush)window.FindResource("WindowBrush"), null, new Rect(0, 0, window.ActualWidth, window.ActualHeight));
+        using (var drawing = background.RenderOpen())
+        {
+            drawing.DrawRectangle((Brush)window.FindResource("ApplicationBackgroundBrush"), null, new Rect(bounds.Size));
+            if (includeOverflow) drawing.DrawRectangle(new VisualBrush(window) { ViewboxUnits = BrushMappingMode.Absolute, Viewbox = bounds }, null, new Rect(bounds.Size));
+        }
         image.Render(background);
-        image.Render(window);
+        if (!includeOverflow) image.Render(window);
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(image));
         using var output = File.Create(path);

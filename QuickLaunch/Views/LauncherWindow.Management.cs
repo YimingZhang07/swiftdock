@@ -29,13 +29,13 @@ public partial class LauncherWindow
             var tab = new Button { DataContext = group, Tag = group, MaxWidth = 190, Style = (Style)FindResource("TabButton") };
             tab.SetBinding(ContentControl.ContentProperty, new Binding(nameof(LaunchGroup.Name)));
             tab.SetBinding(ToolTipProperty, new Binding(nameof(LaunchGroup.Name)));
-            tab.Click += (_, _) => { if (!DragSession.Active) { SelectGroup(group); FocusFirst(); } };
+            tab.Click += (_, _) => { if (!DragSession.Active) SelectGroup(group); };
             var menu = new ContextMenu();
             var rename = new MenuItem { Header = "重命名分组", IsEnabled = CanEdit };
             rename.Click += (_, _) => RenameGroup(group);
             var delete = new MenuItem { Header = "删除分组…", IsEnabled = CanEdit };
-            delete.SetResourceReference(ForegroundProperty, "ErrorBrush");
-            delete.Click += (_, _) => DeleteGroup(group);
+            delete.SetResourceReference(ForegroundProperty, "SystemFillColorCriticalBrush");
+            delete.Click += async (_, _) => await DeleteGroupAsync(group);
             menu.Items.Add(rename); menu.Items.Add(delete);
             menu.Opened += (_, _) => _menuOpen = true;
             menu.Closed += (_, _) => _menuOpen = false;
@@ -48,13 +48,13 @@ public partial class LauncherWindow
     private void EnsureGrid(LaunchGroup group)
     {
         if (_grids.ContainsKey(group)) return;
-        var grid = new ItemsControl
+        var grid = new TileListBox
         {
-            ItemsSource = group.Items, ItemTemplate = (DataTemplate)FindResource("TileTemplate"),
+            ItemsSource = group.Items, ItemContainerStyle = (Style)FindResource("TileItem"),
+            Style = (Style)FindResource("TileList"), Viewport = Viewer,
             ItemsPanel = (ItemsPanelTemplate)FindResource("TilePanel"), Visibility = Visibility.Collapsed,
-            Focusable = false, FocusVisualStyle = null
+            FocusVisualStyle = null
         };
-        KeyboardNavigation.SetDirectionalNavigation(grid, KeyboardNavigationMode.Contained);
         _grids.Add(group, grid); GroupHost.Children.Add(grid);
     }
     internal bool ShowEditor(Window editor)
@@ -68,27 +68,27 @@ public partial class LauncherWindow
     public void EditItem(LaunchItem? original, bool openIconPicker = false)
     {
         if (!CanEdit || DragSession.Active || original?.IsPending == true) return;
-        var group = SelectedGroup; var dialog = new EditItemDialog(original, _theme, Icons, openIconPicker);
+        var group = SelectedGroup; var dialog = new EditItemDialog(original, Icons, openIconPicker);
         if (!ShowEditor(dialog) || dialog.Result is not { } result || !Groups.Contains(group)) return;
         try
         {
             if (original is not null) ViewModel.UpdateItem(group, original, result);
             else if (ViewModel.IsDuplicate(group, result)) throw new InvalidOperationException("该组已有相同的启动条目。");
             else group.Items.Add(result);
-            SetStatus("条目已更新，将自动保存。", toast: false); FitContent(); _ = LoadIconsAsync(); FocusItem(original?.Id ?? result.Id);
+            SetStatus("条目已更新，将自动保存。", toast: false); FitContent(); _ = LoadIconsAsync(); SelectItem(original?.Id ?? result.Id);
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { SetStatus(ex.Message); }
     }
     public void RenameItem(LaunchItem item)
     {
         if (!CanEdit || DragSession.Active || item.IsPending) return;
-        var dialog = new NameDialog("重命名条目", item.Name, _theme);
-        if (ShowEditor(dialog)) { ViewModel.UpdateItem(SelectedGroup, item, item with { Name = dialog.Value }); FocusItem(item.Id); }
+        var dialog = new NameDialog("重命名条目", item.Name);
+        if (ShowEditor(dialog)) { ViewModel.UpdateItem(SelectedGroup, item, item with { Name = dialog.Value }); SelectItem(item.Id); }
     }
     public void DeleteItem(LaunchItem item)
     {
         if (!CanEdit || DragSession.Active || item.IsPending) return;
-        ViewModel.DeleteItem(SelectedGroup, item); SetStatus("已删除，5 秒内按 Ctrl+Z 撤销。"); FitContent(); FocusFirst();
+        ViewModel.DeleteItem(SelectedGroup, item); SetStatus("已删除，5 秒内按 Ctrl+Z 撤销。"); FitContent(); ClearTileSelection();
     }
     private string NewGroupName()
     {
@@ -99,27 +99,36 @@ public partial class LauncherWindow
     private void AddGroupClick(object sender, RoutedEventArgs e)
     {
         if (!CanEdit || DragSession.Active) return;
-        var dialog = new NameDialog("新建分组", NewGroupName(), _theme);
-        if (ShowEditor(dialog)) { SelectGroup(ViewModel.AddGroup(dialog.Value)); FocusFirst(); }
+        var dialog = new NameDialog("新建分组", NewGroupName());
+        if (ShowEditor(dialog)) { SelectGroup(ViewModel.AddGroup(dialog.Value)); }
     }
     public void RenameGroup(LaunchGroup group)
     {
         if (!CanEdit || DragSession.Active) return;
-        var dialog = new NameDialog("重命名分组", group.Name, _theme);
+        var dialog = new NameDialog("重命名分组", group.Name);
         if (ShowEditor(dialog)) ViewModel.RenameGroup(group, dialog.Value);
     }
-    private void DeleteGroup(LaunchGroup group)
+    internal async Task DeleteGroupAsync(LaunchGroup group)
     {
-        if (!CanEdit || DragSession.Active) return;
+        if (!CanEdit || DragSession.Active || HasOpenEditor || !Groups.Contains(group)) return;
         if (group.Items.Any(i => !i.IsPending))
         {
+            var dialog = new Wpf.Ui.Controls.MessageBox
+            {
+                Owner = this, Title = "删除分组", Content = $"删除“{group.Name}”及其中的条目？此操作不能用单条撤销恢复。",
+                PrimaryButtonText = "删除", PrimaryButtonAppearance = Wpf.Ui.Controls.ControlAppearance.Danger,
+                CloseButtonText = "取消", WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ResizeMode = ResizeMode.NoResize, ShowInTaskbar = false, MaxWidth = 460,
+                FontFamily = FontFamily
+            };
+            _editor = dialog;
             SetSettingsOpen(true);
-            try { if (MessageBox.Show(this, $"删除“{group.Name}”及其中的条目？此操作不能用单条撤销恢复。", "删除分组", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return; }
-            finally { SetSettingsOpen(false); }
+            try { if (await dialog.ShowDialogAsync() != Wpf.Ui.Controls.MessageBoxResult.Primary) return; }
+            finally { _editor = null; SetSettingsOpen(false); }
         }
-        ViewModel.RemoveGroup(group); FocusFirst();
+        if (!_closing && CanEdit && Groups.Contains(group)) ViewModel.RemoveGroup(group);
     }
-    private LaunchItem? MenuItemData(object sender) => sender is MenuItem { Parent: ContextMenu { PlacementTarget: Button { DataContext: LaunchItem item } } } ? item : null;
+    private LaunchItem? MenuItemData(object sender) => sender is MenuItem { Parent: ContextMenu { PlacementTarget: ListBoxItem { DataContext: LaunchItem item } } } ? item : null;
     private void EditMenuClick(object sender, RoutedEventArgs e) { if (MenuItemData(sender) is { } item) EditItem(item); }
     private void ChangeIconMenuClick(object sender, RoutedEventArgs e) { if (MenuItemData(sender) is { } item) EditItem(item, openIconPicker: true); }
     private void RenameMenuClick(object sender, RoutedEventArgs e) { if (MenuItemData(sender) is { } item) RenameItem(item); }
@@ -151,10 +160,14 @@ public partial class LauncherWindow
         foreach (var current in affected) { current.Visual.BeginRequest(0); current.Visual.Image = null; }
         _ = LoadIconsAsync();
     }
-    private void FocusItem(string id)
+    private void SelectItem(string id)
     {
-        _focusedItemId = id;
-        Dispatcher.BeginInvoke(() => { if (!_closing && IsVisible) FocusFirst(); });
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (_closing || !IsVisible) return;
+            SelectedList.SelectedItem = SelectedGroup.Items.FirstOrDefault(i => i.Id == id);
+            FocusSelectionList(); SelectedList.RevealSelection();
+        });
     }
     public bool IsAddGroupAt(Point point) => new Rect(TabsViewport.TranslatePoint(new Point(), Root), TabsViewport.RenderSize).Contains(point)
         && new Rect(AddGroupButton.TranslatePoint(new Point(), Root), AddGroupButton.RenderSize).Contains(point);
@@ -205,14 +218,14 @@ public partial class LauncherWindow
         }
         else projected.Insert(slot.Value, item);
         int columns = Math.Max(1, (int)(Viewer.ViewportWidth / CellSize));
-        foreach (var button in Descendants<Button>(_grids[SelectedGroup]))
+        foreach (var tile in Descendants<ListBoxItem>(_grids[SelectedGroup]))
         {
-            if (button.DataContext is not LaunchItem entry) continue;
+            if (tile.DataContext is not LaunchItem entry) continue;
             int old = original.FindIndex(i => i.Id == entry.Id), next = projected.FindIndex(i => i.Id == entry.Id);
-            _previewElements[button] = (button.RenderTransform, button.Opacity);
-            if (entry.Id == item.Id) { button.Opacity = .2; continue; }
-            Point start = previous.GetValueOrDefault(button);
-            var transform = new TranslateTransform(start.X, start.Y); button.RenderTransform = transform;
+            _previewElements[tile] = (tile.RenderTransform, tile.Opacity);
+            if (entry.Id == item.Id) { tile.Opacity = .2; continue; }
+            Point start = previous.GetValueOrDefault(tile);
+            var transform = new TranslateTransform(start.X, start.Y); tile.RenderTransform = transform;
             double x = (next % columns - old % columns) * CellSize, y = (next / columns - old / columns) * CellSize;
             if (SystemParameters.ClientAreaAnimation)
             {
@@ -254,7 +267,7 @@ public partial class LauncherWindow
     public void HighlightDropTab(LaunchGroup? group)
     {
         foreach (Button tab in Tabs.Children)
-            if (tab.Tag == group) tab.SetResourceReference(BackgroundProperty, "SelectedFillBrush");
+            if (tab.Tag == group) tab.SetResourceReference(BackgroundProperty, "SubtleFillColorSecondaryBrush");
             else tab.ClearValue(BackgroundProperty);
     }
     public void AfterDrag() => Dispatcher.BeginInvoke(() => { if (IsVisible) FitContent(); });
@@ -265,7 +278,7 @@ public partial class LauncherWindow
         {
             if (generation != _ghostGeneration || !IsVisible) return;
             UpdateLayout();
-            FrameworkElement? destination = target == SelectedGroup ? Descendants<Button>(_grids[target]).FirstOrDefault(b => b.DataContext is LaunchItem i && i.Id == item.Id)
+            FrameworkElement? destination = target == SelectedGroup ? Descendants<ListBoxItem>(_grids[target]).FirstOrDefault(b => b.DataContext is LaunchItem i && i.Id == item.Id)
                 : Tabs.Children.OfType<Button>().FirstOrDefault(b => b.Tag == target);
             if (destination is null || !SystemParameters.ClientAreaAnimation) { HideGhost(); return; }
             Point point = destination.TranslatePoint(new Point(8, 8), Root);
@@ -278,7 +291,7 @@ public partial class LauncherWindow
     public void FlashDuplicate(LaunchItem item)
     {
         if (!SystemParameters.ClientAreaAnimation) return;
-        var button = Descendants<Button>(_grids[SelectedGroup]).FirstOrDefault(b => b.DataContext is LaunchItem i && i.Id == item.Id);
-        button?.BeginAnimation(OpacityProperty, new DoubleAnimation(.35, 1, TimeSpan.FromMilliseconds(100)) { AutoReverse = true, RepeatBehavior = new RepeatBehavior(2), FillBehavior = FillBehavior.Stop });
+        var tile = Descendants<ListBoxItem>(_grids[SelectedGroup]).FirstOrDefault(b => b.DataContext is LaunchItem i && i.Id == item.Id);
+        tile?.BeginAnimation(OpacityProperty, new DoubleAnimation(.35, 1, TimeSpan.FromMilliseconds(100)) { AutoReverse = true, RepeatBehavior = new RepeatBehavior(2), FillBehavior = FillBehavior.Stop });
     }
 }

@@ -15,22 +15,29 @@ public sealed class SingleInstanceService : IAsyncDisposable
     private Task? _server;
     private readonly string _pipeName;
     private readonly Action _showRequested;
+    private readonly Action? _exitRequested;
     private readonly Func<bool> _acceptsRequests;
     public bool IsPrimary { get; private set; }
     public string Identity { get; }
 
-    public SingleInstanceService(string configDirectory, Action showRequested, Func<bool>? acceptsRequests = null)
+    public SingleInstanceService(string configDirectory, Action showRequested, Func<bool>? acceptsRequests = null, Action? exitRequested = null)
+    {
+        Identity = GetIdentity(configDirectory);
+        _pipeName = "QuickLaunch_" + Identity;
+        _showRequested = showRequested;
+        _exitRequested = exitRequested;
+        _acceptsRequests = acceptsRequests ?? (() => true);
+        TryBecomePrimary();
+    }
+
+    internal static string GetIdentity(string configDirectory)
     {
         using var user = WindowsIdentity.GetCurrent();
         using var process = Process.GetCurrentProcess();
         string sid = user.User?.Value ?? throw new InvalidOperationException("无法确定当前用户 SID。");
         string canonical = Path.TrimEndingDirectorySeparator(Path.GetFullPath(configDirectory)).ToUpperInvariant();
         string hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)))[..24];
-        Identity = $"{sid}_{process.SessionId}_{hash}";
-        _pipeName = "QuickLaunch_" + Identity;
-        _showRequested = showRequested;
-        _acceptsRequests = acceptsRequests ?? (() => true);
-        TryBecomePrimary();
+        return $"{sid}_{process.SessionId}_{hash}";
     }
 
     private bool TryBecomePrimary()
@@ -61,16 +68,50 @@ public sealed class SingleInstanceService : IAsyncDisposable
                 await pipe.WriteAsync(BitConverter.GetBytes(Environment.ProcessId), token);
                 var command = new byte[1];
                 await pipe.ReadExactlyAsync(command, token);
-                if (command[0] != 1) continue;
-                if (!_acceptsRequests()) { await pipe.WriteAsync(new byte[] { 0 }, token); continue; }
-                _showRequested(); // Queue onto the UI dispatcher; ACK means accepted, not yet rendered.
-                await pipe.WriteAsync(new byte[] { 1 }, token);
-                await pipe.FlushAsync(token);
+                await HandleRequestAsync(command[0], pipe, _showRequested, _exitRequested, _acceptsRequests, token);
             }
             catch (OperationCanceledException) when (_stop.IsCancellationRequested) { break; }
             catch (Exception ex) when (ex is IOException or OperationCanceledException or InvalidOperationException)
             { /* A failed/disconnected client must not terminate the listener. */ }
         }
+    }
+
+    internal static async Task HandleRequestAsync(byte command, Stream response, Action showRequested, Action? exitRequested,
+        Func<bool> acceptsRequests, CancellationToken cancellation = default)
+    {
+        bool accepted = (command == 1 || command == 2 && exitRequested is not null) && acceptsRequests();
+        if (accepted && command == 1) showRequested();
+        await response.WriteAsync(new byte[] { accepted ? (byte)1 : (byte)0 }, cancellation);
+        await response.FlushAsync(cancellation);
+        // Exit can dispose this listener immediately. Send ACK before queuing shutdown.
+        if (accepted && command == 2) exitRequested!();
+    }
+
+    public static async Task<int> RequestExitAsync(string configDirectory, TimeSpan? timeout = null)
+    {
+        // Client only: an exit command must never acquire the mutex or start a replacement.
+        using var deadline = new CancellationTokenSource(timeout ?? TimeSpan.FromSeconds(2));
+        try
+        {
+            return await SendRequestAsync("QuickLaunch_" + GetIdentity(configDirectory), 2, deadline.Token) ? 0 : 2;
+        }
+        catch (Exception ex) when (ex is IOException or TimeoutException or OperationCanceledException) { return 2; }
+    }
+
+    private static async Task<bool> SendRequestAsync(string pipeName, byte command, CancellationToken cancellation)
+    {
+        await using var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut,
+            PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        await pipe.ConnectAsync(command == 1 ? 300 : 2000, cancellation);
+        var pidBytes = new byte[4];
+        await pipe.ReadExactlyAsync(pidBytes, cancellation);
+        int serverPid = BitConverter.ToInt32(pidBytes);
+        if (serverPid <= 0) throw new IOException("已有实例返回无效 PID。");
+        if (command == 1) NativeMethods.AllowSetForegroundWindow((uint)serverPid);
+        await pipe.WriteAsync(new byte[] { command }, cancellation);
+        var ack = new byte[1];
+        await pipe.ReadExactlyAsync(ack, cancellation);
+        return ack[0] == 1;
     }
 
     public async Task NotifyPrimaryAsync(TimeSpan? timeout = null)
@@ -81,18 +122,7 @@ public sealed class SingleInstanceService : IAsyncDisposable
             deadline.Token.ThrowIfCancellationRequested();
             try
             {
-                await using var pipe = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut,
-                    PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
-                await pipe.ConnectAsync(300, deadline.Token);
-                var pidBytes = new byte[4];
-                await pipe.ReadExactlyAsync(pidBytes, deadline.Token);
-                int serverPid = BitConverter.ToInt32(pidBytes);
-                if (serverPid <= 0) throw new IOException("已有实例返回无效 PID。");
-                NativeMethods.AllowSetForegroundWindow((uint)serverPid);
-                await pipe.WriteAsync(new byte[] { 1 }, deadline.Token);
-                var ack = new byte[1];
-                await pipe.ReadExactlyAsync(ack, deadline.Token);
-                if (ack[0] == 1) return;
+                if (await SendRequestAsync(_pipeName, 1, deadline.Token)) return;
                 throw new IOException("已有实例未确认显示请求。");
             }
             catch (Exception ex) when (ex is IOException or TimeoutException)

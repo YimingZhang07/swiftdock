@@ -13,6 +13,7 @@ public sealed class DragCoordinator
     private readonly DispatcherTimer _hover, _scroll;
     private LaunchGroup? _source, _hoverTarget, _tab, _startGroup;
     private LaunchItem? _item;
+    private TileListBoxItem? _pressedTile;
     private Point _start;
     private bool _ending;
     private string? _previewKey;
@@ -20,10 +21,14 @@ public sealed class DragCoordinator
     public bool Active => _item is not null || _tab is not null;
     public bool Dragging { get; private set; }
     public Task WhenIdle => Active && _done is not null ? _done.Task : Task.CompletedTask;
+    internal Func<MouseEventArgs, Point> PointerPosition { get; set; }
+    internal Func<bool> CapturePointer { get; set; }
 
     public DragCoordinator(LauncherWindow view)
     {
         _view = view;
+        PointerPosition = e => e.GetPosition(view.CaptureRoot);
+        CapturePointer = () => view.CaptureRoot.CaptureMouse();
         _hover = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
         _hover.Tick += (_, _) => { _hover.Stop(); if (_hoverTarget is not null) { _view.SelectGroup(_hoverTarget, preview: true); _previewKey = null; } };
         _scroll = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(30) };
@@ -43,27 +48,33 @@ public sealed class DragCoordinator
     }
     private void Down(object sender, MouseButtonEventArgs e)
     {
-        if (!_view.CanEdit || Active || e.OriginalSource is not DependencyObject target) return;
+        if (Active || e.OriginalSource is not DependencyObject target) return;
         var button = LauncherWindow.Ancestor<Button>(target);
-        if (button?.DataContext is LaunchItem item && !item.IsPending) { _item = item; _source = _view.SelectedGroup; }
-        else if (button?.Tag is LaunchGroup group)
+        var tile = LauncherWindow.Ancestor<TileListBoxItem>(target);
+        if (tile?.DataContext is LaunchItem item && !item.IsPending)
+        {
+            _item = item; _source = _view.SelectedGroup;
+            _view.ClearTileSelection();
+            _pressedTile = tile; tile.IsPressed = true;
+        }
+        else if (_view.CanEdit && button?.Tag is LaunchGroup group)
         {
             if (e.ClickCount == 2) { e.Handled = true; _view.RenameGroup(group); return; }
             _tab = group;
         }
         else return;
-        _startGroup = _view.SelectedGroup; _start = e.GetPosition(_view.CaptureRoot);
+        _startGroup = _view.SelectedGroup; _start = PointerPosition(e);
         _done = new(TaskCreationOptions.RunContinuationsAsynchronously);
         button?.Focus();
-        if (!_view.CaptureRoot.CaptureMouse()) Clear();
+        if (!CapturePointer()) Clear();
         e.Handled = true;
     }
     private void Move(object sender, MouseEventArgs e)
     {
-        if (!Active) return;
-        var point = e.GetPosition(_view.CaptureRoot);
+        if (!Active || !_view.CanEdit) return;
+        var point = PointerPosition(e);
         if (!Dragging && (Math.Abs(point.X - _start.X) > SystemParameters.MinimumHorizontalDragDistance || Math.Abs(point.Y - _start.Y) > SystemParameters.MinimumVerticalDragDistance))
-        { Dragging = true; _scroll.Start(); _view.SetStatus("拖动中 · Esc 取消 · 松开提交"); }
+        { Dragging = true; if (_pressedTile is not null) _pressedTile.IsPressed = false; _scroll.Start(); _view.SetStatus("拖动中 · Esc 取消 · 松开提交"); }
         if (Dragging) Preview(point);
         e.Handled = true;
     }
@@ -92,7 +103,7 @@ public sealed class DragCoordinator
     private void Up(object sender, MouseButtonEventArgs e)
     {
         if (!Active) return;
-        var point = e.GetPosition(_view.CaptureRoot);
+        var point = PointerPosition(e);
         e.Handled = true;
         if (_tab is { } tab)
         {
@@ -141,6 +152,8 @@ public sealed class DragCoordinator
     private void Clear(bool keepGhost = false)
     {
         _ending = true;
+        if (_pressedTile is not null) _pressedTile.IsPressed = false;
+        _pressedTile = null;
         _hover.Stop(); _scroll.Stop(); _hoverTarget = null; _previewKey = null;
         _item = null; _source = _tab = _startGroup = null; Dragging = false;
         _view.ClearPreview(); _view.HighlightDropTab(null); _view.ShowInsertion(null);

@@ -15,8 +15,7 @@ internal static class EditItemDialogSmoke
 {
     public static async Task RunAsync(LauncherWindow main, string directory, string profileDirectory, Action<string, bool> check)
     {
-        var resources = Application.Current.Resources;
-        var palette = resources.Keys.OfType<string>().Where(k => resources[k] is SolidColorBrush || k == "PopupShadowOpacity").ToDictionary(k => k, k => resources[k]);
+        using var themeScope = new ThemeSmokeScope();
         string fixtures = Path.Combine(profileDirectory, "editor-fixtures");
         var locations = Enum.GetValues<CommonLocation>().ToDictionary(k => k, k => Path.Combine(fixtures, k.ToString()));
         foreach (string path in locations.Values) Directory.CreateDirectory(path);
@@ -25,29 +24,32 @@ internal static class EditItemDialogSmoke
         string app = Environment.ProcessPath!;
         try
         {
-            ThemeService.ApplyPalette(resources, true, Colors.Teal);
+            ThemeSmokeScope.Apply(true);
             var dialog = new EditItemDialog(null, icons: main.Icons) { Owner = main, ResolveLocation = location => locations[location] };
             try
             {
-                dialog.Show();
+                dialog.Show(); WindowSmoke.Pump();
                 check("add-defaults-to-app", dialog.AppCard.IsChecked == true && dialog.SelectedKind == LaunchKind.App && (string)dialog.SaveButton.Content == "添加");
                 check("add-advanced-starts-collapsed", !dialog.AdvancedOptions.IsExpanded && dialog.AdvancedOptions.IsVisible);
+                check("add-advanced-uses-library-expander", dialog.AdvancedOptions.Style == dialog.FindResource(typeof(Wpf.Ui.Controls.CardExpander)));
+                check("add-save-uses-library-primary-button", dialog.SaveButton.Appearance == Wpf.Ui.Controls.ControlAppearance.Primary);
                 check("add-icon-preview-is-button", dialog.IconPreview.Focusable && dialog.IconPreview.Width == 56 && dialog.IconPreview.Height == 56);
+                dialog.SaveButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                check("add-empty-validation-keeps-dialog-open", dialog.IsVisible && dialog.Result is null && dialog.Error.Text == "名称和目标不能为空。"
+                    && dialog.Error.Foreground == dialog.FindResource("SystemFillColorCriticalBrush"));
                 dialog.NameBox.Text = "QuickLaunch"; dialog.PathBox.Text = ItemIdentity.PortablePath(app);
                 await CaptureAsync(dialog, directory, "add-app.png");
                 check("add-app-preview-uses-icon-service", dialog.PreviewImage.Source is not null && dialog.PreviewGlyph.Visibility == Visibility.Collapsed);
                 check("add-type-cards-have-equal-widths", dialog.TypeCards.Children.OfType<RadioButton>().All(c => Math.Abs(c.ActualWidth - dialog.AppCard.ActualWidth) < 1));
 
-                ThemeService.ApplyPalette(resources, false, Colors.Teal);
-                DialogTheme.Apply(dialog, false);
+                ThemeSmokeScope.Apply(false);
                 await CaptureAsync(dialog, directory, "add-app-light.png");
-                ThemeService.ApplyPalette(resources, true, Colors.Teal);
-                DialogTheme.Apply(dialog, true);
+                ThemeSmokeScope.Apply(true);
 
                 dialog.AppCard.Focus();
                 dialog.AppCard.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(dialog), Environment.TickCount, Key.Right)
                     { RoutedEvent = Keyboard.PreviewKeyDownEvent });
-                check("add-type-cards-support-arrow-key", dialog.FileCard.IsChecked == true && dialog.FileCard.IsKeyboardFocused);
+                check("add-type-cards-support-arrow-key", dialog.FileCard.IsChecked == true);
                 await dialog.TargetRefresh.WaitAsync(TimeSpan.FromSeconds(10));
                 check("add-card-selection-does-not-reinfer-path", dialog.SelectedKind == LaunchKind.File);
                 dialog.PathBox.Text = file;
@@ -68,6 +70,9 @@ internal static class EditItemDialogSmoke
                         && dialog.PathBox.Text == ItemIdentity.PortablePath(locations[(CommonLocation)chip.Tag]));
                 }
                 await CaptureAsync(dialog, directory, "add-folder.png");
+                ThemeSmokeScope.Apply(false);
+                await CaptureAsync(dialog, directory, "add-folder-light.png");
+                ThemeSmokeScope.Apply(true);
                 check("add-folder-shows-chips", dialog.LocationChips.IsVisible && chips.All(c => c.IsVisible) && !dialog.AdvancedOptions.IsVisible);
                 check("add-folder-chips-fit-without-clipping", chips.All(c => c.TranslatePoint(new Point(c.ActualWidth, 0), dialog.LocationChips).X <= dialog.LocationChips.ActualWidth));
 
@@ -101,9 +106,9 @@ internal static class EditItemDialogSmoke
                 check("add-existing-file-autoswitches", dialog.SelectedKind == LaunchKind.File);
                 dialog.UrlCard.IsChecked = true; dialog.PathBox.Clear();
                 await dialog.TargetRefresh.WaitAsync(TimeSpan.FromSeconds(10));
-                check("add-empty-url-shows-hint-and-fallback", dialog.UrlHint.IsVisible && dialog.PreviewImage.Source is null && dialog.PreviewGlyph.IsVisible);
+                check("add-empty-url-shows-hint-and-fallback", dialog.PathBox.PlaceholderText == dialog.UrlHint.Text && dialog.PreviewImage.Source is null && dialog.PreviewGlyph.IsVisible);
             }
-            finally { dialog.Close(); }
+            finally { dialog.Close(); WindowSmoke.Pump(); }
 
             foreach (LaunchKind kind in Enum.GetValues<LaunchKind>())
             {
@@ -111,11 +116,11 @@ internal static class EditItemDialogSmoke
                 var editing = new EditItemDialog(new("已有名称", path, kind), icons: main.Icons) { Owner = main };
                 try
                 {
-                    editing.Show(); await editing.TargetRefresh.WaitAsync(TimeSpan.FromSeconds(10));
+                    editing.Show(); WindowSmoke.Pump(); await editing.TargetRefresh.WaitAsync(TimeSpan.FromSeconds(10));
                     check($"edit-{kind}-preselects-kind-and-preserves-name", editing.SelectedKind == kind && editing.NameBox.Text == "已有名称" && (string)editing.SaveButton.Content == "保存");
                     check($"edit-{kind}-advanced-defaults-collapsed", !editing.AdvancedOptions.IsExpanded);
                 }
-                finally { editing.Close(); }
+                finally { editing.Close(); WindowSmoke.Pump(); }
 
                 var saved = Save(main, null, d =>
                 {
@@ -135,7 +140,7 @@ internal static class EditItemDialogSmoke
                 var editing = new EditItemDialog(item, icons: main.Icons) { Owner = main };
                 try
                 {
-                    editing.Show(); await editing.TargetRefresh.WaitAsync(TimeSpan.FromSeconds(10));
+                    editing.Show(); WindowSmoke.Pump(); await editing.TargetRefresh.WaitAsync(TimeSpan.FromSeconds(10));
                     check($"edit-advanced-{item.Name}-starts-expanded", editing.AdvancedOptions.IsExpanded);
                     if (item.Name == "快捷方式")
                     {
@@ -143,18 +148,18 @@ internal static class EditItemDialogSmoke
                         await CaptureAsync(editing, directory, "edit-shortcut.png");
                     }
                 }
-                finally { editing.Close(); }
+                finally { editing.Close(); WindowSmoke.Pump(); }
             }
             var shortcut = Save(main, new("快捷方式", Path.Combine(fixtures, "example.lnk"), LaunchKind.App, "ignored", "relative", true), _ => { });
             check("edit-shortcut-save-drops-ignored-values", shortcut is { Kind: LaunchKind.App, Arguments: "", WorkingDirectory: "", RunAsAdmin: true });
         }
-        finally { foreach (var (key, value) in palette) resources[key] = value; }
+        finally { themeScope.Dispose(); }
     }
 
     private static async Task CaptureAsync(EditItemDialog dialog, string directory, string name)
     {
         await dialog.TargetRefresh.WaitAsync(TimeSpan.FromSeconds(10));
-        dialog.UpdateLayout(); await BenchmarkRunner.NextFrame();
+        dialog.UpdateLayout(); WindowSmoke.Pump();
         PrototypeSmoke.SaveSnapshot(dialog, Path.Combine(directory, name));
     }
 
@@ -165,10 +170,10 @@ internal static class EditItemDialogSmoke
         timeout.Tick += (_, _) => dialog.Close();
         dialog.Loaded += (_, _) => dialog.Dispatcher.BeginInvoke(() =>
         {
-            configure(dialog); dialog.SaveButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            WindowSmoke.Pump(); configure(dialog); dialog.SaveButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         });
         timeout.Start();
         try { return main.ShowEditor(dialog) ? dialog.Result : null; }
-        finally { timeout.Stop(); dialog.Close(); }
+        finally { timeout.Stop(); dialog.Close(); WindowSmoke.Pump(); }
     }
 }

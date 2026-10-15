@@ -9,7 +9,7 @@ using QuickLaunch.Services;
 
 namespace QuickLaunch.Views;
 
-public partial class EditItemDialog : Window
+public partial class EditItemDialog : Wpf.Ui.Controls.FluentWindow
 {
     private IconService? _icons;
     private CancellationTokenSource? _refresh;
@@ -19,11 +19,10 @@ public partial class EditItemDialog : Window
     internal Task TargetRefresh { get; private set; } = Task.CompletedTask;
     internal Func<CommonLocation, string> ResolveLocation { get; set; } = CommonLocations.Resolve;
 
-    public EditItemDialog(LaunchItem? item, ThemeService? theme = null, IconService? icons = null, bool openIconPicker = false)
+    public EditItemDialog(LaunchItem? item, IconService? icons = null, bool openIconPicker = false)
     {
         InitializeComponent(); _icons = icons; Title = item is null ? "添加项目" : "编辑项目";
         InitializeIconPicker(item?.Icon);
-        DialogTheme.Attach(this, theme);
         NameBox.Text = item?.Name ?? ""; PathBox.Text = item?.Path ?? "";
         ArgumentsBox.Text = item?.Arguments ?? ""; WorkingBox.Text = item?.WorkingDirectory ?? "";
         ElevateBox.IsChecked = item?.RunAsAdmin ?? false;
@@ -99,7 +98,7 @@ public partial class EditItemDialog : Window
         bool shortcut = Path.GetExtension(ItemEditorValidation.NormalizeTarget(PathBox.Text)).Equals(".lnk", StringComparison.OrdinalIgnoreCase);
         TargetLabel.Text = SelectedKind switch { LaunchKind.App => "程序路径", LaunchKind.File => "文件路径", LaunchKind.Folder => "文件夹路径", _ => "网址" };
         BrowseButton.Visibility = SelectedKind == LaunchKind.Url ? Visibility.Collapsed : Visibility.Visible;
-        UrlHint.Visibility = SelectedKind == LaunchKind.Url && PathBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        PathBox.PlaceholderText = SelectedKind == LaunchKind.Url ? UrlHint.Text : TargetLabel.Text;
         LocationChips.Visibility = SelectedKind == LaunchKind.Folder ? Visibility.Visible : Visibility.Collapsed;
         AdvancedOptions.Visibility = application ? Visibility.Visible : Visibility.Collapsed;
         ArgumentsBox.IsEnabled = WorkingBox.IsEnabled = application && !shortcut;

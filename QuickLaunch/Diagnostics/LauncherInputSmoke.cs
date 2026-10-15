@@ -48,288 +48,370 @@ internal static class LauncherInputSmoke
         probe.GetPlacementDesktop = _ => Desktop;
         try
         {
-            probe.ShowPanel("input-smoke", forDrop: true);
+            probe.ShowPanel("input-smoke");
             await probe.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ContextIdle);
             await probe.LoadIconsAsync().WaitAsync(TimeSpan.FromSeconds(10));
             CheckInput(probe, () => launches, check, directory);
-            CheckFocusRouting(probe, check);
+            CheckSelectionNavigation(probe, check);
+            CheckDragRouting(probe, () => launches, check);
             var dialogButton = new Button { Style = (Style)Application.Current.FindResource(typeof(Button)) };
-            check("cues-dialog-focus-style-unchanged", dialogButton.FocusVisualStyle == Application.Current.FindResource("DialogFocus"));
+            check("selection-dialog-uses-library-style", dialogButton.Style == Application.Current.FindResource(typeof(Button)));
             var tile = Tiles(probe).First();
-            await CheckMenu(tile.ContextMenu, tile, "item", directory, check);
+            await CheckMenu(probe, tile.ContextMenu, tile, "item", directory, check);
             var tab = probe.Tabs.Children.OfType<Button>().First();
             // The current group menu has no separator; verify its resource scope with a temporary one.
             var separator = new Separator();
             tab.ContextMenu.Items.Add(separator);
-            try { await CheckMenu(tab.ContextMenu, tab, "group", directory, check); }
+            try { await CheckMenu(probe, tab.ContextMenu, tab, "group", directory, check); }
             finally { tab.ContextMenu.Items.Remove(separator); }
-            if (trayMenu is not null) await CheckMenu(trayMenu, tile, "tray", directory, check);
+            if (trayMenu is not null) await CheckMenu(probe, trayMenu, tile, "tray", directory, check);
         }
         finally { model.Suspend(true); probe.PrepareExit(); probe.Close(); }
     }
 
-    internal static void CheckInput(LauncherWindow probe, Func<int> launches, Action<string, bool> check, string? directory = null)
+    // Use the real show state and routed events; selection does not depend on acquiring native focus.
+    // The only replaced boundaries are the OS pointer position/capture, never selection or focus.
+    private sealed class Input(LauncherWindow window)
     {
-        void Layout()
+        private readonly TestKeyboard _keyboard = new();
+        public void Layout()
         {
-            probe.Dispatcher.Invoke(() => { }, DispatcherPriority.DataBind);
-            probe.UpdateLayout();
+            window.Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
+            window.UpdateLayout();
         }
-        probe.UpdateLayout();
-        var tile = Tiles(probe).First();
-        var keyboard = new TestKeyboard();
-        KeyEventArgs KeyDown(Key key, ModifierKeys modifiers = ModifierKeys.None, UIElement? target = null, bool repeat = false)
+        public KeyEventArgs Key(Key key, ModifierKeys modifiers = ModifierKeys.None, bool repeat = false, bool up = false)
         {
-            keyboard.Held = modifiers;
-            var e = new KeyEventArgs(keyboard, PresentationSource.FromVisual(probe), 0, key)
-                { RoutedEvent = Keyboard.PreviewKeyDownEvent };
+            _keyboard.Held = modifiers;
+            var e = new KeyEventArgs(_keyboard, PresentationSource.FromVisual(window), 0, key)
+                { RoutedEvent = up ? Keyboard.PreviewKeyUpEvent : Keyboard.PreviewKeyDownEvent };
             if (repeat) typeof(KeyEventArgs).GetMethod("SetRepeat", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(e, [true]);
-            (target ?? tile).RaiseEvent(e);
+            var target = window.SelectedList;
+            target.RaiseEvent(e);
+            if (!e.Handled)
+            {
+                e.RoutedEvent = up ? Keyboard.KeyUpEvent : Keyboard.KeyDownEvent;
+                target.RaiseEvent(e);
+            }
             Layout();
             return e;
         }
-        void MouseDown(MouseButton button, UIElement? target = null, bool handled = false) =>
-            (target ?? probe.Root).RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, button)
-                { RoutedEvent = Mouse.PreviewMouseDownEvent, Handled = handled });
-        Border Ring(Button button) => (Border)button.Template.FindName("FocusRing", button);
-
-        // WPF owns this read-only DP. Set only its visual input in this isolated fixture, then
-        // restore it; acquiring real keyboard focus would make the test depend on the desktop.
-        var focusKey = (DependencyPropertyKey)typeof(UIElement).GetField("IsKeyboardFocusedPropertyKey", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null)!;
-        var controls = new[] { tile, probe.Tabs.Children.OfType<Button>().First(), probe.SettingsButton, probe.CancelImportButton };
-        var focusBefore = controls.Select(b => b.IsKeyboardFocused).ToArray();
-        var focusButton = probe.FocusButton;
-        probe.FocusButton = _ => false; // This fixture checks cue state; CheckFocusRouting checks focus transfers.
-        try
+        public void Mouse(UIElement target, MouseButton button = MouseButton.Left, bool up = false)
         {
-            foreach (var control in controls) { control.ApplyTemplate(); control.SetValue(focusKey, false); }
-            tile.SetValue(focusKey, true);
+            var e = new MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0, button)
+                { RoutedEvent = up ? System.Windows.Input.Mouse.PreviewMouseUpEvent : System.Windows.Input.Mouse.PreviewMouseDownEvent };
+            target.RaiseEvent(e);
+            if (!e.Handled)
+            {
+                e.RoutedEvent = up ? System.Windows.Input.Mouse.MouseUpEvent : System.Windows.Input.Mouse.MouseDownEvent;
+                target.RaiseEvent(e);
+            }
             Layout();
-            check("cues-hidden-on-show-with-focused-tile", !probe.KeyboardCues && Ring(tile).Visibility == Visibility.Collapsed);
-            foreach (var key in new[] { Key.LeftAlt, Key.RightAlt, Key.System, Key.LeftCtrl, Key.RightCtrl, Key.LeftShift, Key.RightShift, Key.LWin, Key.RWin, Key.Space })
-            {
-                KeyDown(key, key == Key.Space ? ModifierKeys.Alt : ModifierKeys.None);
-                check($"cues-ignore-{key}", !probe.KeyboardCues && Ring(tile).Visibility == Visibility.Collapsed);
-            }
-            foreach (var key in new[] { Key.Left, Key.Right, Key.Up, Key.Down, Key.Home, Key.End, Key.PageUp, Key.PageDown, Key.Tab })
-            {
-                KeyDown(key);
-                check($"cues-navigation-{key}", probe.KeyboardCues && Ring(tile).Visibility == Visibility.Visible);
-                MouseDown(MouseButton.Left);
-            }
-            KeyDown(Key.Tab, ModifierKeys.Shift);
-            check("cues-shift-tab", probe.KeyboardCues);
-            foreach (var button in Enum.GetValues<MouseButton>())
-            {
-                KeyDown(Key.Right);
-                MouseDown(button, probe.SettingsButton, handled: true);
-                check($"cues-mouse-{button}-hides-even-handled", !probe.KeyboardCues && Ring(tile).Visibility == Visibility.Collapsed);
-            }
-
-            int count = probe.SelectedGroup.Items.Count;
-            var delete = KeyDown(Key.Delete);
-            var rename = KeyDown(Key.F2);
-            check("cues-hidden-delete-f2-do-nothing", delete.Handled && rename.Handled && !probe.KeyboardCues
-                && !probe.HasOpenEditor && probe.SelectedGroup.Items.Count == count);
-            int before = launches();
-            check("cues-first-enter-reveals-without-launch", KeyDown(Key.Enter).Handled && probe.KeyboardCues
-                && Ring(tile).Visibility == Visibility.Visible && launches() == before);
-            KeyDown(Key.Enter, repeat: true);
-            check("cues-held-enter-does-not-launch", launches() == before);
-            check("cues-second-enter-launches", KeyDown(Key.Enter).Handled && launches() == before + 1);
-
-            foreach (var (control, name) in controls.Zip(new[] { "tile", "tab", "icon-button", "toast-link" }))
-            {
-                tile.SetValue(focusKey, false);
-                control.SetValue(focusKey, true);
-                Layout();
-                var ring = Ring(control);
-                check($"cues-style-{name}",
-                    control.FocusVisualStyle is null && ring.Visibility == Visibility.Visible && ring.BorderThickness == new Thickness(2)
-                    && ring.CornerRadius == new CornerRadius(6) && ring.BorderBrush == probe.FindResource("AccentBrush"));
-                control.SetValue(focusKey, false);
-                Layout();
-                check($"cues-unfocused-{name}-has-no-ring", ring.Visibility == Visibility.Collapsed);
-            }
-            tile.SetValue(focusKey, true);
-            Layout();
-            if (directory is not null) PrototypeSmoke.SaveSnapshot(tile, Path.Combine(directory, "tile-focus-ring.png"));
-
-            var first = probe.SelectedGroup;
-            MouseDown(MouseButton.Left);
-            KeyDown(Key.Tab, ModifierKeys.Control);
-            check("cues-ctrl-tab-switches-group", probe.KeyboardCues && probe.SelectedGroup != first);
-            MouseDown(MouseButton.Left);
-            KeyDown(Key.Tab, ModifierKeys.Control | ModifierKeys.Shift, probe.Root);
-            check("cues-ctrl-shift-tab-switches-back", probe.KeyboardCues && probe.SelectedGroup == first);
-            MouseDown(MouseButton.Left);
-            KeyDown(Key.D2, ModifierKeys.Control);
-            check("cues-ctrl-digit-switches-group", probe.KeyboardCues && probe.SelectedGroup == probe.Groups[1]);
-            KeyDown(Key.D1, ModifierKeys.Control, probe.Root);
-            probe.ShowPanel("input-smoke-reset-visible", forDrop: true);
-            check("cues-show-resets-visible-panel", !probe.KeyboardCues && Ring(tile).Visibility == Visibility.Collapsed);
-            KeyDown(Key.Right);
-            KeyDown(Key.Escape);
-            check("cues-escape-hides-panel", !probe.IsVisible);
-            probe.ShowPanel("input-smoke-reshow", forDrop: true);
-            check("cues-reshow-resets-hidden-panel", !probe.KeyboardCues);
-        }
-        finally
-        {
-            probe.FocusButton = focusButton;
-            for (int i = 0; i < controls.Length; i++) controls[i].SetValue(focusKey, focusBefore[i]);
         }
     }
 
-    internal static void CheckFocusRouting(LauncherWindow probe, Action<string, bool> check)
+    internal static void CheckInput(LauncherWindow probe, Func<int> launches, Action<string, bool> check, string? directory = null)
+    {
+        var input = new Input(probe);
+        input.Layout();
+        var first = probe.SelectedGroup;
+        check("selection-fresh-show-is-empty-and-list-is-logical-focus", probe.SelectedList.SelectedItem is null
+            && FocusManager.GetFocusedElement(probe) == probe.SelectedList);
+        foreach (bool forDrop in new[] { false, true })
+        foreach (var key in new[] { Key.Right, Key.Down, Key.Left, Key.Up, Key.Home, Key.End, Key.PageUp, Key.PageDown })
+        {
+            probe.ShowPanel("input-fresh-show", forDrop); input.Layout();
+            check($"selection-show-drop-{forDrop}-{key}-clears", probe.SelectedList.SelectedItem is null);
+            check($"selection-first-drop-{forDrop}-{key}-selects-zero", input.Key(key).Handled && probe.SelectedList.SelectedIndex == 0);
+            check($"selection-second-right-drop-{forDrop}-after-{key}-selects-one", input.Key(Key.Right).Handled && probe.SelectedList.SelectedIndex == 1);
+        }
+        foreach (var target in new UIElement[] { probe.SelectedList, probe.Viewer, probe.GroupHost }
+            .Concat(LauncherWindow.Descendants<ScrollContentPresenter>(probe.Viewer)))
+        {
+            input.Mouse(target);
+            check($"selection-empty-click-{target.GetType().Name}-clears", probe.SelectedList.SelectedItem is null);
+            check($"selection-after-empty-click-{target.GetType().Name}-starts-at-zero", input.Key(Key.Right).Handled && probe.SelectedList.SelectedIndex == 0);
+            input.Key(Key.Right);
+        }
+
+        var tile = Tiles(probe).ElementAt(1);
+        var drag = probe.DragSession;
+        var oldPoint = drag.PointerPosition; var oldCapture = drag.CapturePointer;
+        try
+        {
+            drag.PointerPosition = _ => tile.TranslatePoint(new Point(12, 12), probe.CaptureRoot);
+            drag.CapturePointer = () => true;
+            int before = launches();
+            input.Mouse(tile);
+            check("selection-click-down-clears-and-presses-container", probe.SelectedList.SelectedItem is null && tile.IsPressed && drag.Active
+                && ((Border)tile.Template.FindName("Surface", tile)).Background == probe.FindResource("SubtleFillColorTertiaryBrush"));
+            input.Mouse(probe.Root, up: true);
+            check("selection-click-tile-two-launches-once-and-stays-clear", launches() == before + 1
+                && probe.SelectedList.SelectedItem is null && !tile.IsPressed && !drag.Active);
+            input.Mouse(probe.Root, up: true);
+            check("selection-second-mouse-up-does-not-launch", launches() == before + 1);
+        }
+        finally { drag.Cancel(); drag.PointerPosition = oldPoint; drag.CapturePointer = oldCapture; }
+
+        int noSelectionLaunches = launches();
+        int count = first.Items.Count;
+        check("selection-enter-without-selection-no-op", input.Key(Key.Enter).Handled && launches() == noSelectionLaunches);
+        check("selection-delete-f2-without-selection-no-op", input.Key(Key.Delete).Handled && input.Key(Key.F2).Handled
+            && !probe.HasOpenEditor && first.Items.Count == count);
+        input.Key(Key.Right);
+        var selected = probe.SelectedList.SelectedItem;
+        foreach (var alt in new[] { Key.LeftAlt, Key.RightAlt })
+        {
+            input.Key(alt, ModifierKeys.Alt); input.Key(alt, up: true);
+            foreach (long command in new long[] { 0xF100, 0xF10F })
+            {
+                bool handled = false;
+                nint result = probe.WindowMessage(0, 0x0112, (nint)command, 0, ref handled);
+                check($"selection-{alt}-system-menu-{command:X}-handled", handled && result == 0 && probe.SelectedList.SelectedItem == selected);
+            }
+        }
+        check("selection-arrow-after-alt-still-moves", input.Key(Key.Right).Handled && probe.SelectedList.SelectedIndex == 1);
+        input.Key(Key.Enter);
+        input.Key(Key.Enter, repeat: true); input.Key(Key.Enter, repeat: true);
+        check("selection-enter-launches-once-despite-repeat", launches() == noSelectionLaunches + 1);
+        foreach (int message in new[] { 0x0127, 0x0128 })
+        {
+            bool handled = false;
+            probe.WindowMessage(0, message, 0x30002, 0, ref handled);
+            check($"selection-ui-state-{message:X}-suppressed", handled && probe.SelectedList.SelectedIndex == 1);
+        }
+        foreach (var (message, command) in new[] { (0x0112, 0xF060), (0x0312, 0), (0, 0) })
+        {
+            bool handled = false;
+            probe.WindowMessage(0, message, command, 0, ref handled);
+            check($"selection-unrelated-message-{message:X}-passes-through", !handled);
+        }
+
+        var tiles = Tiles(probe).ToArray();
+        foreach (var entry in tiles)
+        {
+            var ring = (Border)entry.Template.FindName("SelectionRing", entry);
+            check($"selection-ring-{probe.SelectedList.ItemContainerGenerator.IndexFromContainer(entry)}", ring.Visibility == (entry.IsSelected ? Visibility.Visible : Visibility.Collapsed)
+                && ring.BorderThickness == new Thickness(2) && ring.CornerRadius == new CornerRadius(6)
+                && ring.BorderBrush == probe.FindResource("AccentTextFillColorPrimaryBrush") && entry.FocusVisualStyle is null);
+        }
+        if (directory is not null)
+        {
+            using var scope = new ThemeSmokeScope();
+            ThemeSmokeScope.Apply(true);
+            probe.ApplyBackdrop(false, false); input.Layout();
+            PrototypeSmoke.SaveSnapshot(probe, Path.Combine(directory, "tile-selected.png"));
+        }
+        input.Mouse(tiles[0], MouseButton.Right);
+        check("selection-right-click-other-tile-keeps-ring", probe.SelectedList.SelectedIndex == 1);
+
+        var menu = tiles[0].ContextMenu;
+        using (var popup = new PopupSmokeScope(menu, probe))
+        {
+            menu.PlacementTarget = tiles[0]; popup.Open();
+            check("selection-context-menu-target-is-container", menu.IsOpen && menu.PlacementTarget is ListBoxItem && probe.SelectedList.SelectedIndex == 1);
+            popup.Close();
+            check("selection-context-menu-closed-and-owner-reset", popup.Closed && !PopupSmokeScope.MenuIsOpen(probe));
+            check("selection-context-menu-close-keeps-ring", probe.SelectedList.SelectedIndex == 1);
+        }
+
+        // Drive the actual modal rename dialog, including its initial value and item update.
+        bool renameOpened = false;
+        string id = ((LaunchItem)probe.SelectedList.SelectedItem!).Id;
+        probe.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
+        {
+            var dialog = probe.OwnedWindows.OfType<NameDialog>().SingleOrDefault();
+            if (dialog is null) return;
+            renameOpened = probe.HasOpenEditor && dialog.NameBox.Text == first.Items.Single(i => i.Id == id).Name;
+            dialog.NameBox.Text = "键盘重命名"; dialog.DialogResult = true;
+        });
+        input.Key(Key.F2);
+        check("selection-f2-renames-selected-item", renameOpened && first.Items.Single(i => i.Id == id).Name == "键盘重命名");
+        input.Key(Key.Delete);
+        check("selection-delete-removes-selected-item", first.Items.All(i => i.Id != id) && first.Items.Count == count - 1);
+        input.Key(Key.Z, ModifierKeys.Control);
+        check("selection-ctrl-z-restores-delete", first.Items.Any(i => i.Id == id) && first.Items.Count == count);
+
+        var next = probe.Groups[1];
+        var added = new LaunchItem("切组选择", "https://example.com/switch", LaunchKind.Url);
+        next.Items.Add(added);
+        try
+        {
+            input.Key(Key.Tab, ModifierKeys.Control);
+            check("selection-ctrl-tab-selects-first-in-next-group", probe.SelectedGroup == next && probe.SelectedList.SelectedIndex == 0);
+            input.Key(Key.Tab, ModifierKeys.Control | ModifierKeys.Shift);
+            check("selection-ctrl-shift-tab-selects-first-in-previous-group", probe.SelectedGroup == first && probe.SelectedList.SelectedIndex == 0);
+            input.Key(Key.D2, ModifierKeys.Control);
+            check("selection-ctrl-digit-selects-first", probe.SelectedGroup == next && probe.SelectedList.SelectedIndex == 0);
+            probe.Tabs.Children.OfType<Button>().First(b => b.Tag == first).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            input.Layout();
+            check("selection-mouse-tab-clears-and-focuses-list", probe.SelectedGroup == first && probe.SelectedList.SelectedItem is null
+                && FocusManager.GetFocusedElement(probe) == probe.SelectedList);
+            input.Key(Key.Down);
+            check("selection-first-arrow-after-mouse-group-selects-zero", probe.SelectedList.SelectedIndex == 0);
+        }
+        finally { next.Items.Remove(added); }
+        check("selection-menu-state-cleared-before-escape", !menu.IsOpen && !PopupSmokeScope.MenuIsOpen(probe));
+        input.Key(Key.Escape);
+        check("selection-escape-hides-panel", !probe.IsVisible);
+        probe.ShowPanel("input-reshow", forDrop: true); input.Layout();
+        check("selection-reshow-clears", probe.SelectedList.SelectedItem is null);
+    }
+
+    internal static void CheckSelectionNavigation(LauncherWindow probe, Action<string, bool> check)
     {
         var group = probe.SelectedGroup;
         var added = Enumerable.Range(0, 48).Select(i => new LaunchItem($"键盘导航 {i}", $"https://example.com/navigation/{i}", LaunchKind.Url)).ToArray();
         var size = new Size(probe.Width, probe.Height);
-        var focusButton = probe.FocusButton;
-        var keyboard = new TestKeyboard();
-        var focusKey = (DependencyPropertyKey)typeof(UIElement).GetField("IsKeyboardFocusedPropertyKey", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null)!;
-        var priorFocus = new Dictionary<UIElement, object>();
-        UIElement? focused = null;
-        int transfers = 0;
-        void Layout()
-        {
-            probe.Dispatcher.Invoke(() => { }, DispatcherPriority.DataBind);
-            probe.UpdateLayout();
-        }
-        void SetFocus(UIElement? element)
-        {
-            foreach (var candidate in new[] { focused, element }.OfType<UIElement>())
-                priorFocus.TryAdd(candidate, candidate.GetValue(UIElement.IsKeyboardFocusedProperty));
-            focused?.SetValue(focusKey, false);
-            focused = element;
-            focused?.SetValue(focusKey, true);
-            Layout();
-        }
-        KeyEventArgs KeyDown(Key key, ModifierKeys modifiers = ModifierKeys.None)
-        {
-            keyboard.Held = modifiers;
-            var e = new KeyEventArgs(keyboard, PresentationSource.FromVisual(probe), 0, key) { RoutedEvent = Keyboard.PreviewKeyDownEvent };
-            (focused ?? probe).RaiseEvent(e);
-            Layout();
-            return e;
-        }
-        void MouseDown(UIElement target)
-        {
-            var e = new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = Mouse.PreviewMouseDownEvent };
-            target.RaiseEvent(e);
-            e.RoutedEvent = Mouse.MouseDownEvent;
-            target.RaiseEvent(e);
-            Layout();
-        }
+        var input = new Input(probe);
         void CheckTree(string phase)
         {
-            var styles = new[] { "TileButton", "TabButton", "IconButton", "ToastLink" }.Select(k => probe.FindResource(k)).ToArray();
-            var focusable = LauncherWindow.Descendants<UIElement>(probe).Prepend(probe).Where(e => e.Focusable).ToArray();
-            check($"focus-tree-{phase}-only-launcher-buttons", focusable.Length > 0
-                && focusable.All(e => e is Button b && styles.Contains(b.Style) && b.FocusVisualStyle is null));
+            var elements = LauncherWindow.Descendants<UIElement>(probe).Prepend(probe).ToArray();
+            var focusable = elements.Where(e => e.Focusable).ToArray();
+            check($"selection-tree-{phase}-only-lists-tabs-header-focusable", focusable.Length > 0
+                && focusable.All(e => e is TileListBox || e is Button b && (b.Tag is LaunchGroup
+                    || b == probe.AddGroupButton || b == probe.AddItemButton || b == probe.SettingsButton || b == probe.HidePanelButton)));
+            check($"selection-tree-{phase}-no-focus-visual-styles", focusable.OfType<FrameworkElement>().All(e => e.FocusVisualStyle is null));
+            check($"selection-tree-{phase}-no-focusable-tile-content", Tiles(probe).All(t => !t.Focusable
+                && LauncherWindow.Descendants<UIElement>(t).All(e => !e.Focusable)));
+            check($"selection-tree-{phase}-no-inner-scrollviewer", !LauncherWindow.Descendants<ScrollViewer>(probe.SelectedList).Any()
+                && probe.SelectedList.SelectionMode == SelectionMode.Single && ReferenceEquals(probe.SelectedList.ItemsSource, probe.SelectedGroup.Items));
         }
         try
         {
-            // Replace only the native focus acquisition boundary. Input routing, target selection,
-            // remembered identity, template bindings and BringIntoView all run through production code.
-            probe.FocusButton = button => { transfers++; SetFocus(button); return true; };
             foreach (var item in added) group.Items.Add(item);
-            probe.Height = probe.MinHeight;
-            Layout();
+            probe.Height = probe.MinHeight; input.Layout();
             CheckTree("overflow");
-            var grid = LauncherWindow.Ancestor<ItemsControl>(Tiles(probe).First())!;
-            var tiles = Tiles(probe).ToArray();
-            var remembered = tiles[1];
-            SetFocus(null);
-            check("focus-navigation-from-none-selects-first", KeyDown(Key.Right).Handled && focused == tiles[0] && probe.KeyboardCues);
-            check("focus-second-arrow-moves-to-next-tile", KeyDown(Key.Right).Handled && focused == remembered);
-            foreach (var source in new UIElement?[] { null, probe.Viewer, grid, probe.GroupHost, probe.SettingsButton })
-            foreach (var key in new[] { Key.Left, Key.Right, Key.Up, Key.Down, Key.Home, Key.End, Key.PageUp, Key.PageDown })
-            {
-                SetFocus(source);
-                MouseDown(probe.GroupHost);
-                int before = transfers;
-                var e = KeyDown(key);
-                var ring = (Border)remembered.Template.FindName("FocusRing", remembered);
-                check($"focus-recovery-{source?.GetType().Name ?? "none"}-{key}", e.Handled && transfers == before + 1
-                    && focused == remembered && probe.KeyboardCues && ring.Visibility == Visibility.Visible);
-            }
-            foreach (var target in new UIElement[] { probe.Viewer, probe.GroupHost, grid }
-                .Concat(LauncherWindow.Descendants<ScrollContentPresenter>(probe.Viewer)))
-            {
-                KeyDown(Key.Home);
-                int before = transfers;
-                MouseDown(target);
-                check($"focus-empty-mouse-{target.GetType().Name}-keeps-tile", focused == tiles[0] && transfers == before
-                    && !probe.KeyboardCues && !target.Focusable);
-            }
-            foreach (bool cues in new[] { false, true })
-            {
-                if (cues) KeyDown(Key.Home); else MouseDown(probe.GroupHost);
-                foreach (int message in new[] { 0x0127, 0x0128 })
-                {
-                    bool handled = false;
-                    nint result = probe.WindowMessage(0, message, 0x30002, 0, ref handled); // UIS_CLEAR focus + accelerator hiding.
-                    check($"focus-ui-state-{message:X4}-cues-{cues}", handled && result == 0 && probe.KeyboardCues == cues);
-                }
-            }
-            bool otherHandled = false;
-            probe.WindowMessage(0, 0x0000, 0, 0, ref otherHandled);
-            check("focus-unrelated-window-message-passes-through", !otherHandled);
-
-            KeyDown(Key.Home);
+            input.Key(Key.Right);
             int columns = Math.Max(1, (int)(probe.Viewer.ViewportWidth / probe.CellSize));
-            check("focus-down-moves-one-row", KeyDown(Key.Down).Handled && focused == tiles[columns]);
-            check("focus-up-moves-one-row", KeyDown(Key.Up).Handled && focused == tiles[0]);
-            foreach (var key in new[] { Key.PageDown, Key.End, Key.PageUp, Key.Home })
+            int page = Math.Max(1, (int)(probe.Viewer.ViewportHeight / probe.CellSize)) * columns;
+            check("selection-down-moves-one-row", input.Key(Key.Down).Handled && probe.SelectedList.SelectedIndex == columns);
+            check("selection-up-moves-one-row", input.Key(Key.Up).Handled && probe.SelectedList.SelectedIndex == 0);
+            check("selection-right-moves-one-column", input.Key(Key.Right).Handled && probe.SelectedList.SelectedIndex == 1);
+            check("selection-up-at-top-keeps-column", input.Key(Key.Up).Handled && probe.SelectedList.SelectedIndex == 1);
+            check("selection-left-moves-one-column", input.Key(Key.Left).Handled && probe.SelectedList.SelectedIndex == 0);
+            foreach (var (key, expected) in new[] { (Key.PageDown, page), (Key.End, group.Items.Count - 1),
+                (Key.PageUp, group.Items.Count - 1 - page), (Key.Home, 0) })
             {
-                var previous = focused;
-                var e = KeyDown(key);
-                var tile = (Button)focused!;
+                var e = input.Key(key);
+                var tile = (ListBoxItem)probe.SelectedList.ItemContainerGenerator.ContainerFromItem(probe.SelectedList.SelectedItem);
                 var bounds = new Rect(tile.TranslatePoint(new Point(), probe.Viewer), tile.RenderSize);
-                check($"focus-{key}-moves-and-reveals-tile", e.Handled && focused != previous
+                check($"selection-{key}-moves-and-reveals", e.Handled && probe.SelectedList.SelectedIndex == expected
                     && bounds.Top >= -.5 && bounds.Bottom <= probe.Viewer.ViewportHeight + .5);
             }
-            int tabTransfers = transfers;
-            check("focus-tab-retains-normal-navigation", !KeyDown(Key.Tab).Handled && !KeyDown(Key.Tab, ModifierKeys.Shift).Handled
-                && transfers == tabTransfers);
-            probe.Viewer.ScrollToTop(); Layout();
-            double offset = probe.Viewer.VerticalOffset;
+            probe.Viewer.ScrollToTop(); input.Layout();
             var wheel = new MouseWheelEventArgs(Mouse.PrimaryDevice, 0, -120) { RoutedEvent = Mouse.MouseWheelEvent };
-            probe.Viewer.RaiseEvent(wheel); Layout();
-            check("focus-nonfocusable-viewer-wheel-scrolls", !probe.Viewer.Focusable && wheel.Handled && probe.Viewer.VerticalOffset > offset);
-
+            probe.Viewer.RaiseEvent(wheel); input.Layout();
+            check("selection-outer-viewer-wheel-scrolls", wheel.Handled && probe.Viewer.VerticalOffset > 0);
             var empty = probe.Groups.First(g => g.Items.Count == 0);
-            probe.SelectGroup(empty); Layout(); SetFocus(null);
-            check("focus-empty-group-selects-tab-not-container", KeyDown(Key.Right).Handled
-                && focused is Button { Tag: LaunchGroup selected } && selected == empty);
+            probe.SelectGroup(empty); input.Layout();
+            check("selection-empty-group-navigation-stays-empty", input.Key(Key.Right).Handled && probe.SelectedList.SelectedItem is null
+                && FocusManager.GetFocusedElement(probe) == probe.SelectedList);
             CheckTree("empty-group");
         }
         finally
         {
-            probe.FocusButton = focusButton;
-            foreach (var (element, value) in priorFocus) element.SetValue(focusKey, value);
             foreach (var item in added) group.Items.Remove(item);
             probe.SelectGroup(group); probe.Width = size.Width; probe.Height = size.Height;
             probe.Viewer.ScrollToTop();
         }
     }
 
-    private static IEnumerable<Button> Tiles(LauncherWindow window) => LauncherWindow.Descendants<Button>(window.GroupHost)
-        .Where(b => b.DataContext is LaunchItem && b.IsVisible);
+    internal static void CheckDragRouting(LauncherWindow probe, Func<int> launches, Action<string, bool> check)
+    {
+        var input = new Input(probe);
+        var source = probe.SelectedGroup;
+        var order = source.Items.ToArray();
+        var target = probe.Groups.First(g => g != source);
+        var drag = probe.DragSession;
+        var oldPoint = drag.PointerPosition; var oldCapture = drag.CapturePointer;
+        Point pointer = default;
+        int before = launches();
+        Point Center(FrameworkElement element) => element.TranslatePoint(new Point(element.ActualWidth / 2, element.ActualHeight / 2), probe.Root);
+        void Down(FrameworkElement tile)
+        {
+            pointer = Center(tile); input.Mouse(tile);
+        }
+        void Move(Point point)
+        {
+            pointer = point;
+            probe.Root.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.PreviewMouseMoveEvent });
+        }
+        try
+        {
+            drag.PointerPosition = _ => pointer; drag.CapturePointer = () => true;
+            input.Layout();
+            var tile = Tiles(probe).First();
+            Down(tile);
+            Move(probe.Viewer.TranslatePoint(new Point(probe.CellSize * 2.9, 12), probe.Root));
+            check("selection-drag-preview-uses-item-containers", drag.Dragging && probe.Ghost.IsVisible && probe.Insertion.IsVisible
+                && Math.Abs(tile.Opacity - .2) < .01 && probe.SelectedList.SelectedItem is null);
+            input.Mouse(probe.Root, up: true);
+            check("selection-drag-reorders-without-launch", source.Items[^1].Id == order[0].Id && launches() == before && !drag.Active);
+            check("selection-drag-clears-preview-and-insertion", !probe.Insertion.IsVisible && Tiles(probe).All(t => Math.Abs(t.Opacity - 1) < .01));
 
-    private static async Task CheckMenu(ContextMenu menu, Button target, string name, string directory, Action<string, bool> check)
+            tile = Tiles(probe).First();
+            var unchanged = source.Items.Select(i => i.Id).ToArray();
+            Down(tile); Move(new Point(-20, -20)); input.Key(Key.Escape);
+            check("selection-drag-escape-keeps-order", !drag.Active && source.Items.Select(i => i.Id).SequenceEqual(unchanged) && !probe.Ghost.IsVisible);
+
+            tile = Tiles(probe).First();
+            var moved = (LaunchItem)tile.DataContext;
+            Down(tile); Move(Center(probe.Tabs.Children.OfType<Button>().Single(b => b.Tag == target)));
+            input.Mouse(probe.Root, up: true);
+            check("selection-drag-to-tab-moves-container-item", target.Items.Contains(moved) && !source.Items.Contains(moved) && launches() == before);
+            probe.ViewModel.MoveItem(target, source, moved, 0); input.Layout();
+
+            tile = Tiles(probe).First(); moved = (LaunchItem)tile.DataContext;
+            Down(tile); Move(Center(probe.AddGroupButton)); input.Mouse(probe.Root, up: true);
+            var created = probe.SelectedGroup;
+            check("selection-drag-to-plus-creates-group", created != source && created != target && created.Items.Contains(moved)
+                && probe.SelectedList.SelectedItem is null && launches() == before);
+            probe.ViewModel.MoveItem(created, source, moved, 0);
+            probe.ViewModel.RemoveGroup(created); probe.SelectGroup(source); input.Layout();
+
+            var tab = probe.Tabs.Children.OfType<Button>().Single(b => b.Tag == target);
+            input.Key(Key.Right); Down(tab); input.Mouse(probe.Root, up: true);
+            check("selection-tab-click-through-drag-path-clears", probe.SelectedGroup == target && probe.SelectedList.SelectedItem is null
+                && FocusManager.GetFocusedElement(probe) == probe.SelectedList);
+            probe.SelectGroup(source); input.Layout();
+
+            // Read-only mode still launches on release, but never turns the gesture into a drag.
+            probe.ViewModel.Suspend(true);
+            tile = Tiles(probe).First(); Down(tile); Move(Center(tile) + new Vector(20, 0));
+            check("selection-read-only-tile-does-not-drag", drag.Active && !drag.Dragging);
+            input.Mouse(probe.Root, up: true);
+            check("selection-read-only-tile-click-launches-once", launches() == before + 1 && probe.SelectedList.SelectedItem is null);
+        }
+        finally
+        {
+            drag.Cancel(); drag.PointerPosition = oldPoint; drag.CapturePointer = oldCapture;
+            probe.ViewModel.Suspend(false);
+            probe.SelectGroup(source);
+            for (int i = 0; i < order.Length; i++)
+            {
+                int index = source.Items.ToList().FindIndex(item => item.Id == order[i].Id);
+                if (index >= 0 && index != i) source.Items.Move(index, i);
+            }
+        }
+    }
+
+    private static IEnumerable<TileListBoxItem> Tiles(LauncherWindow window) => LauncherWindow.Descendants<TileListBoxItem>(window.GroupHost)
+        .Where(b => b.IsVisible);
+
+    internal static async Task CheckMenu(LauncherWindow probe, ContextMenu menu, FrameworkElement target, string name, string directory, Action<string, bool> check)
     {
         var oldTarget = menu.PlacementTarget;
         var oldPlacement = menu.Placement;
         bool oldStaysOpen = menu.StaysOpen;
+        using var lifetime = new PopupSmokeScope(menu, name == "tray" ? null : probe);
         try
         {
             menu.PlacementTarget = target; menu.Placement = PlacementMode.Bottom; menu.StaysOpen = true;
-            menu.IsOpen = true;
+            lifetime.Open();
             await menu.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ContextIdle);
-            menu.UpdateLayout();
+            PopupSmokeScope.Layout(menu);
+            check($"{name}-menu-uses-wpf-ui-style", ReferenceEquals(menu.Style, menu.FindResource(typeof(ContextMenu)))
+                && menu.Style.BasedOn == menu.FindResource("UiContextMenu"));
             var style = (Style)menu.FindResource(MenuItem.SeparatorStyleKey);
             check($"{name}-menu-has-separator", menu.Items.OfType<Separator>().Count() == 1);
             foreach (var separator in menu.Items.OfType<Separator>())
@@ -338,19 +420,24 @@ internal static class LauncherInputSmoke
                 var line = LauncherWindow.Descendants<Border>(separator).Single();
                 var row = menu.Items.OfType<MenuItem>().First();
                 check($"{name}-menu-separator-key-and-full-width", ReferenceEquals(separator.Style, style)
-                    && style.BasedOn == menu.FindResource(typeof(Separator)) && line.ActualHeight == 1
-                    && separator.ActualHeight == 9 && line.Margin == new Thickness(8, 0, 8, 0)
-                    && Math.Abs(line.ActualWidth - (row.ActualWidth - 16)) < .5
-                    && Math.Abs(line.TranslatePoint(new Point(), separator).Y - 4) < .5
-                    && line.Background == menu.FindResource("BorderBrush"));
+                    && line.ActualHeight > 0 && line.ActualHeight <= 2
+                    && separator.ActualWidth >= row.ActualWidth - 1
+                    && line.ActualWidth >= row.ActualWidth - 32);
             }
+            foreach (var delete in menu.Items.OfType<MenuItem>().Where(item => item.Header as string == "删除"))
+                check($"{name}-delete-uses-critical-brush", delete.Foreground == menu.FindResource("SystemFillColorCriticalBrush"));
             if (name == "item")
             {
-                var popup = (Popup)menu.Parent;
-                check("item-menu-popup-child-is-menu", ReferenceEquals(popup.Child, menu) && menu.IsOpen);
-                PrototypeSmoke.SaveSnapshot((FrameworkElement)popup.Child, Path.Combine(directory, "item-menu.png"));
+                check("item-menu-popup-child-is-menu-when-created", menu.Parent is not Popup popup || ReferenceEquals(popup.Child, menu));
+                await PopupSmokeScope.SettleAnimationAsync(menu);
+                PrototypeSmoke.SaveSnapshot(PopupSmokeScope.SnapshotRoot(menu), Path.Combine(directory, "item-menu.png"), includeOverflow: true);
             }
         }
-        finally { menu.IsOpen = false; menu.PlacementTarget = oldTarget; menu.Placement = oldPlacement; menu.StaysOpen = oldStaysOpen; }
+        finally
+        {
+            lifetime.Close();
+            check($"{name}-menu-closed-and-owner-reset", lifetime.Closed && !PopupSmokeScope.MenuIsOpen(probe));
+            menu.PlacementTarget = oldTarget; menu.Placement = oldPlacement; menu.StaysOpen = oldStaysOpen;
+        }
     }
 }

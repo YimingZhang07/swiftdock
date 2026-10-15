@@ -35,14 +35,12 @@ internal static partial class NativeMethods
     internal static partial int OleInitialize(nint reserved);
     [LibraryImport("ole32.dll")]
     internal static partial void OleUninitialize();
+    internal const int WmSysCommand = 0x0112, ScKeyMenu = 0xF100;
     internal const int WmHotkey = 0x0312;
     internal const int WmDpiChanged = 0x02E0;
     internal const int WmChangeUiState = 0x0127, WmUpdateUiState = 0x0128;
     internal const int WmEnterSizeMove = 0x0231, WmExitSizeMove = 0x0232, WmSizing = 0x0214;
     internal const int WmNcHitTest = 0x0084;
-    internal const int WmGetIcon = 0x007F, WmSetIcon = 0x0080;
-    internal const int GwlStyle = -16, GwlExStyle = -20, WsExDlgModalFrame = 0x0001;
-    internal const int WsSysMenu = 0x00080000;
     internal const uint ModAlt = 0x0001, ModNoRepeat = 0x4000;
 
     [StructLayout(LayoutKind.Sequential)]
@@ -110,10 +108,6 @@ internal static partial class NativeMethods
     internal static partial int GetSystemMetricsForDpi(int index, uint dpi);
     [LibraryImport("user32.dll", EntryPoint = "FindWindowW", StringMarshalling = StringMarshalling.Utf16)]
     internal static partial nint FindWindow(string className, string? windowName);
-    [LibraryImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
-    internal static partial nint GetWindowLongPtr(nint hwnd, int index);
-    [LibraryImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
-    internal static partial nint SetWindowLongPtr(nint hwnd, int index, nint value);
     [LibraryImport("user32.dll", EntryPoint = "SendMessageW")]
     internal static partial nint SendMessage(nint hwnd, int message, nint wParam, nint lParam);
     [LibraryImport("shcore.dll")]

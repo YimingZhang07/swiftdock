@@ -5,7 +5,7 @@
         xmlns:services="clr-namespace:QuickLaunch.Services"
         Title="QuickLaunch" Width="620" Height="500" WindowStyle="None"
         ResizeMode="CanResize" AllowsTransparency="False" ShowInTaskbar="False" Topmost="True"
-        Background="{DynamicResource WindowBrush}" Foreground="{DynamicResource TextBrush}" FontFamily="Segoe UI, Microsoft YaHei UI"
+        Background="{DynamicResource ApplicationBackgroundBrush}" Foreground="{DynamicResource TextFillColorPrimaryBrush}" FontFamily="Segoe UI, Microsoft YaHei UI"
         UseLayoutRounding="True" AllowDrop="True" Focusable="False" FocusVisualStyle="{x:Null}">
     <WindowChrome.WindowChrome>
         <WindowChrome ResizeBorderThickness="6" CaptionHeight="0" GlassFrameThickness="-1"
@@ -18,38 +18,23 @@
         <Style TargetType="Thumb">
             <Setter Property="Focusable" Value="False" /><Setter Property="FocusVisualStyle" Value="{x:Null}" />
         </Style>
-        <Style x:Key="KeyboardFocusRing" TargetType="Border">
-            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-            <Setter Property="BorderThickness" Value="2" /><Setter Property="CornerRadius" Value="6" />
-            <Setter Property="IsHitTestVisible" Value="False" /><Setter Property="Visibility" Value="Collapsed" />
-            <Style.Triggers>
-                <MultiDataTrigger>
-                    <MultiDataTrigger.Conditions>
-                        <Condition Binding="{Binding IsKeyboardFocused, RelativeSource={RelativeSource TemplatedParent}}" Value="True" />
-                        <Condition Binding="{Binding KeyboardCues, RelativeSource={RelativeSource AncestorType=local:LauncherWindow}}" Value="True" />
-                    </MultiDataTrigger.Conditions>
-                    <Setter Property="Visibility" Value="Visible" />
-                </MultiDataTrigger>
-            </Style.Triggers>
-        </Style>
         <Style x:Key="IconButton" TargetType="Button">
             <Setter Property="Width" Value="32" /><Setter Property="Height" Value="32" />
             <Setter Property="Margin" Value="0" /><Setter Property="Padding" Value="0" />
-            <Setter Property="Background" Value="Transparent" /><Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
-            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" /><Setter Property="FontSize" Value="14" />
+            <Setter Property="Background" Value="Transparent" /><Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="FontSize" Value="14" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Grid>
                             <Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="4">
-                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" />
                             </Border>
-                            <Border x:Name="FocusRing" Style="{StaticResource KeyboardFocusRing}" />
                         </Grid>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="{DynamicResource SubtleFillBrush}" /></Trigger>
-                            <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Background" Value="{DynamicResource SubtlePressedBrush}" /></Trigger>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" /></Trigger>
+                            <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Background" Value="{DynamicResource SubtleFillColorTertiaryBrush}" /></Trigger>
                             <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.4" /></Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -57,7 +42,7 @@
             </Setter>
         </Style>
         <Style x:Key="TabButton" TargetType="Button">
-            <Setter Property="Background" Value="Transparent" /><Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+            <Setter Property="Background" Value="Transparent" /><Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
             <Setter Property="FontSize" Value="13" /><Setter Property="Padding" Value="10,6" /><Setter Property="Margin" Value="0" />
             <Setter Property="FontWeight" Value="Normal" /><Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Template">
@@ -67,16 +52,15 @@
                             <Border Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
                                 <TextBlock Text="{TemplateBinding Content}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,0,0,3" />
                             </Border>
-                            <Border x:Name="Underline" Width="16" Height="3" CornerRadius="1.5" Background="{DynamicResource AccentBrush}"
+                            <Border x:Name="Underline" Width="16" Height="3" CornerRadius="1.5" Background="{DynamicResource AccentFillColorDefaultBrush}"
                                     HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,2" Visibility="Collapsed" />
-                            <Border x:Name="FocusRing" Style="{StaticResource KeyboardFocusRing}" />
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Foreground" Value="{DynamicResource TextBrush}" /><Setter Property="Background" Value="{DynamicResource SubtleFillBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" /><Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
                             </Trigger>
                             <Trigger Property="local:TabState.IsSelected" Value="True">
-                                <Setter Property="Foreground" Value="{DynamicResource TextBrush}" /><Setter Property="FontWeight" Value="SemiBold" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" /><Setter Property="FontWeight" Value="SemiBold" />
                                 <Setter TargetName="Underline" Property="Visibility" Value="Visible" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -84,35 +68,14 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <Style x:Key="TileButton" TargetType="Button">
-            <Setter Property="Background" Value="Transparent" /><Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
-            <Setter Property="Margin" Value="2" /><Setter Property="Padding" Value="4" />
-            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Grid>
-                            <Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
-                                <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center" />
-                            </Border>
-                            <Border x:Name="FocusRing" Style="{StaticResource KeyboardFocusRing}" />
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="{DynamicResource SubtleFillBrush}" /></Trigger>
-                            <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Background" Value="{DynamicResource SubtlePressedBrush}" /></Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
         <Style x:Key="ToastLink" TargetType="Button">
-            <Setter Property="Background" Value="Transparent" /><Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Background" Value="Transparent" /><Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
             <Setter Property="Margin" Value="10,0,0,0" /><Setter Property="Padding" Value="0" /><Setter Property="Cursor" Value="Hand" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
                 <Grid>
                     <Border Background="Transparent"><ContentPresenter VerticalAlignment="Center" /></Border>
-                    <Border x:Name="FocusRing" Style="{StaticResource KeyboardFocusRing}" />
                 </Grid>
             </ControlTemplate></Setter.Value></Setter>
         </Style>
@@ -124,43 +87,72 @@
             <MenuItem Header="编辑…" Tag="edit" Click="EditMenuClick" />
             <MenuItem Header="更换图标…" Tag="edit" Click="ChangeIconMenuClick" />
             <MenuItem Header="重命名" Tag="edit" Click="RenameMenuClick" />
-            <MenuItem Header="删除" Tag="edit" Foreground="{DynamicResource ErrorBrush}" Click="DeleteMenuClick" />
+            <MenuItem Header="删除" Tag="edit" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Click="DeleteMenuClick" />
             <Separator /><MenuItem Header="刷新图标" Click="RefreshIconMenuClick" />
         </ContextMenu>
-        <DataTemplate x:Key="TileTemplate">
-            <Button x:Name="Tile" Style="{StaticResource TileButton}" Width="{Binding DataContext.TileSize, RelativeSource={RelativeSource AncestorType=Window}}"
-                    Height="{Binding DataContext.TileSize, RelativeSource={RelativeSource AncestorType=Window}}" Opacity="0.55"
-                    ToolTip="{Binding ToolTip}" Click="ItemClick" AutomationProperties.Name="{Binding Name}" ContextMenu="{StaticResource ItemContextMenu}">
-                <StackPanel>
-                    <Grid Width="{Binding DataContext.IconSize, RelativeSource={RelativeSource AncestorType=Window}}" Height="{Binding DataContext.IconSize, RelativeSource={RelativeSource AncestorType=Window}}">
-                        <Image Source="{Binding Visual.Image}" RenderOptions.BitmapScalingMode="HighQuality" />
-                        <TextBlock x:Name="TileGlyph" Text="{Binding Glyph}" FontSize="{Binding DataContext.IconSize, RelativeSource={RelativeSource AncestorType=Window}}"
-                                   Foreground="{DynamicResource ErrorBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
-                        <Ellipse x:Name="ErrorBadge" Fill="{DynamicResource ErrorBrush}" Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Bottom" />
-                    </Grid>
-                    <TextBlock x:Name="TileLabel" Text="{Binding Name}" FontSize="12" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"
-                               LineHeight="14" LineStackingStrategy="BlockLineHeight" Height="28" TextAlignment="Center" Margin="0,6,0,0" />
-                </StackPanel>
-            </Button>
-            <DataTemplate.Triggers>
-                <DataTrigger Binding="{Binding Visual.Image}" Value="{x:Null}"><Setter TargetName="TileGlyph" Property="Visibility" Value="Visible" /></DataTrigger>
-                <DataTrigger Binding="{Binding ErrorMessage}" Value="{x:Null}">
-                    <Setter TargetName="ErrorBadge" Property="Visibility" Value="Collapsed" /><Setter TargetName="Tile" Property="Opacity" Value="1" />
-                    <Setter TargetName="TileGlyph" Property="Foreground" Value="{DynamicResource AccentBrush}" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding IsPending}" Value="True">
-                    <Setter TargetName="Tile" Property="IsEnabled" Value="False" /><Setter TargetName="Tile" Property="Opacity" Value="0.5" />
-                    <Setter TargetName="ErrorBadge" Property="Visibility" Value="Collapsed" />
-                </DataTrigger>
-            </DataTemplate.Triggers>
-        </DataTemplate>
+        <Style x:Key="TileList" TargetType="local:TileListBox">
+            <Setter Property="SelectionMode" Value="Single" /><Setter Property="IsSynchronizedWithCurrentItem" Value="False" />
+            <Setter Property="IsTextSearchEnabled" Value="False" />
+            <Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /><Setter Property="Padding" Value="0" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="KeyboardNavigation.DirectionalNavigation" Value="Contained" />
+            <Setter Property="KeyboardNavigation.TabNavigation" Value="Once" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" /><Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="local:TileListBox">
+                <Border Background="{TemplateBinding Background}"><ItemsPresenter /></Border>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="TileItem" TargetType="local:TileListBoxItem">
+            <Setter Property="Width" Value="{Binding DataContext.TileSize, RelativeSource={RelativeSource AncestorType=Window}}" />
+            <Setter Property="Height" Value="{Binding DataContext.TileSize, RelativeSource={RelativeSource AncestorType=Window}}" />
+            <Setter Property="Background" Value="Transparent" /><Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="Margin" Value="2" /><Setter Property="Padding" Value="4" /><Setter Property="Opacity" Value="0.55" />
+            <Setter Property="Focusable" Value="False" /><Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="ToolTip" Value="{Binding ToolTip}" /><Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+            <Setter Property="ContextMenu" Value="{StaticResource ItemContextMenu}" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="local:TileListBoxItem">
+                <Grid>
+                    <Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                        <StackPanel VerticalAlignment="Center">
+                            <Grid Width="{Binding DataContext.IconSize, RelativeSource={RelativeSource AncestorType=Window}}" Height="{Binding DataContext.IconSize, RelativeSource={RelativeSource AncestorType=Window}}">
+                                <Image Source="{Binding Visual.Image}" RenderOptions.BitmapScalingMode="HighQuality" />
+                                <TextBlock x:Name="TileGlyph" Text="{Binding Glyph}" FontSize="{Binding DataContext.IconSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                           Foreground="{DynamicResource SystemFillColorCriticalBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
+                                <Ellipse x:Name="ErrorBadge" Fill="{DynamicResource SystemFillColorCriticalBrush}" Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Bottom" />
+                            </Grid>
+                            <TextBlock x:Name="TileLabel" Text="{Binding Name}" FontSize="12" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"
+                                       LineHeight="14" LineStackingStrategy="BlockLineHeight" Height="28" TextAlignment="Center" Margin="0,6,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <Border x:Name="SelectionRing" BorderBrush="{DynamicResource AccentTextFillColorPrimaryBrush}" BorderThickness="2" CornerRadius="6"
+                            IsHitTestVisible="False" Visibility="Collapsed" />
+                </Grid>
+                <ControlTemplate.Triggers>
+                    <DataTrigger Binding="{Binding Visual.Image}" Value="{x:Null}"><Setter TargetName="TileGlyph" Property="Visibility" Value="Visible" /></DataTrigger>
+                    <DataTrigger Binding="{Binding ErrorMessage}" Value="{x:Null}">
+                        <Setter TargetName="ErrorBadge" Property="Visibility" Value="Collapsed" /><Setter Property="Opacity" Value="1" />
+                        <Setter TargetName="TileGlyph" Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsPending}" Value="True">
+                        <Setter Property="IsEnabled" Value="False" /><Setter Property="Opacity" Value="0.5" />
+                        <Setter TargetName="ErrorBadge" Property="Visibility" Value="Collapsed" />
+                    </DataTrigger>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter TargetName="Surface" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                        <Setter TargetName="SelectionRing" Property="Visibility" Value="Visible" />
+                    </Trigger>
+                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" /></Trigger>
+                    <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Background" Value="{DynamicResource SubtleFillColorTertiaryBrush}" /></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
     </Window.Resources>
-    <Grid x:Name="Root" Background="{DynamicResource WindowBrush}" Focusable="False">
+    <Grid x:Name="Root" Background="{DynamicResource ApplicationBackgroundBrush}" Focusable="False">
         <Grid.RowDefinitions><RowDefinition Height="{x:Static services:WindowPlacement.HeaderRowHeight}" /><RowDefinition Height="*" /></Grid.RowDefinitions>
         <Border x:Name="WindowDragArea" Background="Transparent" Padding="12,0" Focusable="False">
             <DockPanel LastChildFill="True">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
-                    <TextBlock x:Name="StorageNotice" Text="{Binding StorageWarning}" Foreground="{DynamicResource TertiaryBrush}" FontSize="12"
+                    <TextBlock x:Name="StorageNotice" Text="{Binding StorageWarning}" Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontSize="12"
                                MaxWidth="120" TextTrimming="CharacterEllipsis" ToolTip="{Binding StorageWarning}" VerticalAlignment="Center" Margin="0,0,8,0">
                         <TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers>
                             <DataTrigger Binding="{Binding StorageWarning}" Value=""><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
@@ -174,7 +166,7 @@
                 <ScrollViewer x:Name="TabsViewport" DockPanel.Dock="Left" Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" PreviewMouseWheel="TabsMouseWheel" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
                         <StackPanel x:Name="Tabs" Orientation="Horizontal" Focusable="False" />
-                        <Button x:Name="AddGroupButton" Style="{StaticResource IconButton}" Content="&#xE710;" FontSize="12" Foreground="{DynamicResource MutedBrush}" ToolTip="新建分组；也可把条目拖到这里"
+                        <Button x:Name="AddGroupButton" Style="{StaticResource IconButton}" Content="&#xE710;" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" ToolTip="新建分组；也可把条目拖到这里"
                                 AutomationProperties.Name="新建分组" Click="AddGroupClick" IsEnabled="{Binding CanEdit}" />
                     </StackPanel>
                 </ScrollViewer>
@@ -190,26 +182,26 @@
                     <Setter Property="Visibility" Value="Collapsed" />
                     <Style.Triggers><DataTrigger Binding="{Binding SelectedGroup.Items.Count, RelativeSource={RelativeSource AncestorType=Window}}" Value="0"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers>
                 </Style></StackPanel.Style>
-                <TextBlock Text="拖入文件、文件夹或网址" Foreground="{DynamicResource TertiaryBrush}" TextAlignment="Center" FontSize="13" />
-                <TextBlock Text="或点击右上角添加项目" Foreground="{DynamicResource TertiaryBrush}" TextAlignment="Center" FontSize="12" Margin="0,6,0,0" />
+                <TextBlock Text="拖入文件、文件夹或网址" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextAlignment="Center" FontSize="13" />
+                <TextBlock Text="或点击右上角添加项目" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextAlignment="Center" FontSize="12" Margin="0,6,0,0" />
             </StackPanel>
             <Border x:Name="Insertion" HorizontalAlignment="Left" VerticalAlignment="Top" Width="3" Height="78"
-                    Background="{DynamicResource AccentBrush}" Visibility="Collapsed" IsHitTestVisible="False" />
+                    Background="{DynamicResource AccentFillColorDefaultBrush}" Visibility="Collapsed" IsHitTestVisible="False" />
         </Grid>
         <Canvas Grid.RowSpan="2" IsHitTestVisible="False" ClipToBounds="True">
-            <Border x:Name="Ghost" Background="{DynamicResource LayerBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" Opacity="0.85" Padding="10" CornerRadius="8" Visibility="Collapsed">
+            <Border x:Name="Ghost" Background="{DynamicResource FlyoutBackground}" BorderBrush="{DynamicResource AccentTextFillColorPrimaryBrush}" BorderThickness="1" Opacity="0.85" Padding="10" CornerRadius="8" Visibility="Collapsed">
                 <Border.RenderTransform><ScaleTransform ScaleX="1.1" ScaleY="1.1" /></Border.RenderTransform>
-                <StackPanel Orientation="Horizontal"><Image x:Name="GhostImage" Width="40" Height="40" Margin="0,0,8,0" /><TextBlock x:Name="GhostText" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center" /></StackPanel>
+                <StackPanel Orientation="Horizontal"><Image x:Name="GhostImage" Width="40" Height="40" Margin="0,0,8,0" /><TextBlock x:Name="GhostText" Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" /></StackPanel>
             </Border>
         </Canvas>
         <Grid Grid.RowSpan="2" VerticalAlignment="Bottom" Margin="0,0,0,12">
             <Grid.ColumnDefinitions><ColumnDefinition Width="5*" /><ColumnDefinition Width="90*" /><ColumnDefinition Width="5*" /></Grid.ColumnDefinitions>
-            <local:ToastSurface x:Name="Toast" Grid.Column="1" HorizontalAlignment="Center" Background="{DynamicResource LayerBrush}"
-                               BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="999" Padding="14,6" Visibility="Collapsed" Opacity="0">
+            <local:ToastSurface x:Name="Toast" Grid.Column="1" HorizontalAlignment="Center" Background="{DynamicResource FlyoutBackground}"
+                               BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="999" Padding="14,6" Visibility="Collapsed" Opacity="0">
                 <DockPanel>
                     <Button x:Name="CancelImportButton" DockPanel.Dock="Right" Style="{StaticResource ToastLink}" FontSize="12" Content="取消" AutomationProperties.Name="取消导入"
                             Click="CancelImportClick" Visibility="Collapsed" />
-                    <TextBlock x:Name="Status" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap" FontSize="12" IsHitTestVisible="False" />
+                    <TextBlock x:Name="Status" Foreground="{DynamicResource TextFillColorPrimaryBrush}" TextWrapping="Wrap" FontSize="12" IsHitTestVisible="False" />
                 </DockPanel>
             </local:ToastSurface>
         </Grid>

@@ -141,7 +141,7 @@ internal static class WindowPositionSmoke
         }
         finally
         {
-            settings?.Close(); window.PrepareExit(); window.Close();
+            settings?.Close(); WindowSmoke.Pump(); window.PrepareExit(); window.Close(); WindowSmoke.Pump();
             await model.FlushAsync(); model.Suspend(true);
         }
     }
@@ -181,6 +181,6 @@ internal static class WindowPositionSmoke
                 && model.Placement == "lastPosition" && model.WindowPosition == saved && model.WindowSize == size
                 && before.SequenceEqual(File.ReadAllBytes(writer.FilePath)));
         }
-        finally { settings.Close(); window.PrepareExit(); window.Close(); model.Suspend(true); }
+        finally { settings.Close(); WindowSmoke.Pump(); window.PrepareExit(); window.Close(); WindowSmoke.Pump(); model.Suspend(true); }
     }
 }

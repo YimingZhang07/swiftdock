@@ -18,7 +18,7 @@ namespace QuickLaunch.Views;
 
 public partial class LauncherWindow : Window
 {
-    private readonly Dictionary<LaunchGroup, ItemsControl> _grids = [];
+    private readonly Dictionary<LaunchGroup, TileListBox> _grids = [];
     private CancellationTokenSource _shutdown = new();
     private readonly Func<LaunchItem, bool, Task<LaunchResult>> _startLaunch;
     private readonly DispatcherTimer _externalWatch = new() { Interval = TimeSpan.FromMilliseconds(100) };
@@ -36,7 +36,6 @@ public partial class LauncherWindow : Window
     private int _ownedWindows;
     private CancellationTokenSource? _importStop;
     private int _showGeneration;
-    private string? _focusedItemId;
     private EventHandler? _renderHandler;
     private DispatcherTimer? _measureTimeout;
     private TaskCompletionSource<double?>? _showCompletion;
@@ -54,16 +53,13 @@ public partial class LauncherWindow : Window
     public static readonly DependencyProperty SelectedGroupProperty = DependencyProperty.Register(
         nameof(SelectedGroup), typeof(LaunchGroup), typeof(LauncherWindow));
     public LaunchGroup SelectedGroup { get => (LaunchGroup)GetValue(SelectedGroupProperty); private set => SetValue(SelectedGroupProperty, value); }
-    public static readonly DependencyProperty KeyboardCuesProperty = DependencyProperty.Register(
-        nameof(KeyboardCues), typeof(bool), typeof(LauncherWindow), new PropertyMetadata(false));
-    public bool KeyboardCues { get => (bool)GetValue(KeyboardCuesProperty); private set => SetValue(KeyboardCuesProperty, value); }
+    internal TileListBox SelectedList => _grids[SelectedGroup];
     public DragCoordinator DragSession { get; }
     public bool Importing { get; private set; }
     public Action? SettingsRequested { get; set; }
     public string StatusText { get; private set; } = "";
     internal Action<MouseButtonEventArgs> StartWindowMove { get; set; }
     internal Func<nint, WindowPlacement.Desktop> GetPlacementDesktop { get; set; } = WindowPlacement.ReadDesktop;
-    internal Func<Button, bool> FocusButton { get; set; } = button => button.Focus();
 
     public LauncherWindow(DiagnosticLog log, MainViewModel viewModel, IconService icons)
         : this(log, viewModel, icons, LaunchService.StartAsync) { }
@@ -86,11 +82,7 @@ public partial class LauncherWindow : Window
         ViewModel.Groups.CollectionChanged += (_, _) => RebuildGroups();
         Loaded += (_, _) => _ = LoadIconsAsync();
         PreviewKeyDown += KeyPressed;
-        AddHandler(PreviewMouseDownEvent, new MouseButtonEventHandler((_, _) => KeyboardCues = false), handledEventsToo: true);
-        PreviewGotKeyboardFocus += (_, e) =>
-        {
-            if (e.NewFocus is Button { DataContext: LaunchItem item }) _focusedItemId = item.Id;
-        };
+        Viewer.AddHandler(PreviewMouseDownEvent, new MouseButtonEventHandler(IconAreaMouseDown), handledEventsToo: true);
         PreviewDragEnter += ExternalOver;
         PreviewDragOver += ExternalOver;
         PreviewDragLeave += ExternalLeave;
@@ -178,38 +170,46 @@ public partial class LauncherWindow : Window
     private void UpdateBackdrop()
     {
         var preferences = _theme is null ? ThemeService.ReadPreferences() : (_theme.IsDark, _theme.HighContrast, _theme.TransparencyEnabled);
-        ApplyBackdrop(preferences.Item1, preferences.Item2, preferences.Item3);
+        ApplyBackdrop(preferences.Item2, preferences.Item3);
     }
 
-    internal void ApplyBackdrop(bool dark, bool highContrast, bool transparency)
+    internal void ApplyBackdrop(bool highContrast, bool transparency)
     {
         nint hwnd = new WindowInteropHelper(this).Handle;
         if (hwnd == 0) return;
-        int immersive = dark ? 1 : 0;
-        int darkResult = NativeMethods.DwmSetWindowAttribute(hwnd, 20, in immersive, sizeof(int));
-        bool supported = OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22621);
-        bool acrylic = supported && !highContrast && transparency && !_warming && _cornerHresult >= 0 && darkResult >= 0;
-        int backdrop = acrylic ? 3 : 1;
-        int result = supported ? NativeMethods.DwmSetWindowAttribute(hwnd, 38, in backdrop, sizeof(int)) : -1;
-        acrylic &= result >= 0;
+        bool supported = OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22621)
+            && Wpf.Ui.Controls.WindowBackdrop.IsSupported(Wpf.Ui.Controls.WindowBackdropType.Acrylic);
+        bool acrylic = CanUseAcrylic(supported, transparency, highContrast, _warming) && _cornerHresult >= 0;
+        // The handle overload also applies WPF-UI's immersive-dark state immediately,
+        // including before Loaded during silent startup. None still updates that state.
+        bool applied = Wpf.Ui.Controls.WindowBackdrop.ApplyBackdrop(hwnd,
+            acrylic ? Wpf.Ui.Controls.WindowBackdropType.Acrylic : Wpf.Ui.Controls.WindowBackdropType.None);
+        acrylic &= applied;
         if (acrylic)
         {
             Background = Brushes.Transparent; Root.Background = Brushes.Transparent;
         }
         else
         {
-            SetResourceReference(BackgroundProperty, "WindowBrush"); Root.SetResourceReference(Panel.BackgroundProperty, "WindowBrush");
-            if (supported && backdrop != 1) { int none = 1; NativeMethods.DwmSetWindowAttribute(hwnd, 38, in none, sizeof(int)); }
+            Wpf.Ui.Controls.WindowBackdrop.RemoveBackdrop(hwnd);
+            SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush"); Root.SetResourceReference(Panel.BackgroundProperty, "ApplicationBackgroundBrush");
         }
         if (HwndSource.FromHwnd(hwnd)?.CompositionTarget is { } target)
-            target.BackgroundColor = acrylic ? Colors.Transparent : ((SolidColorBrush)FindResource("WindowBrush")).Color;
+            target.BackgroundColor = acrylic ? Colors.Transparent : ((SolidColorBrush)FindResource("ApplicationBackgroundBrush")).Color;
         BackdropMode = acrylic ? "acrylic" : "solid";
     }
 
+    internal static bool CanUseAcrylic(bool supported, bool transparency, bool highContrast, bool warming = false) =>
+        supported && transparency && !highContrast && !warming;
+
     internal nint WindowMessage(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)
     {
-        // Only the launcher suppresses native focus/access-key cues; its templates draw our own.
-        if (message is NativeMethods.WmChangeUiState or NativeMethods.WmUpdateUiState)
+        // Equivalent to SystemThemeWatcher, including transparency/high-contrast setting changes.
+        // Keep the hook active even before a silent launcher's first Loaded event.
+        if (message is 0x001A or 0x0015 or 0x031A or 0x0320) _theme?.QueueUpdate();
+        // Suppress native cues and the captionless system-menu loop entered by Alt release.
+        if (message is NativeMethods.WmChangeUiState or NativeMethods.WmUpdateUiState
+            || message == NativeMethods.WmSysCommand && (wParam.ToInt64() & 0xFFF0) == NativeMethods.ScKeyMenu)
         { handled = true; return 0; }
         if (message == NativeMethods.WmEnterSizeMove)
             BeginSizeMove();
@@ -288,7 +288,7 @@ public partial class LauncherWindow : Window
     {
         if (_closing || _sizeMove || _movingWindow) return;
         if (_editor?.IsVisible == true) { _editor.Activate(); return; }
-        KeyboardCues = false;
+        foreach (var list in _grids.Values) list.SelectedItem = null;
         if (_warming && source != "prewarm") RestoreWarmupState();
         var watch = Stopwatch.StartNew();
         CancelMeasurement();
@@ -298,6 +298,7 @@ public partial class LauncherWindow : Window
         ShowActivated = !forDrop;
         if (source != "prewarm") PlacePanel();
         Show();
+        FocusSelectionList(acquireKeyboard: !forDrop);
         nint hwnd = new WindowInteropHelper(this).Handle;
         if (!forDrop)
         {
@@ -309,7 +310,7 @@ public partial class LauncherWindow : Window
             if (generation != _showGeneration || !IsVisible) return;
             _ = LoadIconsAsync(); // Revisit expired favicon entries lazily after the window is shown.
             if (forDrop) return;
-            FocusFirst();
+            FocusSelectionList();
         });
         _renderHandler = (_, _) =>
         {
@@ -442,69 +443,39 @@ public partial class LauncherWindow : Window
             TabState.SetIsSelected(tab, tab.Tag == group);
         Tabs.Children.OfType<Button>().FirstOrDefault(b => b.Tag == group)?.BringIntoView();
         Viewer.ScrollToTop();
+        foreach (var list in _grids.Values) list.SelectedItem = null;
+        if (!preview) FocusSelectionList();
         if (!preview) ViewModel.CommitGroup(group.Id);
         if (IsVisible && !DragSession.Active) FitContent();
         if (IsLoaded) _ = LoadIconsAsync();
     }
 
-    private void FocusFirst()
+    internal void ClearTileSelection()
     {
-        var grid = _grids[SelectedGroup];
-        grid.UpdateLayout();
-        var buttons = Descendants<Button>(grid).Where(b => b.IsEnabled && b.Focusable).ToList();
-        var first = buttons.FirstOrDefault(b => b.DataContext is LaunchItem item && item.Id == _focusedItemId) ?? buttons.FirstOrDefault();
-        first ??= Tabs.Children.OfType<Button>().FirstOrDefault(b => b.Tag == SelectedGroup);
-        if (first is not null) FocusAndReveal(first);
+        SelectedList.SelectedItem = null;
+        FocusSelectionList();
     }
 
-    private void FocusAndReveal(Button button)
+    private void FocusSelectionList(bool acquireKeyboard = true)
     {
-        if (FocusButton(button) && button.DataContext is LaunchItem item) _focusedItemId = item.Id;
-        button.BringIntoView();
+        FocusManager.SetFocusedElement(this, SelectedList);
+        if (acquireKeyboard && IsVisible) SelectedList.Focus();
     }
 
-    private void NavigateTiles(Button? current, Key key)
+    private void IconAreaMouseDown(object sender, MouseButtonEventArgs e)
     {
-        var grid = _grids[SelectedGroup];
-        grid.UpdateLayout();
-        var buttons = Descendants<Button>(grid).ToList();
-        int index = current is null ? -1 : buttons.IndexOf(current);
-        if (index < 0) { FocusFirst(); return; }
-        int columns = Math.Max(1, (int)(Viewer.ViewportWidth / CellSize));
-        int page = Math.Max(1, (int)(Viewer.ViewportHeight / CellSize)) * columns;
-        int target = key switch
-        {
-            Key.Left => index - 1, Key.Right => index + 1,
-            Key.Up => index - columns, Key.Down => index + columns,
-            Key.Home => 0, Key.End => buttons.Count - 1,
-            Key.PageUp => index - page, Key.PageDown => index + page,
-            _ => index
-        };
-        target = Math.Clamp(target, 0, buttons.Count - 1);
-        int step = key is Key.Left or Key.Up or Key.End or Key.PageUp ? -1 : 1;
-        while (target >= 0 && target < buttons.Count)
-        {
-            if (buttons[target].IsEnabled && buttons[target].Focusable) { FocusAndReveal(buttons[target]); return; }
-            target += step;
-        }
+        if (e.ChangedButton != MouseButton.Left || e.OriginalSource is not DependencyObject source) return;
+        if (Ancestor<ListBoxItem>(source) is null && Ancestor<System.Windows.Controls.Primitives.ScrollBar>(source) is null)
+            ClearTileSelection();
     }
 
     private void KeyPressed(object sender, KeyEventArgs e)
     {
         if (e.OriginalSource is System.Windows.Controls.Primitives.TextBoxBase || _editor?.IsVisible == true) return;
-        // Routed key events originate at the focused control. Using their device/source also
-        // lets diagnostics exercise this path without foreground permission or native input.
-        var focused = e.OriginalSource as DependencyObject;
-        var button = focused is null ? null : Ancestor<Button>(focused);
-        var item = button?.DataContext as LaunchItem;
+        var item = SelectedList.SelectedItem as LaunchItem;
         var modifiers = e.KeyboardDevice.Modifiers;
-        if (!DragSession.Active && IsKeyboardNavigation(e.Key, modifiers)) KeyboardCues = true;
-        if (!DragSession.Active && IsKeyboardNavigation(e.Key, modifiers)
-            && e.Key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Home or Key.End or Key.PageUp or Key.PageDown)
-        {
-            NavigateTiles(button, e.Key);
-            e.Handled = true;
-        }
+        if (!DragSession.Active && TileListBox.IsNavigationKey(e.Key, modifiers))
+            SelectedList.HandleNavigation(e);
         else if (e.Key == Key.Escape)
         {
             if (_menuOpen) return; // Let the menu consume Esc before the panel's hide shortcut.
@@ -515,33 +486,27 @@ public partial class LauncherWindow : Window
         {
             int step = modifiers.HasFlag(ModifierKeys.Shift) ? -1 : 1;
             SelectGroup(Groups[(Groups.ToList().IndexOf(SelectedGroup) + step + Groups.Count) % Groups.Count]);
-            FocusFirst();
+            SelectedList.SelectFirst();
             e.Handled = true;
         }
         else if (modifiers == ModifierKeys.Control && e.Key >= Key.D1 && e.Key <= Key.D9 && !DragSession.Active)
         {
             int index = e.Key - Key.D1;
-            if (index < Groups.Count) { SelectGroup(Groups[index]); FocusFirst(); }
+            if (index < Groups.Count) { SelectGroup(Groups[index]); SelectedList.SelectFirst(); }
             e.Handled = true;
         }
         else if (e.Key == Key.Z && modifiers == ModifierKeys.Control && !DragSession.Active)
         { SetStatus(ViewModel.UndoDelete() ? "已恢复删除的条目。" : "没有可恢复的删除记录，或已超过 5 秒。"); e.Handled = true; }
-        else if (e.Key == Key.F2 && item is not null && !DragSession.Active)
-        { if (KeyboardCues) RenameItem(item); e.Handled = true; }
-        else if (e.Key == Key.Delete && item is not null && !DragSession.Active)
-        { if (KeyboardCues) DeleteItem(item); e.Handled = true; }
-        else if (e.Key == Key.Enter && item is not null && !DragSession.Active)
+        else if (e.Key == Key.F2 && !DragSession.Active)
+        { if (item is not null) RenameItem(item); e.Handled = true; }
+        else if (e.Key == Key.Delete && !DragSession.Active)
+        { if (item is not null) DeleteItem(item); e.Handled = true; }
+        else if (e.Key == Key.Enter && !DragSession.Active)
         {
-            if (KeyboardCues) { if (!e.IsRepeat) _ = LaunchAsync(item); }
-            else KeyboardCues = true;
+            if (item is not null && !e.IsRepeat) _ = LaunchAsync(item);
             e.Handled = true;
         }
     }
-
-    internal static bool IsKeyboardNavigation(Key key, ModifierKeys modifiers) =>
-        (modifiers & (ModifierKeys.Alt | ModifierKeys.Windows)) == 0
-        && (key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Tab or Key.Home or Key.End or Key.PageUp or Key.PageDown
-            || modifiers == ModifierKeys.Control && key >= Key.D1 && key <= Key.D9);
 
     private void TabsMouseWheel(object sender, MouseWheelEventArgs e)
     {
@@ -554,11 +519,10 @@ public partial class LauncherWindow : Window
     internal void HandleIconSizeWheel(MouseWheelEventArgs e, ModifierKeys modifiers)
     {
         if (!modifiers.HasFlag(ModifierKeys.Control) || !CanEdit || DragSession.Active || _externalDrag || e.Delta == 0) return;
-        var focused = Keyboard.FocusedElement as FrameworkElement;
+        var list = SelectedList;
         ViewModel.SetIconSize(IconSizePresets.Step(ViewModel.IconSize, e.Delta));
         e.Handled = true;
-        if (focused?.DataContext is LaunchItem && focused.IsDescendantOf(GroupHost))
-            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => { if (focused.IsKeyboardFocusWithin) focused.BringIntoView(); });
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => { if (list == SelectedList) list.RevealSelection(); });
     }
 
     public void SetStatus(string text, bool toast = true)
@@ -607,8 +571,6 @@ public partial class LauncherWindow : Window
         Log.Write("launch.result", new { item.Kind, result.Accepted, result.Cancelled, result.Message });
     }
 
-    private void ItemClick(object sender, RoutedEventArgs e)
-    { if (!DragSession.Active && sender is Button { DataContext: LaunchItem item }) _ = LaunchAsync(item); }
     private void HideClick(object sender, RoutedEventArgs e) => HidePanel();
     private void SettingsClick(object sender, RoutedEventArgs e) => SettingsRequested?.Invoke();
     public void SetSettingsOpen(bool value)
@@ -619,7 +581,7 @@ public partial class LauncherWindow : Window
     private void ItemMenuOpened(object sender, RoutedEventArgs e)
     {
         _menuOpen = true;
-        if (sender is ContextMenu menu && menu.PlacementTarget is Button { DataContext: LaunchItem item })
+        if (sender is ContextMenu menu && menu.PlacementTarget is ListBoxItem { DataContext: LaunchItem item })
         {
             ((MenuItem)menu.Items[1]).IsEnabled = item.Kind == LaunchKind.App && !item.IsPending;
             ((MenuItem)menu.Items[2]).IsEnabled = item.Kind != LaunchKind.Url && !item.IsPending;
@@ -634,7 +596,7 @@ public partial class LauncherWindow : Window
     private void AdminMenuClick(object sender, RoutedEventArgs e) => LaunchFromMenu(sender, true);
     private void LaunchFromMenu(object sender, bool admin)
     {
-        if (sender is MenuItem { Parent: ContextMenu { PlacementTarget: Button { DataContext: LaunchItem item } } })
+        if (sender is MenuItem { Parent: ContextMenu { PlacementTarget: ListBoxItem { DataContext: LaunchItem item } } })
             _ = LaunchAsync(item, admin);
     }
 
@@ -716,7 +678,7 @@ public partial class LauncherWindow : Window
         return null;
     }
     public LaunchItem? ItemAt(Point point) => Root.InputHitTest(point) is DependencyObject hit
-        ? Ancestor<Button>(hit)?.DataContext as LaunchItem : null;
+        ? Ancestor<ListBoxItem>(hit)?.DataContext as LaunchItem : null;
     public int? SlotAt(Point point)
     {
         Point p = Root.TranslatePoint(point, Viewer);

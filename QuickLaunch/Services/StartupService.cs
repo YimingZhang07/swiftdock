@@ -10,27 +10,38 @@ public sealed class StartupService
     public const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private readonly string _registryPath;
     private readonly string _executable;
+    private readonly Func<string, string?> _readValue;
+    private readonly Action<string, string?> _writeValue;
     public string ValueName { get; }
     public string Command { get; }
     public StartupService(string executable, string configDirectory, string registryPath = RunKey)
+        : this(executable, configDirectory, registryPath, name =>
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(registryPath);
+            return key?.GetValue(name) as string;
+        }, (name, command) =>
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(registryPath) ?? throw new IOException("无法访问当前用户自启设置。");
+            if (command is not null) key.SetValue(name, command, RegistryValueKind.String);
+            else key.DeleteValue(name, throwOnMissingValue: false);
+        }) { }
+
+    internal StartupService(string executable, string configDirectory, string registryPath,
+        Func<string, string?> readValue, Action<string, string?> writeValue)
     {
+        _readValue = readValue; _writeValue = writeValue;
         _registryPath = registryPath;
         _executable = executable;
         string directory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(configDirectory));
         ValueName = "QuickLaunch_" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(directory.ToUpperInvariant())))[..16];
         Command = $"{Quote(Path.GetFullPath(executable))} --silent --config-dir {Quote(directory)}";
     }
-    public bool IsEnabled
-    {
-        get { using var key = Registry.CurrentUser.OpenSubKey(_registryPath); return string.Equals(key?.GetValue(ValueName) as string, Command, StringComparison.OrdinalIgnoreCase); }
-    }
+    public bool IsEnabled => string.Equals(_readValue(ValueName), Command, StringComparison.OrdinalIgnoreCase);
     public void SetEnabled(bool enabled)
     {
         if (enabled && _registryPath == RunKey && !CanStartAtLogin())
             throw new InvalidOperationException("当前使用仓库内的开发运行时。请从独立发布版启用自启，或先安装 .NET 10 Windows Desktop Runtime。");
-        using var key = Registry.CurrentUser.CreateSubKey(_registryPath) ?? throw new IOException("无法访问当前用户自启设置。");
-        if (enabled) key.SetValue(ValueName, Command, RegistryValueKind.String);
-        else key.DeleteValue(ValueName, throwOnMissingValue: false);
+        _writeValue(ValueName, enabled ? Command : null);
     }
     private bool CanStartAtLogin()
     {

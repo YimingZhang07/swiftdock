@@ -1,15 +1,13 @@
 using System.Windows;
-using QuickLaunch.Services;
 
 namespace QuickLaunch.Views;
 
-public partial class NameDialog : Window
+public partial class NameDialog : Wpf.Ui.Controls.FluentWindow
 {
     public string Value => NameBox.Text.Trim();
-    public NameDialog(string title, string value, ThemeService? theme = null)
+    public NameDialog(string title, string value)
     {
         InitializeComponent(); Title = title; NameBox.Text = value;
-        DialogTheme.Attach(this, theme);
         Loaded += (_, _) => { NameBox.Focus(); NameBox.SelectAll(); };
     }
     private void Accept(object sender, RoutedEventArgs e)

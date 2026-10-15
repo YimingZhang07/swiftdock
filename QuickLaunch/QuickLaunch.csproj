@@ -16,6 +16,7 @@
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="WPF-UI" Version="4.3.0" />
     <Resource Include="Assets\QuickLaunch.ico" />
     <InternalsVisibleTo Include="QuickLaunch.Tests" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />

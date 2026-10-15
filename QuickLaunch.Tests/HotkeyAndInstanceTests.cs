@@ -7,6 +7,50 @@ namespace QuickLaunch.Tests;
 
 public sealed class HotkeyAndInstanceTests
 {
+    [Theory]
+    [InlineData(1, true, true, 1, 0, 1)]
+    [InlineData(2, true, true, 0, 1, 1)]
+    [InlineData(2, false, true, 0, 0, 0)]
+    [InlineData(2, true, false, 0, 0, 0)]
+    [InlineData(1, false, true, 0, 0, 0)]
+    [InlineData(0, true, true, 0, 0, 0)]
+    [InlineData(255, true, true, 0, 0, 0)]
+    public async Task PipeCommandsAcknowledgeBeforeShutdown(byte command, bool accepts, bool supportsExit, int expectedShows, int expectedExits, byte expectedAck)
+    {
+        using var response = new MemoryStream();
+        int shows = 0, exits = 0;
+        void Exit()
+        {
+            Assert.Equal(new byte[] { 1 }, response.ToArray());
+            exits++;
+        }
+        await SingleInstanceService.HandleRequestAsync(command, response, () => shows++, supportsExit ? Exit : null, () => accepts);
+        Assert.Equal(new byte[] { expectedAck }, response.ToArray());
+        Assert.Equal(expectedShows, shows);
+        Assert.Equal(expectedExits, exits);
+    }
+
+    [Fact]
+    public async Task FailedAcknowledgementDoesNotRequestExit()
+    {
+        using var response = new MemoryStream(new byte[1], writable: false);
+        int exits = 0;
+        await Assert.ThrowsAsync<NotSupportedException>(() => SingleInstanceService.HandleRequestAsync(2, response, () => { }, () => exits++, () => true));
+        Assert.Equal(0, exits);
+    }
+
+    [Fact]
+    public async Task ExitWithoutAnInstanceDoesNotCreateAProfileOrClaimPrimary()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "QuickLaunch-exit-" + Guid.NewGuid().ToString("N"));
+        Assert.Equal(2, await SingleInstanceService.RequestExitAsync(directory, TimeSpan.FromMilliseconds(60)));
+        Assert.False(Directory.Exists(directory));
+        await using var first = new SingleInstanceService(directory, () => { });
+        Assert.True(first.IsPrimary);
+        Assert.Equal(SingleInstanceService.GetIdentity(directory), SingleInstanceService.GetIdentity(directory.ToUpperInvariant() + Path.DirectorySeparatorChar));
+        Assert.NotEqual(SingleInstanceService.GetIdentity(directory), SingleInstanceService.GetIdentity(directory + "-other"));
+    }
+
     private sealed class Backend : IHotkeyBackend
     {
         public bool Fail { get; set; }
@@ -56,11 +100,17 @@ public sealed class HotkeyAndInstanceTests
     {
         string directory = Path.Combine(Path.GetTempPath(), "QuickLaunch-ipc-" + Guid.NewGuid().ToString("N"));
         int shows = 0;
-        await using var first = new SingleInstanceService(directory, () => Interlocked.Increment(ref shows));
+        var exit = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var first = new SingleInstanceService(directory, () => Interlocked.Increment(ref shows), exitRequested: () => exit.TrySetResult());
         await using var second = new SingleInstanceService(directory, () => throw new InvalidOperationException());
         Assert.True(first.IsPrimary);
         Assert.False(second.IsPrimary);
         await second.NotifyPrimaryAsync();
+        Assert.Equal(1, Volatile.Read(ref shows));
+        Assert.Equal(2, await SingleInstanceService.RequestExitAsync(directory + "-other", TimeSpan.FromMilliseconds(60)));
+        Assert.False(exit.Task.IsCompleted);
+        Assert.Equal(0, await SingleInstanceService.RequestExitAsync(directory));
+        await exit.Task.WaitAsync(TimeSpan.FromSeconds(2));
         Assert.Equal(1, Volatile.Read(ref shows));
     }
 

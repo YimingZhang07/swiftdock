@@ -1,6 +1,5 @@
 using System.IO;
 using System.Windows;
-using Microsoft.Win32;
 using QuickLaunch.Models;
 using QuickLaunch.Services;
 using QuickLaunch.ViewModels;
@@ -212,18 +211,18 @@ public sealed class InteractionTests
         Assert.Single(vm.Groups); Assert.Equal(vm.Groups[0].Id, vm.LastGroupId);
     });
     [Fact]
-    public void StartupRegistryRoundtripTouchesOnlyTestKey()
+    public void StartupRegistrationRoundtripUsesProfileKeyAndCommand()
     {
-        string key = @"Software\QuickLaunch\Tests\" + Guid.NewGuid().ToString("N");
-        try
+        var values = new Dictionary<string, string>();
+        var service = new StartupService(@"C:\Program Files\QuickLaunch\QuickLaunch.exe", @"C:\Test Profile", @"Software\QuickLaunch\Tests", values.GetValueOrDefault, (name, command) =>
         {
-            var service = new StartupService(@"C:\Program Files\QuickLaunch\QuickLaunch.exe", @"C:\Test Profile", key);
-            Assert.False(service.IsEnabled); service.SetEnabled(true); Assert.True(service.IsEnabled);
-            Assert.Contains("--silent --config-dir \"C:\\Test Profile\"", service.Command);
-            service.SetEnabled(false); Assert.False(service.IsEnabled);
-            Assert.Equal("\"C:\\\\\"", StartupService.Quote(@"C:\"));
-        }
-        finally { Registry.CurrentUser.DeleteSubKey(key, throwOnMissingSubKey: false); }
+            if (command is null) values.Remove(name); else values[name] = command;
+        });
+        Assert.False(service.IsEnabled); service.SetEnabled(true); Assert.True(service.IsEnabled);
+        Assert.Equal(service.Command, values[service.ValueName]);
+        Assert.Contains("--silent --config-dir \"C:\\Test Profile\"", service.Command);
+        service.SetEnabled(false); Assert.False(service.IsEnabled); Assert.Empty(values);
+        Assert.Equal("\"C:\\\\\"", StartupService.Quote(@"C:\"));
     }
     private sealed class RecordingWriter : IConfigWriter
     {

@@ -37,12 +37,18 @@ public partial class App : Application
         base.OnStartup(e);
         bool benchmark = e.Args.Contains("--benchmark");
         bool startupProbe = e.Args.Contains("--startup-probe");
+        bool exitRequested = e.Args.Contains("--exit");
         _smoke = e.Args.Contains("--smoke-test") || benchmark || startupProbe;
         try
         {
             string? explicitConfig = Argument(e.Args, "--config-dir");
             if (_smoke && explicitConfig is null) throw new ArgumentException("冒烟检查必须指定独立 --config-dir，禁止修改用户配置。");
             var paths = DataPaths.Resolve(explicitConfig, Argument(e.Args, "--diagnostics-dir"));
+            if (exitRequested)
+            {
+                Shutdown(await SingleInstanceService.RequestExitAsync(paths.ConfigDirectory));
+                return;
+            }
             bool readOnly = false;
             if (!DataPaths.CanWrite(paths.ConfigDirectory))
             {
@@ -64,7 +70,8 @@ public partial class App : Application
                     if (_window is null) _pendingShow = true;
                     else ShowMain("second-instance");
                 });
-            }, () => !_exiting && !Dispatcher.HasShutdownStarted);
+            }, () => !_exiting && !Dispatcher.HasShutdownStarted,
+                () => Dispatcher.BeginInvoke(() => _ = ExitAsync()));
             if (!_instance.IsPrimary)
             {
                 await _instance.NotifyPrimaryAsync();
@@ -146,7 +153,7 @@ public partial class App : Application
         catch (Exception ex)
         {
             _log?.Write("startup.failed", new { ex.Message, type = ex.GetType().Name });
-            if (!_smoke) MessageBox.Show(ex is OperationCanceledException ? "已有实例未及时响应，请稍后重新启动。" : ex.Message, "QuickLaunch 无法启动");
+            if (!_smoke && !exitRequested) MessageBox.Show(ex is OperationCanceledException ? "已有实例未及时响应，请稍后重新启动。" : ex.Message, "QuickLaunch 无法启动");
             await ExitAsync(1);
         }
     }
@@ -183,7 +190,7 @@ public partial class App : Application
                 UpdateTrayText();
                 _log?.Write("hotkey.changed", new { hotkey = candidate.Display });
                 return ("已应用，配置将自动保存。", false);
-            }, _startup!, _window.ResetWindowSize, () => _ = ExitAsync(), _theme, !_hotkey.Registered) { Owner = _window };
+            }, _startup!, _window.ResetWindowSize, () => _ = ExitAsync(), !_hotkey.Registered) { Owner = _window };
         _settings.Closed += (_, _) => { _settings = null; _window.SetSettingsOpen(false); };
         _settings.Show();
     }

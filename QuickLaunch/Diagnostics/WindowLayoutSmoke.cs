@@ -40,7 +40,7 @@ internal static class WindowLayoutSmoke
             && !window.IsWindowDragSource(window.CaptureRoot.InputHitTest(tabCenter) as DependencyObject));
         check("selected-tab-uses-attached-state", TabState.GetIsSelected(tab));
         window.HighlightDropTab((LaunchGroup)tab.Tag);
-        check("tab-drop-highlight", tab.Background == window.FindResource("SelectedFillBrush"));
+        check("tab-drop-highlight", tab.Background == window.FindResource("SubtleFillColorSecondaryBrush"));
         window.HighlightDropTab(null);
         check("tab-drop-highlight-clears-local-value", tab.ReadLocalValue(Control.BackgroundProperty) == DependencyProperty.UnsetValue);
         CheckResizeDirections(window, check);
