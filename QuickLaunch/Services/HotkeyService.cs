@@ -5,11 +5,12 @@ using QuickLaunch.Models;
 
 namespace QuickLaunch.Services;
 
-public sealed class HotkeyService : IDisposable
+public sealed class HotkeyService : IHotkeyService, IDisposable
 {
     private readonly HwndSource _source;
     private readonly Action _pressed;
     private readonly HotkeyBinding _binding;
+    private bool _disposed;
     public bool Registered => _binding.Registered;
     public int Error => _binding.Error;
     public HotkeyConfig? Current => _binding.Current;
@@ -37,6 +38,8 @@ public sealed class HotkeyService : IDisposable
 
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
         _binding.Dispose();
         _source.RemoveHook(HandleMessage);
     }

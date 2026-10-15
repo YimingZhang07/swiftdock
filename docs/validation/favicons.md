@@ -1,5 +1,7 @@
 # Task 9 — website icons
 
+> Historical report: the in-process smoke suite and its commands were retired in Task 19. Use the three tiers and coverage mapping in [test-consolidation.md](test-consolidation.md) for current validation.
+
 Implemented on top of the earlier tasks staged in the index. Task 9 changes are unstaged; new files are untracked. No packages or standalone probe programs were added, and no staging commands were run.
 
 ## Behavior and decisions

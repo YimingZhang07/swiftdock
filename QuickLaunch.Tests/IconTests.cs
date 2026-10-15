@@ -26,23 +26,23 @@ public sealed class IconTests
         Directory.CreateDirectory(directory);
         try
         {
-            await using (var log = new DiagnosticLog(directory))
+            await using (var log = new TestLogging())
             {
                 var item = new LaunchItem("Web", "https://example.com", LaunchKind.Url);
-                using (var icons = new IconService(directory, log))
+                using (var icons = log.CreateIcons(directory))
                 {
                     var image = await icons.GetAsync(item, 96);
                     Assert.NotNull(image); Assert.True(image.IsFrozen); Assert.Equal(96, image.PixelWidth);
                     Assert.Same(image, await icons.GetAsync(item, 96));
                     Assert.Equal(1, icons.Extractions); Assert.Equal(1, icons.MemoryHits);
                 }
-                using (var icons = new IconService(directory, log))
+                using (var icons = log.CreateIcons(directory))
                 {
                     Assert.NotNull(await icons.GetAsync(item, 96));
                     Assert.Equal(1, icons.DiskHits); Assert.Equal(0, icons.Extractions);
                 }
                 await File.WriteAllTextAsync(Assert.Single(Directory.GetFiles(directory, "*.png")), "broken PNG");
-                using (var icons = new IconService(directory, log))
+                using (var icons = log.CreateIcons(directory))
                 {
                     Assert.NotNull(await icons.GetAsync(item, 96));
                     Assert.Equal(1, icons.Extractions);

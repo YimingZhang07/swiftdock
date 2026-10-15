@@ -1,5 +1,7 @@
 # Fluent dialogs — task 12
 
+> Historical report: the in-process smoke suite and its commands were retired in Task 19. Use the three tiers and coverage mapping in [test-consolidation.md](test-consolidation.md) for current validation.
+
 Validated on 2026-10-14, branch `ui/round2`, against the staged task 11 implementation. All task 12 changes are in the working tree. No packages or lock files changed. The git index SHA-256 before and after is `1FFA1D5EF4DF4FF7FC0B2F78A61C53445F9735145B93FFC2C355617328BA79BE`.
 
 SettingsWindow, EditItemDialog and NameDialog now inherit WPF-UI FluentWindow, request Mica and extend content into a WPF-UI TitleBar. Title bars explicitly have no icon, no minimize/maximize buttons, and retain Close. The dialogs remain non-resizable, centered over their launcher owner and absent from the taskbar. Mica fallback belongs to WPF-UI; the launcher's existing Acrylic policy is unchanged.

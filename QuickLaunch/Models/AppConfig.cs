@@ -31,6 +31,13 @@ public sealed record AppConfig
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool HideOnDeactivate { get; init; }
     public int IconSize { get; init; } = 32;
+    // Null preserves the original defaults: system theme/accent and acrylic panel.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Theme { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Backdrop { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Accent { get; init; }
     // Null is the default (on); only an explicit opt-out is written.
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? AutoFetchWebsiteIcons { get; init; }

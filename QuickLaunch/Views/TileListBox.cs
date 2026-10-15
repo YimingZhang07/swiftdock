@@ -3,15 +3,17 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using QuickLaunch.Models;
+using QuickLaunch.ViewModels;
 
 namespace QuickLaunch.Views;
 
-// Selection belongs to ListBox; keyboard focus stays on the list, including when it is empty.
+// ListBox projects the panel model's per-group selection; keyboard focus stays on the list, including when it is empty.
 // WPF's default navigation focuses item containers and pages an internal ScrollViewer. Our
 // non-focusable wrap tiles instead use the outer viewport for row and page distances.
 public sealed class TileListBox : ListBox
 {
     internal ScrollViewer Viewport { get; set; } = null!;
+    internal LauncherViewModel Launcher { get; set; } = null!;
 
     protected override DependencyObject GetContainerForItemOverride() => new TileListBoxItem();
     protected override bool IsItemItsOwnContainerOverride(object item) => item is TileListBoxItem;
@@ -40,20 +42,9 @@ public sealed class TileListBox : ListBox
         Focus();
         if (SelectedIndex < 0) { SelectFirst(); return; }
         UpdateLayout();
-        var panel = LauncherWindow.Descendants<WrapPanel>(this).Single();
-        int columns = Math.Max(1, (int)(panel.ActualWidth / panel.ItemWidth));
-        int page = Math.Max(1, (int)(Viewport.ViewportHeight / panel.ItemHeight)) * columns;
-        int index = SelectedIndex;
-        int target = e.Key switch
-        {
-            Key.Left => index - 1, Key.Right => index + 1,
-            Key.Up => index < columns ? index : index - columns,
-            Key.Down => index / columns == (Items.Count - 1) / columns ? index : index + columns,
-            Key.Home => 0, Key.End => Items.Count - 1,
-            Key.PageUp => index - page, Key.PageDown => index + page,
-            _ => index
-        };
-        SelectEnabled(Math.Clamp(target, 0, Items.Count - 1), e.Key is Key.Left or Key.Up or Key.End or Key.PageUp ? -1 : 1);
+        var panel = LauncherWindow.Descendants<TilePanel>(this).Single();
+        int target = panel.Geometry.Navigate(SelectedIndex, Items.Count, Viewport.ViewportHeight, e.Key);
+        SelectEnabled(target, e.Key is Key.Left or Key.Up or Key.End or Key.PageUp ? -1 : 1);
     }
 
     private void SelectEnabled(int index, int step)
@@ -88,6 +79,23 @@ public sealed class TileListBoxItem : ListBoxItem
         nameof(IsPressed), typeof(bool), typeof(TileListBoxItem), new PropertyMetadata(false));
     public static readonly DependencyProperty IsPressedProperty = IsPressedPropertyKey.DependencyProperty;
     public bool IsPressed { get => (bool)GetValue(IsPressedProperty); internal set => SetValue(IsPressedPropertyKey, value); }
+
+    internal void CancelClick() => IsPressed = false;
+    protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
+    {
+        if (DataContext is not LaunchItem { IsPending: false }) return;
+        ((TileListBox)ItemsControl.ItemsControlFromItemContainer(this)).Launcher.ClearSelectionCommand.Execute(null);
+        IsPressed = true;
+        e.Handled = true;
+    }
+    protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
+    {
+        bool launch = IsPressed; CancelClick();
+        e.Handled = true;
+        if (launch && DataContext is LaunchItem item)
+            ((TileListBox)ItemsControl.ItemsControlFromItemContainer(this)).Launcher.LaunchCommand.Execute(item);
+    }
+    protected override void OnMouseLeave(MouseEventArgs e) { CancelClick(); base.OnMouseLeave(e); }
 
     // ContextMenuService still handles the right-button release; do not let ListBoxItem select.
     protected override void OnMouseRightButtonDown(MouseButtonEventArgs e) { }

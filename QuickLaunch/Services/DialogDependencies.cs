@@ -1,0 +1,68 @@
+using System.ComponentModel;
+using System.IO;
+using QuickLaunch.Models;
+
+namespace QuickLaunch.Services;
+
+public interface ISettingsState : INotifyPropertyChanged
+{
+    bool CanEdit { get; }
+    string DirectoryPath { get; }
+    HotkeyConfig Hotkey { get; }
+    int IconSize { get; }
+    string Placement { get; }
+    string Theme { get; }
+    string Backdrop { get; }
+    string Accent { get; }
+    bool AutoFetchWebsiteIcons { get; }
+    void ApplySettings(HotkeyConfig hotkey);
+    void SetIconSize(int size);
+    void SetPlacement(string placement);
+    void SetTheme(string theme);
+    void SetBackdrop(string backdrop);
+    void SetAccent(string accent);
+    void SetAutoFetchWebsiteIcons(bool enabled);
+}
+
+public interface IHotkeyService
+{
+    bool Registered { get; }
+    int Error { get; }
+    HotkeyConfig? Current { get; }
+    bool TryChange(HotkeyConfig candidate);
+}
+
+public interface ISettingsActions
+{
+    void ResetWindowSize();
+    void HotkeyChanged();
+    Task ExitAsync();
+}
+
+internal sealed class SettingsActions(Action reset, Action hotkeyChanged, Func<Task> exit) : ISettingsActions
+{
+    public void ResetWindowSize() => reset();
+    public void HotkeyChanged() => hotkeyChanged();
+    public Task ExitAsync() => exit();
+}
+
+public interface IFilePicker
+{
+    string? PickTarget(LaunchKind kind);
+    string? PickIcon();
+}
+
+public interface IItemEditorEnvironment
+{
+    IReadOnlyList<LibraryGlyph> AvailableGlyphs { get; }
+    string ResolveLocation(CommonLocation location);
+    Task<(bool File, bool Directory)> InspectAsync(string path, CancellationToken cancellation);
+}
+
+internal sealed class ItemEditorEnvironment : IItemEditorEnvironment
+{
+    public IReadOnlyList<LibraryGlyph> AvailableGlyphs => IconCatalog.AvailableGlyphs.ToArray();
+    public string ResolveLocation(CommonLocation location) => CommonLocations.Resolve(location);
+    public Task<(bool File, bool Directory)> InspectAsync(string path, CancellationToken cancellation) =>
+        Task.Run(() => (File.Exists(path), Directory.Exists(path)), cancellation);
+}

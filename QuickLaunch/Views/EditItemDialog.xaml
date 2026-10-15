@@ -1,10 +1,13 @@
 <ui:FluentWindow x:Class="QuickLaunch.Views.EditItemDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:QuickLaunch.Views"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         xmlns:models="clr-namespace:QuickLaunch.Models" xmlns:services="clr-namespace:QuickLaunch.Services"
-        Width="520" SizeToContent="Height" ResizeMode="NoResize" ShowInTaskbar="False" WindowStartupLocation="CenterOwner"
+        Title="{Binding Title}" Width="520" SizeToContent="Height" ResizeMode="NoResize" ShowInTaskbar="False" WindowStartupLocation="CenterOwner"
         ExtendsContentIntoTitleBar="True" WindowBackdropType="Mica"
         Foreground="{DynamicResource TextFillColorPrimaryBrush}" FontFamily="Segoe UI, Microsoft YaHei UI" UseLayoutRounding="True" PreviewKeyDown="EditorKeyDown">
     <ui:FluentWindow.Resources>
+        <views:SelectionConverter x:Key="Selection" />
+        <BooleanToVisibilityConverter x:Key="Visible" />
         <Style x:Key="TypeCard" TargetType="RadioButton" BasedOn="{StaticResource IconSizeSegment}">
             <Setter Property="Height" Value="64" /><Setter Property="FontSize" Value="12" />
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
@@ -63,20 +66,20 @@
                  Icon="{x:Null}" ShowMaximize="False" ShowMinimize="False" CanMaximize="False" />
     <Grid>
     <StackPanel Margin="24,12,24,24">
-        <StackPanel x:Name="EditorBody">
+        <StackPanel x:Name="EditorBody" IsEnabled="{Binding IsEditing}">
             <Grid x:Name="TypeCards" Margin="0,0,0,20" KeyboardNavigation.TabNavigation="Once" KeyboardNavigation.DirectionalNavigation="Cycle" PreviewKeyDown="TypeKeyDown">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition /><ColumnDefinition Width="8" /><ColumnDefinition /><ColumnDefinition Width="8" />
                     <ColumnDefinition /><ColumnDefinition Width="8" /><ColumnDefinition />
                 </Grid.ColumnDefinitions>
-                <RadioButton x:Name="AppCard" Grid.Column="0" Content="&#xE71D;" AutomationProperties.Name="应用" Tag="{x:Static models:LaunchKind.App}" GroupName="ItemType" Style="{StaticResource TypeCard}" Checked="TypeChanged" Click="TypeChanged" />
-                <RadioButton x:Name="FileCard" Grid.Column="2" Content="&#xE8A5;" AutomationProperties.Name="文件" Tag="{x:Static models:LaunchKind.File}" GroupName="ItemType" Style="{StaticResource TypeCard}" Checked="TypeChanged" Click="TypeChanged" />
-                <RadioButton x:Name="FolderCard" Grid.Column="4" Content="&#xE8B7;" AutomationProperties.Name="文件夹" Tag="{x:Static models:LaunchKind.Folder}" GroupName="ItemType" Style="{StaticResource TypeCard}" Checked="TypeChanged" Click="TypeChanged" />
-                <RadioButton x:Name="UrlCard" Grid.Column="6" Content="&#xE774;" AutomationProperties.Name="网址" Tag="{x:Static models:LaunchKind.Url}" GroupName="ItemType" Style="{StaticResource TypeCard}" Checked="TypeChanged" Click="TypeChanged" />
+                <RadioButton x:Name="AppCard" Grid.Column="0" Content="&#xE71D;" AutomationProperties.Name="应用" Tag="{x:Static models:LaunchKind.App}" IsChecked="{Binding SelectedKind, Converter={StaticResource Selection}, ConverterParameter={x:Static models:LaunchKind.App}}" GroupName="ItemType" Style="{StaticResource TypeCard}" Command="{Binding SelectTypeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}" />
+                <RadioButton x:Name="FileCard" Grid.Column="2" Content="&#xE8A5;" AutomationProperties.Name="文件" Tag="{x:Static models:LaunchKind.File}" IsChecked="{Binding SelectedKind, Converter={StaticResource Selection}, ConverterParameter={x:Static models:LaunchKind.File}}" GroupName="ItemType" Style="{StaticResource TypeCard}" Command="{Binding SelectTypeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}" />
+                <RadioButton x:Name="FolderCard" Grid.Column="4" Content="&#xE8B7;" AutomationProperties.Name="文件夹" Tag="{x:Static models:LaunchKind.Folder}" IsChecked="{Binding SelectedKind, Converter={StaticResource Selection}, ConverterParameter={x:Static models:LaunchKind.Folder}}" GroupName="ItemType" Style="{StaticResource TypeCard}" Command="{Binding SelectTypeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}" />
+                <RadioButton x:Name="UrlCard" Grid.Column="6" Content="&#xE774;" AutomationProperties.Name="网址" Tag="{x:Static models:LaunchKind.Url}" IsChecked="{Binding SelectedKind, Converter={StaticResource Selection}, ConverterParameter={x:Static models:LaunchKind.Url}}" GroupName="ItemType" Style="{StaticResource TypeCard}" Command="{Binding SelectTypeCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}" />
             </Grid>
             <Grid Margin="0,0,0,20">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="56" /><ColumnDefinition Width="16" /><ColumnDefinition /></Grid.ColumnDefinitions>
-                <Button x:Name="IconPreview" Width="56" Height="56" MinWidth="0" Padding="0" ToolTip="更换图标" AutomationProperties.Name="更换图标" Click="IconPreviewClick">
+                <Button x:Name="IconPreview" Width="56" Height="56" MinWidth="0" Padding="0" ToolTip="更换图标" AutomationProperties.Name="更换图标" Command="{Binding OpenIconPickerCommand}">
                     <Button.Template><ControlTemplate TargetType="Button">
                         <Grid>
                             <Border Background="{DynamicResource LayerFillColorDefaultBrush}" CornerRadius="8"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" /></Border>
@@ -90,50 +93,50 @@
                         </ControlTemplate.Triggers>
                     </ControlTemplate></Button.Template>
                     <Grid>
-                        <TextBlock x:Name="PreviewGlyph" Text="&#xE71D;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="28" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                        <TextBlock x:Name="PreviewGlyph" Text="{Binding PreviewGlyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="28" VerticalAlignment="Center" HorizontalAlignment="Center" />
                         <Image x:Name="PreviewImage" Width="40" Height="40" SnapsToDevicePixels="True" RenderOptions.BitmapScalingMode="HighQuality" />
                     </Grid>
                 </Button>
                 <StackPanel Grid.Column="2" VerticalAlignment="Center">
                     <TextBlock Text="名称" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    <ui:TextBox x:Name="NameBox" PlaceholderText="名称" Margin="0,6,0,0" MaxLength="160" TextChanged="NameChanged" AutomationProperties.Name="名称" />
+                    <ui:TextBox x:Name="NameBox" PlaceholderText="名称" Margin="0,6,0,0" MaxLength="160" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="名称" />
                 </StackPanel>
             </Grid>
-            <TextBlock x:Name="TargetLabel" Text="程序路径" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            <TextBlock x:Name="TargetLabel" Text="{Binding TargetLabel}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
             <Grid Margin="0,6,0,0">
                 <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                 <Grid>
-                    <ui:TextBox x:Name="PathBox" PlaceholderText="程序路径" TextChanged="PathChanged" AutomationProperties.Name="{Binding Text, ElementName=TargetLabel}" />
+                    <ui:TextBox x:Name="PathBox" PlaceholderText="{Binding TargetPlaceholder}" Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{Binding Text, ElementName=TargetLabel}" InputMethod.PreferredImeState="Off" />
                     <!-- Keep the named hint as the URL placeholder source; TextBox renders it. -->
                     <TextBlock x:Name="UrlHint" Text="https://" Visibility="Collapsed" />
                 </Grid>
-                <ui:Button x:Name="BrowseButton" Grid.Column="1" Content="浏览…" Click="BrowseClick" Margin="8,0,0,0" />
+                <ui:Button x:Name="BrowseButton" Grid.Column="1" Content="浏览…" Command="{Binding BrowseCommand}" Visibility="{Binding CanBrowse, Converter={StaticResource Visible}}" Margin="8,0,0,0" />
             </Grid>
-            <StackPanel x:Name="LocationChips" Orientation="Horizontal" Margin="0,12,0,0" Visibility="Collapsed">
+            <StackPanel x:Name="LocationChips" Orientation="Horizontal" Margin="0,12,0,0" Visibility="{Binding IsFolder, Converter={StaticResource Visible}}">
                 <TextBlock Text="常用位置" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,10,0" />
-                <Button Content="桌面" Tag="{x:Static services:CommonLocation.Desktop}" Style="{StaticResource LocationChip}" Click="LocationClick" />
-                <Button Content="下载" Tag="{x:Static services:CommonLocation.Downloads}" Style="{StaticResource LocationChip}" Click="LocationClick" />
-                <Button Content="文档" Tag="{x:Static services:CommonLocation.Documents}" Style="{StaticResource LocationChip}" Click="LocationClick" />
-                <Button Content="图片" Tag="{x:Static services:CommonLocation.Pictures}" Style="{StaticResource LocationChip}" Click="LocationClick" />
-                <Button Content="用户目录" Tag="{x:Static services:CommonLocation.Profile}" Style="{StaticResource LocationChip}" Click="LocationClick" Margin="0" />
+                <Button Content="桌面" Tag="{x:Static services:CommonLocation.Desktop}" Style="{StaticResource LocationChip}" Command="{Binding SelectLocationCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}" />
+                <Button Content="下载" Tag="{x:Static services:CommonLocation.Downloads}" Style="{StaticResource LocationChip}" Command="{Binding SelectLocationCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}" />
+                <Button Content="文档" Tag="{x:Static services:CommonLocation.Documents}" Style="{StaticResource LocationChip}" Command="{Binding SelectLocationCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}" />
+                <Button Content="图片" Tag="{x:Static services:CommonLocation.Pictures}" Style="{StaticResource LocationChip}" Command="{Binding SelectLocationCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}" />
+                <Button Content="用户目录" Tag="{x:Static services:CommonLocation.Profile}" Style="{StaticResource LocationChip}" Command="{Binding SelectLocationCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}" Margin="0" />
             </StackPanel>
-            <ui:CardExpander x:Name="AdvancedOptions" Header="高级选项" Margin="0,16,0,0" ContentPadding="16">
+            <ui:CardExpander x:Name="AdvancedOptions" IsExpanded="{Binding AdvancedExpanded}" Visibility="{Binding IsApplication, Converter={StaticResource Visible}}" Header="高级选项" Margin="0,16,0,0" ContentPadding="16">
                 <StackPanel>
-                    <TextBlock x:Name="ShortcutHint" Text="快捷方式使用自身的参数和工作目录。" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" Margin="0,0,0,12" Visibility="Collapsed" />
+                    <TextBlock x:Name="ShortcutHint" Text="快捷方式使用自身的参数和工作目录。" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" Margin="0,0,0,12" Visibility="{Binding IsShortcut, Converter={StaticResource Visible}}" />
                     <TextBlock Text="启动参数" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    <ui:TextBox x:Name="ArgumentsBox" PlaceholderText="启动参数" Margin="0,6,0,12" AutomationProperties.Name="启动参数" />
+                    <ui:TextBox x:Name="ArgumentsBox" Text="{Binding Arguments, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanSetArguments}" PlaceholderText="启动参数" Margin="0,6,0,12" AutomationProperties.Name="启动参数" InputMethod.PreferredImeState="Off" />
                     <TextBlock Text="工作目录" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    <ui:TextBox x:Name="WorkingBox" PlaceholderText="工作目录" Margin="0,6,0,16" AutomationProperties.Name="工作目录" />
-                    <CheckBox x:Name="ElevateBox" Content="以管理员身份运行" />
+                    <ui:TextBox x:Name="WorkingBox" Text="{Binding WorkingDirectory, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanSetArguments}" PlaceholderText="工作目录" Margin="0,6,0,16" AutomationProperties.Name="工作目录" InputMethod.PreferredImeState="Off" />
+                    <CheckBox x:Name="ElevateBox" IsChecked="{Binding RunAsAdmin}" IsEnabled="{Binding IsApplication}" Content="以管理员身份运行" />
                 </StackPanel>
             </ui:CardExpander>
         </StackPanel>
-        <TextBlock x:Name="Error" Foreground="{DynamicResource SystemFillColorCriticalBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,16,0,16" />
+        <TextBlock x:Name="Error" Text="{Binding Error}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,16,0,16" />
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-            <ui:Button x:Name="SaveButton" Content="添加" Appearance="Primary" IsDefault="True" Click="SaveClick" Margin="0,0,8,0" /><ui:Button Content="取消" IsCancel="True" />
+            <ui:Button x:Name="SaveButton" Content="{Binding SaveLabel}" Appearance="Primary" IsDefault="True" Command="{Binding SaveCommand}" Margin="0,0,8,0" /><ui:Button Content="取消" IsCancel="True" />
         </StackPanel>
     </StackPanel>
-    <Popup x:Name="IconPopup" PlacementTarget="{Binding ElementName=IconPreview}" Placement="Bottom" AllowsTransparency="True" StaysOpen="False"
+    <Popup x:Name="IconPopup" IsOpen="{Binding IsIconPickerOpen, Mode=TwoWay}" PlacementTarget="{Binding ElementName=IconPreview}" Placement="Bottom" AllowsTransparency="True" StaysOpen="False"
            HorizontalOffset="-12" VerticalOffset="-6" Opened="IconPopupOpened">
         <Border x:Name="PickerSurface" Margin="12" Padding="12" CornerRadius="8" Background="{DynamicResource FlyoutBackground}" BorderBrush="{DynamicResource FlyoutBorderBrush}" BorderThickness="1"
                 KeyboardNavigation.TabNavigation="Cycle" PreviewKeyDown="PickerKeyDown" UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -146,8 +149,8 @@
                 <TextBlock Text="颜色" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" Margin="4,12,0,4" />
                 <UniformGrid x:Name="PaletteGrid" Columns="8" Width="288" HorizontalAlignment="Left" KeyboardNavigation.TabNavigation="Once" PreviewKeyDown="ChoiceKeyDown" />
                 <Border Height="1" Background="{DynamicResource ControlStrokeColorDefaultBrush}" Margin="4,10,4,8" />
-                <Button x:Name="IconFileButton" Content="从文件选择…" Style="{StaticResource IconPickerLink}" Click="IconFileClick" />
-                <Button x:Name="IconResetButton" Content="恢复默认" Style="{StaticResource IconPickerLink}" Click="IconResetClick" />
+                <Button x:Name="IconFileButton" Content="从文件选择…" Style="{StaticResource IconPickerLink}" Command="{Binding SelectIconFileCommand}" />
+                <Button x:Name="IconResetButton" Content="恢复默认" Style="{StaticResource IconPickerLink}" Command="{Binding ResetIconCommand}" />
             </StackPanel>
         </Border>
     </Popup>

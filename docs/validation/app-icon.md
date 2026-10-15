@@ -1,5 +1,7 @@
 # Task 5: application icon
 
+> Historical report: the in-process smoke suite and its commands were retired in Task 19. Use the three tiers and coverage mapping in [test-consolidation.md](test-consolidation.md) for current validation.
+
 Validated on Windows 11 / .NET SDK 10.0.401, 2026-10-13. Earlier staged work was preserved; this task does not modify the index.
 
 ## Changes

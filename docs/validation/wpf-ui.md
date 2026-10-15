@@ -1,5 +1,7 @@
 # WPF-UI and graceful exit — task 11
 
+> Historical report: the in-process smoke suite and its commands were retired in Task 19. Use the three tiers and coverage mapping in [test-consolidation.md](test-consolidation.md) for current validation.
+
 Validated on 2026-10-14, Windows x64, .NET 10.0.12 / SDK 10.0.401, branch `ui/round2`. These are worktree changes relative to the reviewer's staged work. The index, application package references and both lock files are unchanged.
 
 `App.xaml` merges WPF-UI 4.3.0 `ThemesDictionary` and `ControlsDictionary`. Standard controls use the library's implicit styles; the launcher tiles, tabs, icon buttons, toast link, segmented controls and icon picker retain their custom templates with library resources. Primary dialog actions use `ui:Button Appearance="Primary"`; the advanced section uses the implicit Expander. Dialogs remain ordinary Window instances.
@@ -24,7 +26,7 @@ Removed code, counted against the index:
 
 App.xaml shrank from 251 to 28 lines; ThemeService from 84 to 70. The old WinRT accent reading/subscription is also removed. No source file was deleted, no package was added or changed, and no analyzer suppression was needed.
 
-Startup was measured from each log's `startup.data.processToReadyMs`, using fresh isolated profiles and the Release apphost. Both sides used `--startup-probe --smoke-test --silent`: the ordinary startup probe cannot create the tray in this sandbox, while the existing smoke flag logs that limitation and continues to the same readiness milestone. These are process launches with filesystem caching, not cold-boot measurements or a claim about successful desktop tray creation. Final-build samples are in `artifacts/validation/startup-before.json` and `startup-after.json`; per-run logs are in `startup-before-1..3/logs` and `startup-after-final-1..3/logs`.
+This historical measurement used the pre-CLEF `startup.data.processToReadyMs` field (current builds use `EventId.Name == startup` and top-level `processToReadyMs`; see [logging](../LOGGING.md)). Startup was measured using fresh isolated profiles and the Release apphost. Both sides used `--startup-probe --smoke-test --silent`: the ordinary startup probe cannot create the tray in this sandbox, while the existing smoke flag logs that limitation and continues to the same readiness milestone. These are process launches with filesystem caching, not cold-boot measurements or a claim about successful desktop tray creation. Final-build samples are in `artifacts/validation/startup-before.json` and `startup-after.json`; per-run logs are in `startup-before-1..3/logs` and `startup-after-final-1..3/logs`.
 
 | processToReadyMs | Run 1 | Run 2 | Run 3 | Median |
 | --- | ---: | ---: | ---: | ---: |

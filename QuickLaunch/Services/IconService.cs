@@ -1,14 +1,15 @@
 using System.Collections.Concurrent;
 using System.IO;
-using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
-using System.Windows;
 using System.Windows.Interop;
-using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Media;
 using System.Windows.Threading;
+using System.Windows;
+using Microsoft.Extensions.Logging;
+using QuickLaunch.Diagnostics;
 using QuickLaunch.Interop;
 using QuickLaunch.Models;
 
@@ -17,7 +18,7 @@ namespace QuickLaunch.Services;
 public sealed class IconService : IDisposable
 {
     private readonly string _directory;
-    private readonly DiagnosticLog _log;
+    private readonly ILogger<IconService> _log;
     private readonly FaviconService _favicons;
     private static readonly ConcurrentDictionary<int, BitmapSource> Globes = new();
     public bool AutoFetchWebsiteIcons { get => _favicons.Enabled; set => _favicons.Enabled = value; }
@@ -26,7 +27,7 @@ public sealed class IconService : IDisposable
     private readonly ConcurrentDictionary<string, int> _revisions = new();
     private readonly SemaphoreSlim _ioSlots = new(4);
     private readonly CancellationTokenSource _stop = new();
-    private readonly TaskCompletionSource<Dispatcher> _sta = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly IconThread _thread;
     private long _memoryHits, _diskHits, _extractions;
     private bool _disposed;
     public long MemoryHits => Interlocked.Read(ref _memoryHits);
@@ -35,24 +36,9 @@ public sealed class IconService : IDisposable
     public int CachedCount => _memory.Count;
     public string DirectoryPath => _directory;
 
-    public IconService(string directory, DiagnosticLog log, HttpMessageHandler? faviconHandler = null)
+    internal IconService(string directory, ILogger<IconService> log, FaviconService favicons, IconThread thread)
     {
-        _directory = directory;
-        _log = log;
-        _favicons = new(directory, log, async (source, pixels) =>
-        {
-            var dispatcher = await _sta.Task.WaitAsync(_stop.Token).ConfigureAwait(false);
-            return await dispatcher.InvokeAsync(() => RenderFavicon(source, pixels), DispatcherPriority.Background, _stop.Token).Task.ConfigureAwait(false);
-        }, faviconHandler);
-        var thread = new Thread(() =>
-        {
-            int result = NativeMethods.OleInitialize(0);
-            if (result < 0) { _sta.TrySetException(Marshal.GetExceptionForHR(result)!); return; }
-            try { _sta.SetResult(Dispatcher.CurrentDispatcher); Dispatcher.Run(); }
-            finally { NativeMethods.OleUninitialize(); }
-        }) { IsBackground = true, Name = "QuickLaunch Shell icons" };
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
+        _directory = directory; _log = log; _favicons = favicons; _thread = thread;
     }
 
     public static int PixelSize(double dip, double scale) => Math.Clamp((int)Math.Ceiling(dip * scale), 16, 256);
@@ -123,7 +109,7 @@ public sealed class IconService : IDisposable
                 { /* Cache is disposable; source extraction remains available. */ }
                 if (image is null)
                 {
-                    var dispatcher = await _sta.Task.WaitAsync(_stop.Token);
+                    var dispatcher = await _thread.Ready.WaitAsync(_stop.Token);
                     image = await dispatcher.InvokeAsync(() => Extract(item, pixels), DispatcherPriority.Background, _stop.Token).Task;
                     Interlocked.Increment(ref _extractions);
                     if (image is not null)
@@ -144,7 +130,7 @@ public sealed class IconService : IDisposable
                             finally { if (File.Exists(temporary)) File.Delete(temporary); }
                         }
                         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                        { _log.Write("icon.cache-write-failed", new { ex.Message }); }
+                        { _log.IconCacheWriteFailed(ex.Message); }
                     }
                 }
                 if (image is not null && !_disposed && _revisions.GetValueOrDefault(source) == revision)
@@ -156,7 +142,7 @@ public sealed class IconService : IDisposable
             }, _stop.Token);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or COMException or OperationCanceledException or ArgumentException)
-        { _log.Write("icon.unavailable", new { item.Kind, ex.Message }); return null; }
+        { _log.IconUnavailable((int)item.Kind, ex.Message); return null; }
         finally { _ioSlots.Release(); }
     }
 
@@ -322,10 +308,7 @@ public sealed class IconService : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        _favicons.Dispose();
         _stop.Cancel();
-        if (_sta.Task.IsCompletedSuccessfully) _sta.Task.Result.BeginInvokeShutdown(DispatcherPriority.Send);
         _memory.Clear();
-        // A blocked third-party Shell extension cannot be force-cancelled; its thread is background.
     }
 }

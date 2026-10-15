@@ -1,8 +1,8 @@
 using System.IO;
-using System.Text;
 using System.Text.Json;
-using System.Windows.Media;
+using System.Text;
 using System.Windows.Media.Imaging;
+using System.Windows.Media;
 using QuickLaunch.Models;
 using QuickLaunch.Services;
 using Xunit;
@@ -140,8 +140,8 @@ public sealed class CustomIconTests : IDisposable
     [InlineData(32)] [InlineData(40)] [InlineData(48)] [InlineData(64)] [InlineData(80)] [InlineData(96)]
     public async Task GlyphRendersAtPhysicalSizeWithWhiteCentreAndTransparentCorners(int pixels)
     {
-        await using var log = new DiagnosticLog(_directory);
-        using var icons = new IconService(_directory, log);
+        await using var log = new TestLogging();
+        using var icons = log.CreateIcons(_directory);
         // Filled star has a solid centre, unlike outline icons whose centre is intentionally empty.
         var image = await icons.GetAsync(Web("glyph:E735:#2F6FDB"), pixels);
         Assert.NotNull(image); Assert.True(image.IsFrozen);
@@ -156,16 +156,16 @@ public sealed class CustomIconTests : IDisposable
     [Fact]
     public async Task GlyphCacheReusesMemoryAndDiskAndSeparatesSpecifications()
     {
-        await using var log = new DiagnosticLog(_directory);
+        await using var log = new TestLogging();
         var item = Web("glyph:E943:#2F6FDB");
-        using (var icons = new IconService(_directory, log))
+        using (var icons = log.CreateIcons(_directory))
         {
             var image = await icons.GetAsync(item, 48);
             Assert.NotNull(image); Assert.Same(image, await icons.GetAsync(item, 48));
             Assert.NotSame(image, await icons.GetAsync(item with { Icon = "glyph:E943:#0F7B6C" }, 48));
             Assert.Equal(2, icons.Extractions);
         }
-        using (var icons = new IconService(_directory, log))
+        using (var icons = log.CreateIcons(_directory))
         {
             Assert.NotNull(await icons.GetAsync(item, 48)); Assert.Equal(1, icons.DiskHits); Assert.Equal(0, icons.Extractions);
         }
@@ -178,8 +178,8 @@ public sealed class CustomIconTests : IDisposable
     {
         Directory.CreateDirectory(_directory);
         string path = Path.Combine(_directory, "frames.ico"); WriteIco(path);
-        await using var log = new DiagnosticLog(_directory);
-        using var icons = new IconService(_directory, log);
+        await using var log = new TestLogging();
+        using var icons = log.CreateIcons(_directory);
         var image = await icons.GetAsync(Web("file:" + path), pixels);
         Assert.NotNull(image); Assert.Equal(pixels, image.PixelWidth); Assert.Equal(pixels, image.PixelHeight);
         Assert.Equal(new byte[] { blue, green, red, 255 }, Pixel(image, pixels / 2, pixels / 2));
@@ -194,8 +194,8 @@ public sealed class CustomIconTests : IDisposable
         BitmapEncoder encoder = extension switch { ".jpg" => new JpegBitmapEncoder(), ".bmp" => new BmpBitmapEncoder(), _ => new PngBitmapEncoder() };
         encoder.Frames.Add(BitmapFrame.Create(Solid(48, 24, Colors.Red)));
         using (var file = File.Create(path)) encoder.Save(file);
-        await using var log = new DiagnosticLog(_directory);
-        using var icons = new IconService(_directory, log);
+        await using var log = new TestLogging();
+        using var icons = log.CreateIcons(_directory);
         var image = await icons.GetAsync(Web("file:" + path), 48);
         Assert.NotNull(image); Assert.Equal(48, image.PixelWidth); Assert.Equal(48, image.PixelHeight);
         Assert.InRange(Pixel(image, 24, 24)[2], 250, 255); Assert.Equal(0, Pixel(image, 24, 0)[3]);
@@ -208,8 +208,8 @@ public sealed class CustomIconTests : IDisposable
         Directory.CreateDirectory(_directory);
         string path = Path.Combine(_directory, "unavailable.ico");
         if (corrupt) await File.WriteAllTextAsync(path, "invalid image");
-        await using var log = new DiagnosticLog(_directory);
-        using var icons = new IconService(_directory, log);
+        await using var log = new TestLogging();
+        using var icons = log.CreateIcons(_directory);
         var item = Web("file:" + path);
         var expected = await icons.GetAsync(Web(), 48); var actual = await icons.GetAsync(item, 48);
         Assert.NotNull(expected); Assert.NotNull(actual);
@@ -223,8 +223,8 @@ public sealed class CustomIconTests : IDisposable
         string path = Path.Combine(_directory, "preview.png");
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(Solid(48, 48, Colors.Red)));
         using (var file = File.Create(path)) encoder.Save(file);
-        await using var log = new DiagnosticLog(_directory);
-        using var icons = new IconService(_directory, log);
+        await using var log = new TestLogging();
+        using var icons = log.CreateIcons(_directory);
         foreach (LaunchKind kind in Enum.GetValues<LaunchKind>())
         {
             var image = await icons.GetAsync(new LaunchItem("", "", kind) { Icon = "file:" + path }, 48);
@@ -239,8 +239,8 @@ public sealed class CustomIconTests : IDisposable
         Directory.CreateDirectory(_directory);
         string path = Path.Combine(_directory, "resources" + extension);
         File.Copy(typeof(IconService).Assembly.Location, path);
-        await using var log = new DiagnosticLog(_directory);
-        using var icons = new IconService(_directory, log);
+        await using var log = new TestLogging();
+        using var icons = log.CreateIcons(_directory);
         var expected = await icons.GetAsync(Web(), 48);
         var custom = await icons.GetAsync(Web("file:" + path + ",0"), 48);
         Assert.NotNull(expected); Assert.NotNull(custom);

@@ -1,14 +1,15 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
-using System.Windows;
 using System.Windows.Threading;
+using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using QuickLaunch.Models;
 using QuickLaunch.Services;
 
 namespace QuickLaunch.ViewModels;
 
-public sealed class MainViewModel : ObservableObject
+// Owns persisted configuration, validated mutations, undo records, and debounced saves; panel interaction state lives in LauncherViewModel.
+public sealed class MainViewModel : ObservableObject, ISettingsState, IDisposable
 {
     private readonly ConfigService _store;
     private readonly Dispatcher _owner = Dispatcher.CurrentDispatcher;
@@ -23,10 +24,14 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<LaunchGroup> Groups { get; }
     public bool CanEdit => !_store.IsReadOnly && !_suspended;
     public bool IsReadOnly => _store.IsReadOnly;
+    public string DirectoryPath => _store.DirectoryPath;
     public HotkeyConfig Hotkey => _settings.Hotkey;
     public string HotkeyDisplay => Hotkey.Display;
     public int Columns => _settings.Columns;
     public int IconSize => _settings.IconSize;
+    public string Theme => _settings.Theme ?? "system";
+    public string Backdrop => _settings.Backdrop ?? "acrylic";
+    public string Accent => _settings.Accent ?? "system";
     public bool AutoFetchWebsiteIcons => _settings.AutoFetchWebsiteIcons ?? true;
     public double CellSize => Math.Max(84, IconSize + 52);
     public double TileSize => CellSize - 4;
@@ -69,6 +74,12 @@ public sealed class MainViewModel : ObservableObject
     private void GroupChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) { if (!_volatileChange) Changed(); }
     private void Wire(LaunchGroup group) { group.Items.CollectionChanged += ItemsChanged; group.PropertyChanged += GroupChanged; }
     private void Unwire(LaunchGroup group) { group.Items.CollectionChanged -= ItemsChanged; group.PropertyChanged -= GroupChanged; }
+    public void Dispose()
+    {
+        _suspended = true;
+        _debounce.Stop();
+        foreach (var group in Groups) Unwire(group);
+    }
     public void Changed()
     {
         _owner.VerifyAccess();
@@ -110,6 +121,30 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(CellSize));
         OnPropertyChanged(nameof(TileSize));
         Changed();
+    }
+    public void SetTheme(string theme)
+    {
+        _owner.VerifyAccess();
+        string? value = AppearanceOptions.NormalizeTheme(theme);
+        if (!CanEdit || _settings.Theme == value) return;
+        _settings = _settings with { Theme = value };
+        OnPropertyChanged(nameof(Theme)); Changed();
+    }
+    public void SetBackdrop(string backdrop)
+    {
+        _owner.VerifyAccess();
+        string? value = AppearanceOptions.NormalizeBackdrop(backdrop);
+        if (!CanEdit || _settings.Backdrop == value) return;
+        _settings = _settings with { Backdrop = value };
+        OnPropertyChanged(nameof(Backdrop)); Changed();
+    }
+    public void SetAccent(string accent)
+    {
+        _owner.VerifyAccess();
+        string? value = AppearanceOptions.NormalizeAccent(accent);
+        if (!CanEdit || _settings.Accent == value) return;
+        _settings = _settings with { Accent = value };
+        OnPropertyChanged(nameof(Accent)); Changed();
     }
     public void SetWindowSize(Size? size)
     {
@@ -262,7 +297,7 @@ public sealed class MainViewModel : ObservableObject
         int old = source.Items.ToList().FindIndex(i => i.Id == item.Id);
         if (!Groups.Contains(source) || !Groups.Contains(target) || old < 0 || item.IsPending || slot < 0 || slot > target.Items.Count) return false;
         if (source != target && IsDuplicate(target, item)) return false;
-        int index = source == target ? DragDrop.ReorderMath.FinalIndex(old, slot, source.Items.Count) : slot;
+        int index = source == target && slot > old ? slot - 1 : slot;
         if (source == target && index == old) return true;
         Mutate(() =>
         {

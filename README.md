@@ -17,12 +17,28 @@ Windows x64 常驻启动器，C# / .NET 10 / WPF。v0.1.3 已实现计划中的�
 - 条目排序、悬停标签跨组移动、拖到“+”新建组、标签排序、边缘滚动、预览/飞入动画；Esc 或窗外松开取消。
 - 编辑名称/路径/参数/工作目录，打开所在位置，单条提权启动；删除后 5 秒内 Ctrl+Z 撤销最近一次删除。
 - 分组新建、双击重命名、非空删除确认；呼出或鼠标切组后未选择，首次方向键/Home/End/PageUp/PageDown 选择首项，之后按行列或视口页移动选择。Enter 启动、F2 重命名、Delete 删除所选项；未选择时无操作。单击启动或点击图标区空白清除选择。Ctrl+Tab / Ctrl+Shift+Tab、Ctrl+1…9 切组并选择首项；Tab 在分组列表、标签和顶栏按钮间移动焦点。
-- 跟随系统深浅色和强调色；面板在 Windows 11 22621 及以上且开启透明效果时使用 Acrylic，否则使用实体背景；高对比度使用系统颜色。设置/托盘可管理当前配置的登录自启。
+- Esc 优先关闭已打开的右键菜单或取消拖动；否则有选择时只清除选择，焦点留在列表，下一次方向键重新选择首项；无选择时隐藏面板。
+- 设置 → 外观支持主题（跟随系统 / 浅色 / 深色）、背景材质（亚克力 / 云母 / 纯色）和强调色（跟随系统 / 7 种 Windows 11 预设），立即应用并自动保存。高对比度优先；透明效果关闭或系统不支持时使用纯色，并在材质行说明原因。设置/托盘可管理当前配置的登录自启。
 - 单实例定向唤出、原子配置保存、备份恢复、损坏原件保留、未知版本只读。
 
 ## 配置
 
 默认数据为 `%APPDATA%\QuickLaunch\config.json`；图标和日志在 `%LOCALAPPDATA%\QuickLaunch`。exe 同目录放置 `portable.flag` 可使用便携数据目录。`--config-dir <绝对目录>` 可选择独立配置。
+
+外观为可选字段，默认值省略，旧配置无需迁移。只读配置禁用所有外观控件；Windows 高对比度始终覆盖所选主题、强调色和透明材质，关闭后恢复所选值。
+
+| 字段 | 省略时 | 非默认值 |
+| --- | --- | --- |
+| `theme` | 跟随系统 | `light`、`dark` |
+| `backdrop` | 亚克力 | `mica`、`solid` |
+| `accent` | 跟随系统 | `blue`、`teal`、`green`、`purple`、`magenta`、`orange`、`slate` |
+
+强调色预设：蓝 `#0067C0`、青 `#038387`、绿 `#107C10`、紫 `#8764B8`、玫红 `#C239B3`、橙 `#CA5010`、石板灰 `#69797E`。亚克力保留 Windows 11 22621 起的支持条件；云母使用 WPF-UI 的系统支持检测，二者都遵守 Windows 透明效果与高对比度设置。材质应用失败也回退纯色，描述显示实际状态。
+
+面板顶栏高 48 DIP、左右内边距 16 DIP，内容内边距 16 DIP；细分隔线、选中标签的 14×3 强调色下划线与首列图标对齐。列均匀分配可用宽度，行高和图标预设不变；键盘导航和 Gong 插入位置与实际网格使用同一几何计算。
+
+
+诊断日志使用 Serilog CLEF（UTF-8 JSONL）：事件名为 `EventId.Name`，结构化字段位于顶层。默认目录为 `%LOCALAPPDATA%\QuickLaunch\logs`，可用 `--diagnostics-dir` 覆盖；同一目录的多个进程共享按日/约 4 MiB 滚动的文件，保留 20 个。读取最新滚动文件及分段后，按 `Pid` 和 GUID `Session` 筛选会话；解析示例见 [日志说明](docs/LOGGING.md)。
 
 脚本可用 `QuickLaunch.exe --exit [--config-dir <目录>]` 请求当前用户、当前登录会话中相同配置的实例正常退出：保存待处理修改并释放托盘图标，不需要强杀进程。退出码 `0` 表示实例已确认请求，`2` 表示没有实例确认（未运行或已退出）；确认不等于保存已完成，保存失败仍走原有重试/取消流程。省略目录时遵循默认/便携模式；此命令不会创建配置目录或启动新实例。
 
@@ -44,7 +60,9 @@ Windows 11 x64，仓库根目录 PowerShell：
 ```powershell
 .\scripts\Setup.ps1                    # 安装仓库专用 SDK，验证 SHA-512
 .\scripts\GenerateIcon.ps1             # 离线 WPF 生成应用 ICO 和 artifacts/icon/preview.png
-.\scripts\Validate.ps1 -DesktopSmoke   # 锁定依赖、Release、逻辑与程序内窗口检查
+.\scripts\Validate.ps1                # 锁定依赖、Release -warnaserror、快速单元测试
+.\scripts\E2E.ps1                     # UI 改动后：解锁桌面，真实键鼠回归
+.\scripts\Snapshots.ps1               # 按需：解锁桌面，生成视觉评审 PNG
 .\scripts\Run.ps1                      # 正常运行
 .\scripts\Run.ps1 -Silent              # 托盘运行，后台加载图标并预热当前组
 .\scripts\Run.ps1 -ConfigDirectory 'D:\LauncherProfile'
@@ -52,9 +70,19 @@ Windows 11 x64，仓库根目录 PowerShell：
 
 SDK 10.0.401 和 NuGet 缓存位于忽略的 `.tools/`，不会替换系统安装。运行脚本启动 apphost exe，保留 manifest 中的 asInvoker/PerMonitorV2。自启若只依赖进程临时设置的开发运行时会被拒绝；使用独立包，或安装系统 .NET 10 Windows Desktop Runtime。
 
-主题、系统强调色和标准控件使用 [WPF-UI 4.3.0](https://github.com/lepoco/wpfui/tree/4.3.0)（MIT），依赖版本与锁文件固定。`App.xaml` 合并其主题/控件字典，面板自定义样式直接引用库的主题资源；系统消息变化后重新应用主题与 Acrylic/实体背景策略。面板保留现有 WindowChrome；设置、项目编辑和名称对话框使用 FluentWindow、无图标标题栏和 Mica（回退由 WPF-UI 处理）。设置按快捷键、外观、启动分为卡片行；网站图标和登录自启使用开关，除快捷键需点“应用”外均立即生效。编辑高级选项使用 CardExpander，删除分组使用 WPF-UI 确认框。WPF-UI 滚动条占 14 DIP，布局为它保留空间。
+主题、系统强调色和标准控件使用 [WPF-UI 4.3.0](https://github.com/lepoco/wpfui/tree/4.3.0)（MIT），依赖版本与锁文件固定。`App.xaml` 合并其主题/控件字典，面板自定义样式直接引用库的主题资源；系统消息变化后重新应用已选主题、强调色与材质策略。`ApplicationThemeManager` / `ApplicationAccentColorManager` 生成深浅色强调色变体。面板保留现有 WindowChrome；设置、项目编辑、名称和确认对话框使用 FluentWindow、无图标标题栏和 Mica；选择纯色或触发系统回退时对话框也使用纯色。设置按快捷键、外观、启动分为卡片行；网站图标和登录自启使用开关，除快捷键需点“应用”外均立即生效。编辑高级选项使用 CardExpander，删除分组使用 WPF-UI 确认框。WPF-UI 滚动条占 14 DIP，布局为它保留空间。
 
-`Run.ps1 -Smoke` 只使用新建的隔离配置，禁止与 `-ConfigDirectory` 混用。自动化检查不修改日常配置或真正的登录启动项。
+验证分为三个独立层级，删除了程序内 smoke 和 `-DesktopSmoke` / `-Smoke` 开关：
+
+| 命令 | 何时运行 | 产物 / 范围 |
+| --- | --- | --- |
+| `scripts/Validate.ps1` | 每次修改，包括沙箱 | 锁定依赖还原、应用与单测 Release 构建（`-warnaserror`）、453 项快速单测；`artifacts/tests/launcher.trx`。目标 ≤40 秒。 |
+| `scripts/E2E.ps1` | UI 改动后，在解锁桌面 | 11 个真实输入用例；`artifacts/e2e/e2e.trx`。评审实测 11/11 通过，125 秒，已接受；保留全部用例。 |
+| `scripts/Snapshots.ps1` | 视觉评审时，在解锁桌面 | 独立 `QuickLaunch.Snapshots` 工具生成 33 张 PNG 和 `artifacts/validation/snapshots.json`；只要求成功渲染，不做行为或像素断言。 |
+
+单测保留配置、VM、解析、图标、几何、资源和 DI 生命周期；E2E 检查原生输入与窗口连接；视觉布局由快照评审。默认验证不构建或运行桌面工具。测试与快照使用隔离配置，不修改日常配置或登录启动项。详细覆盖去向与实测限制见 [测试整合记录](docs/validation/test-consolidation.md)，真实桌面要求见 [E2E 说明](docs/E2E.md)。
+
+`--e2e-launch-log <file>` 必须配合独立 `--config-dir`，将条目启动委托替换为 JSONL 记录器，每行包含 `id`、`name`、`elevated`，不调用 Shell；未提供此开关时正常启动条目。`--exit`、日志、基准和启动测量继续保留。
 
 ## 发布与性能检查
 
@@ -70,6 +98,8 @@ SDK 10.0.401 和 NuGet 缓存位于忽略的 `.tools/`，不会替换系统安�
 
 基准会重复显示/隐藏窗口，使用专用生成数据，不启动条目。后台运行可能没有前台权限；这种情况下焦点确认失败单列，渲染耗时不能冒充完整呼出耗时。首次、预热后、闲置恢复及首次/已访问分组分开记录；不强制 GC 或修剪工作集。
 
-日志和产物：`artifacts/tests/launcher.trx`、`artifacts/validation/smoke-result.json`、`artifacts/validation/window.png`、`artifacts/validation/settings.png`、`artifacts/validation/settings-light.png`、`artifacts/validation/edit-dialog.png`、`artifacts/validation/add-folder.png`、`artifacts/validation/name-dialog.png`、`artifacts/validation/delete-group.png`、`artifacts/benchmarks/`、`artifacts/startup/`、`artifacts/releases/`。对话框另有 `-light.png` 浅色快照；PNG 包含 WPF 标题栏，不含原生 DWM 材质或物理屏幕呈现证据。
+`Snapshots.ps1` 输出 launcher、settings、add-dialog、edit-dialog、name-dialog、icon-picker、item-menu、delete-confirm 的深/浅色 PNG，以及 `appearance-{dark|light}-{blue|purple}-{acrylic|mica|solid}.png`（12 张）、`appearance-settings-{dark|light}-{blue|purple}.png`（4 张）和 `panel-polish.png`。基础深色文件无后缀，浅色使用 `-light`。窗口不激活并固定在整个虚拟桌面外，确认框不进入模态循环，菜单/选择器不打开原生弹出窗口。每张图使用独立进程，6 秒超时后记录失败并继续；脚本默认 90 秒总运行时限（可用 `-TimeoutSeconds` 调整），超时终止渲染器及其工作进程。`snapshots.json` 在开始和每步结束时更新，始终记录 `rendered` / `failed`，以及运行中的 `current`；旧 PNG 不代表本次成功。PNG 为 WPF 合成图，不包含原生 DWM 材质、边框或阴影；原生材质由 E2E 验证。
 
-当前结果、预算未达项和未验证场景见 [M2–M5 实施与验证](docs/validation/M2-M5.md)。[M0](docs/validation/M0.md) 和 [M1](docs/validation/M1.md) 是历史记录。
+性能日志保留在 `artifacts/benchmarks/`、`artifacts/startup/`，发布包在 `artifacts/releases/`。启动测量在无托盘的环境可显式使用 `MeasureStartup.ps1 -AllowUnavailableTray`（对应 `--allow-unavailable-tray`，仅性能模式有效）。基准禁用网站请求，避免网络时间影响测量。
+
+最新验证结果与历史覆盖迁移见 [测试整合记录](docs/validation/test-consolidation.md)。`docs/validation/` 中其他报告是当时的历史记录，不能用作当前 smoke 运行指南。

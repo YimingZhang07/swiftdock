@@ -1,5 +1,7 @@
 # Task 8 — launcher keyboard cues and menu separators
 
+> Historical report: the in-process smoke suite and its commands were retired in Task 19. Use the three tiers and coverage mapping in [test-consolidation.md](test-consolidation.md) for current validation.
+
 Changes build on the previously staged tasks. The git index was not written. No packages or standalone probe programs were added.
 
 ## Behavior

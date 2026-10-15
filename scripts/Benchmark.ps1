@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param([switch]$SingleGroup, [switch]$Interactive, [switch]$Prewarm, [ValidateRange(0,300)][int]$IdleSeconds = 0, [string]$Executable)
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/ReadDiagnostics.ps1"
 $repoRoot = Split-Path $PSScriptRoot -Parent
 $env:DOTNET_ROOT = Join-Path $repoRoot '.tools/dotnet'
 $env:DOTNET_ROOT_X64 = $env:DOTNET_ROOT
@@ -20,7 +21,12 @@ if ($SingleGroup) { $appArguments += ' --single-group' }
 if ($Interactive) { $appArguments += ' --benchmark-interactive' }
 if ($Prewarm) { $appArguments += ' --prewarm' }
 $windowStyle = if ($Interactive) { 'Normal' } else { 'Hidden' }
+$startedAfter = [DateTime]::UtcNow
 $appProcess = Start-Process -FilePath $Executable -ArgumentList $appArguments -WindowStyle $windowStyle -PassThru -Wait
 if ($appProcess.ExitCode -ne 0) { throw "Benchmark failed; inspect $output" }
+$events = @(Read-QuickLaunchSession -Directory $output -ProcessId $appProcess.Id -StartedAfter $startedAfter)
+$startup = $events | Where-Object { $_.EventId.Name -eq 'startup' } | Select-Object -First 1
+if ($null -eq $startup -or $null -eq $startup.processToReadyMs) { throw "Startup CLEF event missing: $output" }
+Write-Output ("Process to ready: {0:N2} ms; UI proxy events: {1}" -f $startup.processToReadyMs, @($events | Where-Object { $_.EventId.Name -eq 'show.ui-proxy' }).Count)
 Get-Content -LiteralPath (Join-Path $output 'benchmark.json') -Raw
 Write-Output "Benchmark output: $output"

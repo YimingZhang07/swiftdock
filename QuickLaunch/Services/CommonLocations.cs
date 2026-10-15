@@ -4,7 +4,7 @@ using QuickLaunch.Interop;
 
 namespace QuickLaunch.Services;
 
-internal enum CommonLocation { Desktop, Downloads, Documents, Pictures, Profile }
+public enum CommonLocation { Desktop, Downloads, Documents, Pictures, Profile }
 
 internal static class CommonLocations
 {

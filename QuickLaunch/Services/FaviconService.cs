@@ -1,12 +1,14 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
-using System.Net;
 using System.Net.Http;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Windows.Media.Imaging;
+using Microsoft.Extensions.Logging;
+using QuickLaunch.Diagnostics;
 
 namespace QuickLaunch.Services;
 
@@ -22,7 +24,7 @@ internal sealed class FaviconService : IDisposable
     private readonly HttpClient _client;
     private readonly bool _ownsClient;
     private readonly string _directory;
-    private readonly DiagnosticLog _log;
+    private readonly ILogger<FaviconService> _log;
     private readonly Func<BitmapSource, int, Task<BitmapSource>> _render;
     private readonly Func<DateTimeOffset> _now;
     private readonly TimeSpan _requestTimeout, _siteTimeout;
@@ -45,7 +47,7 @@ internal sealed class FaviconService : IDisposable
     private sealed record Entry(BitmapSource? Image, DateTimeOffset Expires);
     private sealed record Result(BitmapSource? Source, string Outcome);
 
-    internal FaviconService(string directory, DiagnosticLog log, Func<BitmapSource, int, Task<BitmapSource>> render,
+    internal FaviconService(string directory, ILogger<FaviconService> log, Func<BitmapSource, int, Task<BitmapSource>> render,
         HttpMessageHandler? handler = null, Func<DateTimeOffset>? now = null, TimeSpan? requestTimeout = null, TimeSpan? siteTimeout = null)
     {
         _directory = directory; _log = log; _render = render; _now = now ?? (() => DateTimeOffset.UtcNow);
@@ -214,7 +216,7 @@ internal sealed class FaviconService : IDisposable
         { outcome = "failure"; return new(null, outcome); }
         finally
         {
-            if (watch.IsRunning) _log.Write("favicon.result", new { origin = FaviconParser.Origin(url), outcome, ms = watch.ElapsedMilliseconds });
+            if (watch.IsRunning) _log.FaviconResult(FaviconParser.Origin(url), outcome, watch.ElapsedMilliseconds);
             if (slotHeld) Sites.Release();
             if (siteHeld) site.Gate.Release();
         }

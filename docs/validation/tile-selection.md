@@ -1,5 +1,7 @@
 # Task 10 — ListBox tile selection
 
+> Historical report: the in-process smoke suite and its commands were retired in Task 19. Use the three tiers and coverage mapping in [test-consolidation.md](test-consolidation.md) for current validation.
+
 Implemented on `ui/round2`, starting from `4c30de2`. No packages, standalone probes, or git-index changes.
 
 The tile groups now use single-selection `TileListBox` controls bound directly to `group.Items`. Their template has only an ItemsPresenter and a transparent hit surface; the existing outer Viewer owns scrolling. The WrapPanel retains CellSize slots. Non-focusable ListBoxItem containers contain the icon, label, error badge, and selected/hover/pressed visuals. Only IsSelected draws the accent ring. Tabs and header controls remain Buttons; the import-cancel link remains clickable and is excluded from keyboard focus.

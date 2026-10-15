@@ -90,7 +90,7 @@ public sealed class ItemEditorValidationTests
         var typeface = new Typeface(new FontFamily(font), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
         Assert.True(typeface.TryGetGlyphTypeface(out var glyphs));
         Assert.Contains(font, glyphs.FamilyNames.Values);
-        foreach (int codePoint in new[] { 0xE71D, 0xE8A5, 0xE8B7, 0xE774, 0xE76C, 0xE70D })
+        foreach (int codePoint in new[] { 0xE71D, 0xE8A5, 0xE8B7, 0xE774, 0xE76C, 0xE70D, 0xECC8 })
             Assert.True(glyphs.CharacterToGlyphMap.TryGetValue(codePoint, out ushort glyph) && glyph != 0, $"{font}: U+{codePoint:X4}");
     }
 }

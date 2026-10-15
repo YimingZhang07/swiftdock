@@ -16,9 +16,15 @@
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="gong-wpf-dragdrop" Version="4.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="Serilog.Formatting.Compact" Version="3.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="WPF-UI" Version="4.3.0" />
     <Resource Include="Assets\QuickLaunch.ico" />
     <InternalsVisibleTo Include="QuickLaunch.Tests" />
+    <InternalsVisibleTo Include="QuickLaunch.Snapshots" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="H.NotifyIcon.Wpf" Version="2.4.1" />
   </ItemGroup>

@@ -1,15 +1,17 @@
-using System.Windows;
+using QuickLaunch.ViewModels;
 
 namespace QuickLaunch.Views;
 
 public partial class NameDialog : Wpf.Ui.Controls.FluentWindow
 {
-    public string Value => NameBox.Text.Trim();
-    public NameDialog(string title, string value)
+    public NameDialogViewModel ViewModel { get; }
+    public NameDialog(NameDialogViewModel viewModel)
     {
-        InitializeComponent(); Title = title; NameBox.Text = value;
+        ViewModel = viewModel;
+        InitializeComponent(); DataContext = viewModel;
+        viewModel.Accepted += Accept;
         Loaded += (_, _) => { NameBox.Focus(); NameBox.SelectAll(); };
+        Closed += (_, _) => viewModel.Accepted -= Accept;
     }
-    private void Accept(object sender, RoutedEventArgs e)
-    { if (Value.Length == 0) Error.Text = "请输入名称。"; else DialogResult = true; }
+    private void Accept() => DialogResult = true;
 }

@@ -11,32 +11,6 @@ namespace QuickLaunch.Tests;
 public class PrototypeTests
 {
     [Fact]
-    public void EveryInsertionSlotMatchesRemoveThenInsert()
-    {
-        for (int count = 1; count <= 20; count++)
-        for (int source = 0; source < count; source++)
-        for (int slot = 0; slot <= count; slot++)
-        {
-            var expected = Enumerable.Range(0, count).ToList();
-            expected.Insert(slot, source);
-            expected.RemoveAt(source < slot ? source : source + 1);
-            var actual = Enumerable.Range(0, count).ToList();
-            actual.RemoveAt(source);
-            actual.Insert(ReorderMath.FinalIndex(source, slot, count), source);
-            Assert.Equal(expected, actual);
-        }
-    }
-
-    [Theory]
-    [InlineData(0, 3, 3, 2)] [InlineData(2, 0, 3, 0)] [InlineData(0, 1, 1, 0)]
-    public void MoveBoundaries(int source, int slot, int count, int expected) => Assert.Equal(expected, ReorderMath.FinalIndex(source, slot, count));
-
-    [Theory]
-    [InlineData(1, 1, 6, 0, 0)] [InlineData(45, 1, 6, 10, 1)]
-    [InlineData(1, 90, 6, 10, 6)] [InlineData(450, 450, 6, 10, 10)]
-    public void GridSlots(double x, double y, int columns, int count, int expected) => Assert.Equal(expected, ReorderMath.Slot(x, y, columns, count));
-
-    [Fact]
     public void MalformedStreamsAreRejected()
     {
         Assert.Throws<InvalidDataException>(() => DropParser.DecodeUrl([1], true));

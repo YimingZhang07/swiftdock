@@ -1,10 +1,10 @@
 using System.IO;
-using System.Net;
 using System.Net.Http;
-using System.Text;
+using System.Net;
 using System.Text.Json;
-using System.Windows.Media;
+using System.Text;
 using System.Windows.Media.Imaging;
+using System.Windows.Media;
 using QuickLaunch.Diagnostics;
 using QuickLaunch.Models;
 using QuickLaunch.Services;
@@ -15,10 +15,11 @@ namespace QuickLaunch.Tests;
 public sealed class FaviconTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "QuickLaunch-favicons-" + Guid.NewGuid().ToString("N"));
+    public FaviconTests() => Directory.CreateDirectory(_directory);
     private static readonly Uri Origin = new("https://large.test");
     private static LaunchItem Web(string path = "https://large.test/page?private=yes") => new("Web", path, LaunchKind.Url);
-    private FaviconService Service(DiagnosticLog log, HttpMessageHandler handler, Func<DateTimeOffset>? now = null,
-        TimeSpan? requestTimeout = null, TimeSpan? siteTimeout = null) => new(_directory, log,
+    private FaviconService Service(TestLogging log, HttpMessageHandler handler, Func<DateTimeOffset>? now = null,
+        TimeSpan? requestTimeout = null, TimeSpan? siteTimeout = null) => new(_directory, log.Logger<FaviconService>(),
             (source, size) => Task.FromResult(IconService.RenderFavicon(source, size)), handler, now, requestTimeout, siteTimeout);
 
     [Theory]
@@ -76,14 +77,14 @@ public sealed class FaviconTests : IDisposable
     [Fact]
     public async Task SameOriginItemsShareOneDiscoveryAndCustomOrDisabledMakesNoRequests()
     {
-        await using var log = new DiagnosticLog(_directory);
+        await using var log = new TestLogging();
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var handler = new FaviconFixtureHandler(async (request, token) =>
         {
             entered.TrySetResult(); await release.Task.WaitAsync(token); return FaviconFixtureHandler.Respond(request.RequestUri!);
         });
-        using var icons = new IconService(_directory, log, handler);
+        using var icons = log.CreateIcons(_directory, handler);
         Assert.Null(await icons.GetFaviconAsync(Web() with { Icon = "glyph:E943:#2F6FDB" }, 48));
         Assert.Null(await icons.GetFaviconAsync(Web() with { Icon = "file:C:\\missing.ico" }, 48));
         icons.AutoFetchWebsiteIcons = false;
@@ -108,7 +109,7 @@ public sealed class FaviconTests : IDisposable
     [InlineData(true)] [InlineData(false)]
     public async Task MemoryAndDiskCachesExpireAndRefreshBypassesBoth(bool success)
     {
-        await using var log = new DiagnosticLog(_directory);
+        await using var log = new TestLogging();
         var now = DateTimeOffset.UtcNow;
         Uri url = success ? Origin : new("https://fail.test");
         var handler = new FaviconFixtureHandler();
@@ -144,7 +145,7 @@ public sealed class FaviconTests : IDisposable
     [InlineData("https://user:password@assets.test/icon.png")]
     public async Task ForbiddenRedirectsAreNeverRequested(string location)
     {
-        await using var log = new DiagnosticLog(_directory);
+        await using var log = new TestLogging();
         var handler = new FaviconFixtureHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Redirect) { Headers = { Location = new(location) } }));
         using var service = Service(log, handler);
         Assert.Null(await service.GetAsync(Origin, 48, default));
@@ -182,7 +183,7 @@ public sealed class FaviconTests : IDisposable
     [Fact]
     public async Task ApexRedirectUsesFinalPagesIconAndKeepsOriginalCacheIdentity()
     {
-        await using var log = new DiagnosticLog(_directory);
+        await using var log = new TestLogging();
         var handler = new FaviconFixtureHandler((request, _) => Task.FromResult(request.RequestUri!.AbsoluteUri switch
         {
             "https://large.test/page" => new HttpResponseMessage(HttpStatusCode.Redirect) { Headers = { Location = new("https://www.large.test/moved/page") } },
@@ -207,7 +208,7 @@ public sealed class FaviconTests : IDisposable
     [InlineData("icon.png", "<base href='https://assets.test/'>")]
     public async Task PageReferencedCdnCandidateIsUsed(string href, string basis)
     {
-        await using var log = new DiagnosticLog(_directory);
+        await using var log = new TestLogging();
         var handler = new FaviconFixtureHandler((request, _) => Task.FromResult(request.RequestUri!.AbsoluteUri switch
         {
             "https://large.test/" => FaviconFixtureHandler.Html($"{basis}<link rel=apple-touch-icon href='{href}' sizes=64x64>"),
@@ -224,7 +225,7 @@ public sealed class FaviconTests : IDisposable
     [InlineData("http://[fc00::1]/x.png")] [InlineData("https://user:password@assets.test/x.png")]
     public async Task PublicPageSkipsLocalOrUserinfoCandidates(string target)
     {
-        await using var log = new DiagnosticLog(_directory);
+        await using var log = new TestLogging();
         var handler = new FaviconFixtureHandler((request, _) => Task.FromResult(request.RequestUri!.AbsolutePath == "/"
             ? FaviconFixtureHandler.Html($"<link rel=icon href='{target}'>")
             : FaviconFixtureHandler.Image(FaviconFixtureHandler.Ico(16), "image/x-icon")));
@@ -237,7 +238,7 @@ public sealed class FaviconTests : IDisposable
     [InlineData(false)] [InlineData(true)]
     public async Task EveryPageAndIconRedirectHopKeepsOriginalPublicHostGuard(bool iconRedirect)
     {
-        await using var log = new DiagnosticLog(_directory);
+        await using var log = new TestLogging();
         var handler = new FaviconFixtureHandler((request, _) => Task.FromResult(request.RequestUri!.AbsoluteUri switch
         {
             "https://large.test/" when iconRedirect => FaviconFixtureHandler.Html("<link rel=icon href='https://assets.test/icon.png'>"),
@@ -255,7 +256,7 @@ public sealed class FaviconTests : IDisposable
     [InlineData("http://192.168.1.10/")] [InlineData("http://localhost/")] [InlineData("http://[fd00::10]/")]
     public async Task IntranetItemCanLoadItsOwnFallback(string address)
     {
-        await using var log = new DiagnosticLog(_directory);
+        await using var log = new TestLogging();
         var handler = new FaviconFixtureHandler((request, _) => Task.FromResult(request.RequestUri!.AbsolutePath == "/"
             ? FaviconFixtureHandler.Html("") : FaviconFixtureHandler.Image(FaviconFixtureHandler.Ico(16), "image/x-icon")));
         using var service = Service(log, handler);
@@ -267,7 +268,7 @@ public sealed class FaviconTests : IDisposable
     [InlineData("html", true)] [InlineData("html", false)] [InlineData("text", false)] [InlineData("404", false)]
     public async Task FallbacksTryFinalOriginBeforeOriginalEvenWithoutHtml(string pageType, bool finalIconExists)
     {
-        await using var log = new DiagnosticLog(_directory);
+        await using var log = new TestLogging();
         var handler = new FaviconFixtureHandler((request, _) => Task.FromResult(request.RequestUri!.AbsoluteUri switch
         {
             "https://large.test/" => new HttpResponseMessage(HttpStatusCode.Redirect) { Headers = { Location = new("https://www.large.test/page") } },
@@ -289,7 +290,7 @@ public sealed class FaviconTests : IDisposable
     [Fact]
     public async Task HttpsPageMayRedirectToHttpWithoutCookiesOrUserinfo()
     {
-        await using var log = new DiagnosticLog(_directory);
+        await using var log = new TestLogging();
         var handler = new FaviconFixtureHandler((request, _) =>
         {
             Assert.False(request.Headers.Contains("Cookie"));
@@ -310,7 +311,7 @@ public sealed class FaviconTests : IDisposable
     [Fact]
     public async Task RedirectLimitAndFinalResponseRelativeResolutionAreEnforced()
     {
-        await using var log = new DiagnosticLog(_directory);
+        await using var log = new TestLogging();
         var handler = new FaviconFixtureHandler((request, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Redirect)
         { Headers = { Location = new(request.RequestUri!, "next") } }));
         using (var service = Service(log, handler))
@@ -335,7 +336,7 @@ public sealed class FaviconTests : IDisposable
     [Fact]
     public async Task OnlyHtmlIsParsedAndOnlyImagesAreDecoded()
     {
-        await using var log = new DiagnosticLog(_directory);
+        await using var log = new TestLogging();
         var handler = new FaviconFixtureHandler((request, _) => Task.FromResult(request.RequestUri!.AbsolutePath == "/"
             ? FaviconFixtureHandler.Image(Encoding.UTF8.GetBytes("<link rel=icon href=/secret.png>"), "text/plain")
             : FaviconFixtureHandler.Image(FaviconFixtureHandler.Png(64), "application/octet-stream")));
@@ -347,7 +348,7 @@ public sealed class FaviconTests : IDisposable
     [Fact]
     public async Task UndecodableCandidatesFallThroughToIcoAndFirstDecodedCandidateWins()
     {
-        await using var log = new DiagnosticLog(_directory);
+        await using var log = new TestLogging();
         var handler = new FaviconFixtureHandler((request, _) => Task.FromResult(request.RequestUri!.AbsolutePath switch
         {
             "/" => FaviconFixtureHandler.Html("<link rel=icon href=/vector.svg sizes=any><link rel=icon href=/bad.webp sizes=48x48><link rel=icon href=/good.png sizes=64x64><link rel=icon href=/later.png sizes=128x128>"),
@@ -374,7 +375,7 @@ public sealed class FaviconTests : IDisposable
     [Fact]
     public async Task RefreshCancelsOldDiscoveryAndSerializesItsReplacement()
     {
-        await using var log = new DiagnosticLog(_directory);
+        await using var log = new TestLogging();
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         int requests = 0, active = 0, maximum = 0;
         var handler = new FaviconFixtureHandler(async (request, token) =>
@@ -401,7 +402,7 @@ public sealed class FaviconTests : IDisposable
     [Fact]
     public async Task DiscoveryLogsOnceWithOriginAndNeverQueryOrPagePath()
     {
-        var log = new DiagnosticLog(_directory);
+        var log = new TestLogging();
         var handler = new FaviconFixtureHandler((request, _) => Task.FromResult(request.RequestUri!.Host switch
         {
             "large.test" => new HttpResponseMessage(HttpStatusCode.Redirect) { Headers = { Location = new("https://www.large.test/private-page?redirect-token=456") } },
@@ -415,13 +416,14 @@ public sealed class FaviconTests : IDisposable
             Assert.NotNull(await service.GetAsync(url, 48, default));
         }
         await log.DisposeAsync();
-        string line = Assert.Single(File.ReadAllLines(log.FilePath), l => l.Contains("favicon.result", StringComparison.Ordinal));
+        string line = TestLogging.Clef(Assert.Single(log.Events));
         Assert.Equal(3, handler.Requests.Count);
         Assert.DoesNotContain("private-page", line); Assert.DoesNotContain("secret-token", line);
         Assert.DoesNotContain("redirect-token", line); Assert.DoesNotContain("cdn-token", line);
         Assert.DoesNotContain("www.large.test", line); Assert.DoesNotContain("assets.test", line);
         using var json = JsonDocument.Parse(line);
-        var data = json.RootElement.GetProperty("data");
+        var data = json.RootElement;
+        Assert.Equal("favicon.result", data.GetProperty("EventId").GetProperty("Name").GetString());
         Assert.Equal("https://large.test", data.GetProperty("origin").GetString());
         Assert.Equal("success", data.GetProperty("outcome").GetString());
         Assert.True(data.GetProperty("ms").GetInt64() >= 0);
@@ -431,7 +433,7 @@ public sealed class FaviconTests : IDisposable
     [InlineData(false)] [InlineData(true)]
     public async Task ByteLimitsApplyEvenWithoutContentLength(bool declaredLength)
     {
-        await using var log = new DiagnosticLog(_directory);
+        await using var log = new TestLogging();
         var html = new CountedStream(Encoding.UTF8.GetBytes(new string(' ', FaviconService.HtmlLimit) + "<link rel=icon href=/too-late.png>"));
         var image = new CountedStream(new byte[FaviconService.ImageLimit + 100]);
         var handler = new FaviconFixtureHandler((request, _) =>
@@ -453,7 +455,7 @@ public sealed class FaviconTests : IDisposable
     [InlineData(false)] [InlineData(true)]
     public async Task RequestAndSiteTimeoutsAreCached(bool overall)
     {
-        await using var log = new DiagnosticLog(_directory);
+        await using var log = new TestLogging();
         var handler = new FaviconFixtureHandler(async (_, cancellation) =>
         {
             await Task.Delay(Timeout.Infinite, cancellation); return new(HttpStatusCode.OK);
@@ -467,7 +469,7 @@ public sealed class FaviconTests : IDisposable
     [Fact]
     public async Task TurningOffCancelsDiscoveryWithoutCachingCancellation()
     {
-        await using var log = new DiagnosticLog(_directory);
+        await using var log = new TestLogging();
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var handler = new FaviconFixtureHandler(async (_, token) =>
         {
@@ -483,7 +485,7 @@ public sealed class FaviconTests : IDisposable
     [Fact]
     public async Task AtMostFourSitesAreActiveAndDifferentSizesSharePendingOriginDiscovery()
     {
-        await using var log = new DiagnosticLog(_directory);
+        await using var log = new TestLogging();
         var four = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         int active = 0, maximum = 0;

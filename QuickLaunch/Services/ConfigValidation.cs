@@ -73,6 +73,8 @@ public static class ConfigValidation
         bool sized = ValidSize(config.WindowWidth) && ValidSize(config.WindowHeight);
         bool positioned = config.WindowLeft is >= -100000 and <= 100000 && config.WindowTop is >= -100000 and <= 100000;
         return config with { HideOnDeactivate = false, AutoFetchWebsiteIcons = config.AutoFetchWebsiteIcons == false ? false : null,
+            Theme = AppearanceOptions.NormalizeTheme(config.Theme), Backdrop = AppearanceOptions.NormalizeBackdrop(config.Backdrop),
+            Accent = AppearanceOptions.NormalizeAccent(config.Accent),
             WindowWidth = sized ? config.WindowWidth : null,
             WindowLeft = positioned ? config.WindowLeft : null, WindowTop = positioned ? config.WindowTop : null,
             Placement = config.Placement == "cursor" ? "cursor" : null,

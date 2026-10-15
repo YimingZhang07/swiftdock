@@ -18,7 +18,7 @@ internal static class BenchmarkRunner
             Path.Combine(directory, "fixture.lnk"), directory, Path.Combine(directory, "fixture.txt"), "https://example.com"];
         LaunchKind[] kinds = [LaunchKind.App, LaunchKind.App, LaunchKind.Folder, LaunchKind.File, LaunchKind.Url];
         for (int i = 0; i < 200; i++) groups[singleGroup ? 0 : i / 50].Items.Add(new($"项目 {i + 1:000}", paths[i % 5], kinds[i % 5], i % 5 == 0 ? $"--sample={i}" : ""));
-        return new() { Groups = groups, LastGroupId = groups[0].Id };
+        return new() { AutoFetchWebsiteIcons = false, Groups = groups, LastGroupId = groups[0].Id };
     }
 
     private static object Statistics(List<double> values) => new
@@ -72,7 +72,7 @@ internal static class BenchmarkRunner
         double? idle = null;
         if (idleSeconds > 0)
         {
-            window.Log.Write("benchmark.idle-start", new { idleSeconds });
+            window.Log.BenchmarkIdle(idleSeconds);
             await Task.Delay(TimeSpan.FromSeconds(idleSeconds));
             window.ShowPanel("benchmark-idle"); idle = await window.PendingShow; window.HidePanel();
         }

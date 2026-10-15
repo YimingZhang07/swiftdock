@@ -80,4 +80,16 @@ public sealed class AppIconTests
         Assert.InRange(bitmap.GetPixel(0, 0).A, 0, 8);
         Assert.Equal(255, bitmap.GetPixel(expected / 2, expected / 2).A);
     }
+
+    [Fact]
+    public void TrayConstructionDisablesLeftClickDelay()
+    {
+        // Check the production initializer without requiring Explorer's notification area.
+        // Construction policy is checked without creating a tray window.
+        var assembly = typeof(AppIconTests).Assembly;
+        string name = assembly.GetManifestResourceNames().Single(n => n.EndsWith(".App.xaml.cs", StringComparison.Ordinal));
+        using var stream = assembly.GetManifestResourceStream(name)!;
+        using var reader = new StreamReader(stream);
+        Assert.Matches(@"_tray\s*=\s*new TaskbarIcon\s*\{[^}]*\bNoLeftClickDelay\s*=\s*true\b", reader.ReadToEnd());
+    }
 }

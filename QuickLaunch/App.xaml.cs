@@ -1,36 +1,40 @@
 using System.IO;
 using System.Security.Principal;
-using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Interop;
+using System.Windows;
 using CommunityToolkit.Mvvm.Input;
 using H.NotifyIcon;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using QuickLaunch.Diagnostics;
 using QuickLaunch.Models;
 using QuickLaunch.Services;
 using QuickLaunch.ViewModels;
 using QuickLaunch.Views;
+using Serilog;
 
 namespace QuickLaunch;
 
 public partial class App : Application
 {
-    private DiagnosticLog? _log;
+    private ILogger<App> _log = NullLogger<App>.Instance;
+    private IHost? _host;
+    private Serilog.Core.Logger? _sessionLogger;
+    private Task? _loggingInitialization;
+    private Task? _disposeTask;
     private LauncherWindow? _window;
-    private SettingsWindow? _settings;
+    private IDialogService? _dialogs;
     private HotkeyService? _hotkey;
     private TaskbarIcon? _tray;
     private System.Drawing.Icon? _trayIcon;
     private SingleInstanceService? _instance;
     private ConfigService? _store;
     private MainViewModel? _viewModel;
-    private IconService? _icons;
-    private ThemeService? _theme;
     private StartupService? _startup;
     private volatile bool _exiting;
-    private bool _pendingShow, _smoke;
-    public int InstanceShowRequests { get; private set; }
-    internal TaskbarIcon? Tray => _tray;
+    private bool _pendingShow, _performanceRun;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -38,11 +42,14 @@ public partial class App : Application
         bool benchmark = e.Args.Contains("--benchmark");
         bool startupProbe = e.Args.Contains("--startup-probe");
         bool exitRequested = e.Args.Contains("--exit");
-        _smoke = e.Args.Contains("--smoke-test") || benchmark || startupProbe;
+        _performanceRun = benchmark || startupProbe;
         try
         {
             string? explicitConfig = Argument(e.Args, "--config-dir");
-            if (_smoke && explicitConfig is null) throw new ArgumentException("冒烟检查必须指定独立 --config-dir，禁止修改用户配置。");
+            string? launchLog = Argument(e.Args, "--e2e-launch-log");
+            if (launchLog is not null && explicitConfig is null)
+                throw new ArgumentException("--e2e-launch-log requires an isolated --config-dir.");
+            if (_performanceRun && explicitConfig is null) throw new ArgumentException("性能检查必须指定独立 --config-dir，禁止修改用户配置。");
             var paths = DataPaths.Resolve(explicitConfig, Argument(e.Args, "--diagnostics-dir"));
             if (exitRequested)
             {
@@ -52,7 +59,7 @@ public partial class App : Application
             bool readOnly = false;
             if (!DataPaths.CanWrite(paths.ConfigDirectory))
             {
-                if (_smoke) readOnly = true;
+                if (_performanceRun) readOnly = true;
                 else
                 {
                     var answer = MessageBox.Show("所选配置目录不可写。\n是：使用默认目录\n否：只读运行\n取消：退出", "QuickLaunch", MessageBoxButton.YesNoCancel);
@@ -66,7 +73,6 @@ public partial class App : Application
                 if (!Dispatcher.HasShutdownStarted) Dispatcher.BeginInvoke(() =>
                 {
                     if (_exiting) return;
-                    InstanceShowRequests++;
                     if (_window is null) _pendingShow = true;
                     else ShowMain("second-instance");
                 });
@@ -83,12 +89,6 @@ public partial class App : Application
                     return;
                 }
             }
-            try { _log = new(paths.LogDirectory); }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                _log = new(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "QuickLaunch", "logs"));
-                _log.Write("log.fallback", new { ex.Message });
-            }
             if (benchmark)
             {
                 string file = Path.Combine(paths.ConfigDirectory, "config.json");
@@ -96,35 +96,55 @@ public partial class App : Application
                 new AtomicConfigWriter().Write(file, System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
                     BenchmarkRunner.CreateConfig(paths.ConfigDirectory, e.Args.Contains("--single-group")), ConfigJsonContext.Default.AppConfig));
             }
-            _store = ConfigService.Open(paths.ConfigDirectory, readOnly);
-            _viewModel = new(_store);
-            _theme = new(Dispatcher);
-            _startup = new(Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "QuickLaunch.exe"), paths.ConfigDirectory);
-            _icons = new(_smoke ? Path.Combine(paths.LogDirectory, "icons") : paths.IconDirectory, _log, _smoke ? new FaviconFixtureHandler() : null);
-            _window = new(_log, _viewModel, _icons) { SettingsRequested = OpenSettings };
-            MainWindow = _window;
-            _window.InitializeNative(_theme);
-            _hotkey = new(new WindowInteropHelper(_window).Handle, () =>
+            // Keep host/logging/DI construction after the client-only exit and instance paths.
+            var hostWatch = System.Diagnostics.Stopwatch.StartNew();
+            var diagnostics = new LoggingDiagnostics();
+            // Logger initialization and empty-host setup are independent. Neither creates
+            // a WPF service; the first file sink is still created by Serilog's batch worker.
+            _loggingInitialization = Task.Run(() => _sessionLogger = SessionLogging.Create(paths.LogDirectory, diagnostics));
+            var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings
+            {
+                ApplicationName = typeof(App).Assembly.GetName().Name,
+                ContentRootPath = AppContext.BaseDirectory
+            });
+            double emptyBuilderMs = hostWatch.Elapsed.TotalMilliseconds;
+            builder.Services.AddSingleton(diagnostics);
+            builder.Services.AddLauncher(paths, readOnly, _performanceRun, launchLog, Dispatcher, _instance, OpenSettings, () =>
             {
                 if (_exiting) return;
-                if (_settings?.IsVisible == true) _settings.Activate();
-                else _window.Toggle();
-            }, _viewModel.Hotkey);
-            _log.Write("hotkey.registered", new { _hotkey.Registered, _hotkey.Error, hotkey = _viewModel.HotkeyDisplay });
-            bool trayAvailable = true;
+                if (_dialogs?.ActivateSettings() != true) _window?.Toggle();
+            }, UpdateTrayText, () => ExitAsync());
+            await _loggingInitialization;
+            if (_exiting) return; // An IPC/OS exit may have arrived during initialization.
+            builder.Services.AddSerilog(_sessionLogger!, dispose: false);
+            double registrationMs = hostWatch.Elapsed.TotalMilliseconds;
+            _host = builder.Build();
+            _host.Services.GetRequiredService<SingleInstanceService>();
+            _instance = null; // The host now owns the lease, including failed startup cleanup.
+            _log = _host.Services.GetRequiredService<ILogger<App>>();
+            await _host.StartAsync();
+            double hostStartedMs = hostWatch.Elapsed.TotalMilliseconds;
+            _window = _host.Services.GetRequiredService<LauncherWindow>();
+            _store = _host.Services.GetRequiredService<ConfigService>();
+            _viewModel = _host.Services.GetRequiredService<MainViewModel>();
+            _startup = _host.Services.GetRequiredService<StartupService>();
+            _dialogs = _host.Services.GetRequiredService<IDialogService>();
+            MainWindow = _window;
+            _hotkey = _host.Services.GetRequiredService<HotkeyService>();
+            _log.HotkeyRegistered(_hotkey.Registered, _hotkey.Error, _viewModel.HotkeyDisplay);
             try { CreateTray(); }
-            catch (InvalidOperationException ex) when (e.Args.Contains("--smoke-test"))
+            catch (InvalidOperationException ex) when (_performanceRun && e.Args.Contains("--allow-unavailable-tray"))
             {
-                trayAvailable = false;
-                _log.Write("smoke.tray-unavailable", new { ex.Message });
+                _log.TrayUnavailable(LogPrivacy.Message(ex.Message));
             }
             _ = _window.LoadIconsAsync();
             using var identity = WindowsIdentity.GetCurrent();
             using var process = System.Diagnostics.Process.GetCurrentProcess();
             bool elevated = new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
-            _log.Write("startup", new { runtime = Environment.Version.ToString(), os = Environment.OSVersion.VersionString,
-                elevated, milestone = $"v{typeof(App).Assembly.GetName().Version?.ToString(3)}", processToReadyMs = (DateTime.UtcNow - process.StartTime.ToUniversalTime()).TotalMilliseconds,
-                configDirectory = paths.ConfigDirectory, _store.IsReadOnly, _store.Notice });
+            _log.Startup(Environment.Version.ToString(), Environment.OSVersion.VersionString, elevated,
+                $"v{typeof(App).Assembly.GetName().Version?.ToString(3)}", (DateTime.UtcNow - process.StartTime.ToUniversalTime()).TotalMilliseconds,
+                paths.ConfigDirectory, _store.IsReadOnly, _store.Notice is null ? null : LogPrivacy.Message(_store.Notice));
+            _log.HostTiming(emptyBuilderMs, registrationMs - emptyBuilderMs, hostStartedMs - registrationMs);
             var notices = new List<string>();
             if (_store.Notice is not null) notices.Add(_store.Notice);
             if (elevated) notices.Add("当前以管理员权限运行；请用普通权限重启以接收外部拖入。");
@@ -141,19 +161,14 @@ public partial class App : Application
                 await BenchmarkRunner.RunAsync(_window, paths.LogDirectory, idle, e.Args.Contains("--benchmark-interactive"), e.Args.Contains("--prewarm"));
                 await ExitAsync();
             }
-            else if (_smoke)
-            {
-                bool passed = await PrototypeSmoke.RunAsync(_window, _hotkey, _store, this, paths.LogDirectory, trayAvailable);
-                await ExitAsync(passed ? 0 : 1);
-            }
             else if (!e.Args.Contains("--silent") || _pendingShow) ShowMain(_pendingShow ? "pending-instance" : "startup");
             else _ = Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ContextIdle, () => _ = _window.PrewarmAsync());
             _pendingShow = false;
         }
         catch (Exception ex)
         {
-            _log?.Write("startup.failed", new { ex.Message, type = ex.GetType().Name });
-            if (!_smoke && !exitRequested) MessageBox.Show(ex is OperationCanceledException ? "已有实例未及时响应，请稍后重新启动。" : ex.Message, "QuickLaunch 无法启动");
+            _log.StartupFailed(LogPrivacy.Message(ex.Message), ex.GetType().Name);
+            if (!_performanceRun && !exitRequested) MessageBox.Show(ex is OperationCanceledException ? "已有实例未及时响应，请稍后重新启动。" : ex.Message, "QuickLaunch 无法启动");
             await ExitAsync(1);
         }
     }
@@ -169,30 +184,12 @@ public partial class App : Application
     private void ShowMain(string source)
     {
         if (_exiting) return;
-        if (_settings?.IsVisible == true) _settings.Activate();
-        else _window?.ShowPanel(source);
+        if (_dialogs?.ActivateSettings() != true) _window?.ShowPanel(source);
     }
 
     public void OpenSettings()
     {
-        if (_exiting || _window is null || _viewModel is null || _store is null || _hotkey is null) return;
-        if (_window.HasOpenEditor) { _window.ShowPanel("existing-editor"); return; }
-        if (_settings is not null) { _settings.Activate(); return; }
-        if (!_window.IsVisible) _window.ShowPanel("settings");
-        _window.SetSettingsOpen(true);
-        _settings = new(_viewModel, _store.DirectoryPath,
-            _hotkey.Registered ? $"当前已注册：{_hotkey.Current!.Display}" : $"注册失败，错误码 {_hotkey.Error}；请选择其他组合。",
-            candidate =>
-            {
-                if (!_viewModel.CanEdit) return ("配置只读，未修改。", true);
-                if (!_hotkey.TryChange(candidate)) return ($"新组合被占用或不可用（{_hotkey.Error}）；原有热键和配置已保留。", true);
-                _viewModel.ApplySettings(candidate);
-                UpdateTrayText();
-                _log?.Write("hotkey.changed", new { hotkey = candidate.Display });
-                return ("已应用，配置将自动保存。", false);
-            }, _startup!, _window.ResetWindowSize, () => _ = ExitAsync(), !_hotkey.Registered) { Owner = _window };
-        _settings.Closed += (_, _) => { _settings = null; _window.SetSettingsOpen(false); };
-        _settings.Show();
+        if (!_exiting && _window is not null) _dialogs?.ShowSettings(_window);
     }
 
     private void UpdateTrayText()
@@ -219,7 +216,7 @@ public partial class App : Application
         menu.Items.Add(startupItem);
         menu.Items.Add(new Separator());
         menu.Items.Add(new MenuItem { Header = "退出", Command = new RelayCommand(() => _ = ExitAsync()) });
-        _tray = new TaskbarIcon { ContextMenu = menu,
+        _tray = new TaskbarIcon { ContextMenu = menu, NoLeftClickDelay = true,
             LeftClickCommand = new RelayCommand(() => ShowMain("tray")) };
         UpdateTrayIcon();
         _tray.TrayIcon.MessageWindow.DpiChanged += TrayDisplayChanged;
@@ -227,7 +224,7 @@ public partial class App : Application
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged += TrayDisplayChanged;
         UpdateTrayText();
         _tray.ForceCreate(enablesEfficiencyMode: false);
-        _log!.Write("tray.created");
+        _log.TrayCreated();
     }
 
     private void UpdateTrayIcon()
@@ -263,7 +260,7 @@ public partial class App : Application
     {
         if (_exiting) return;
         _exiting = true;
-        _settings?.Close();
+        _dialogs?.CloseSettings();
         _window?.PrepareExit();
         _viewModel?.Suspend(true);
         if (_viewModel is not null)
@@ -273,8 +270,8 @@ public partial class App : Application
                 try { await _viewModel.FlushAsync(); break; }
                 catch (Exception ex)
                 {
-                    _log?.Write("save.exit-failed", new { ex.Message });
-                    if (_smoke) { code = 1; break; }
+                    _log.SaveExitFailed(LogPrivacy.Message(ex.Message));
+                    if (_performanceRun) { code = 1; break; }
                     var answer = MessageBox.Show($"配置尚未保存：{ex.Message}\n是：重试\n否：放弃未保存修改并退出\n取消：返回程序", "QuickLaunch", MessageBoxButton.YesNoCancel);
                     if (answer == MessageBoxResult.Yes) continue;
                     if (answer == MessageBoxResult.No) break;
@@ -285,18 +282,8 @@ public partial class App : Application
                 }
             }
         }
-        _hotkey?.Dispose();
-        DisposeTray();
-        _icons?.Dispose();
-        _theme?.Dispose();
-        if (_store is not null) await _store.DisposeAsync();
-        if (_instance is not null) await _instance.DisposeAsync();
-        if (_log is not null)
-        {
-            _log.Write("shutdown", new { code, savedRevision = _store?.SavedRevision });
-            try { await _log.DisposeAsync(); } catch (TimeoutException) { }
-        }
-        _window?.Close();
+        _log.Shutdown(code, _store?.SavedRevision);
+        await DisposeServicesAsync();
         Shutdown(code);
     }
 
@@ -313,12 +300,55 @@ public partial class App : Application
                 // This completion depends only on the IO worker, never the UI dispatcher.
                 // OS shutdown gets a bounded best-effort flush, unlike normal async exit.
                 bool saved = _store.SaveAsync(_viewModel.Snapshot(), _viewModel.Revision).Wait(TimeSpan.FromMilliseconds(800));
-                _log?.Write("session-ending", new { saved });
+                _log.SessionEnding(saved);
             }
-            catch (Exception ex) { _log?.Write("session-ending.failed", new { ex.Message }); }
+            catch (Exception ex) { _log.SessionEndingFailed(LogPrivacy.Message(ex.Message)); }
         }
-        _hotkey?.Dispose();
+        _dialogs?.CloseSettings();
+        // UI-affine disposal runs first, before the async config/IPC/log drains.
+        // The remaining continuations never require this dispatcher during OS shutdown.
+        try { DisposeServicesAsync().Wait(TimeSpan.FromSeconds(2)); }
+        catch (AggregateException) { }
+    }
+
+    private Task DisposeServicesAsync() => _disposeTask ??= DisposeCoreAsync();
+
+    private async Task DisposeCoreAsync()
+    {
         DisposeTray();
-        // Do not cancel OS shutdown or await IPC/logging indefinitely; OS releases remaining handles.
+        try
+        {
+            if (_host is not null)
+            {
+                try { await _host.StopAsync().ConfigureAwait(false); }
+                finally { await ((IAsyncDisposable)_host).DisposeAsync().ConfigureAwait(false); }
+            }
+        }
+        finally
+        {
+            if (_instance is not null) await _instance.DisposeAsync().ConfigureAwait(false);
+            // A failure while setting up the builder can precede the logger's completion.
+            if (_loggingInitialization is not null)
+            {
+                try { await _loggingInitialization.ConfigureAwait(false); }
+                catch (Exception) { /* Initialization failure was handled by startup. */ }
+            }
+            if (_sessionLogger is not null) await _sessionLogger.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        // Covers Application.Shutdown as well as the normal async exit and session end.
+        _exiting = true;
+        if (_disposeTask is null)
+        {
+            _dialogs?.CloseSettings();
+            _window?.PrepareExit();
+            _viewModel?.Suspend(true);
+        }
+        try { DisposeServicesAsync().Wait(TimeSpan.FromSeconds(2)); }
+        catch (AggregateException) { }
+        base.OnExit(e);
     }
 }

@@ -1,0 +1,138 @@
+using System.Diagnostics;
+using System.IO;
+using System.Text.Json;
+
+namespace QuickLaunch.Snapshots;
+
+internal static class SnapshotRunner
+{
+    internal const int ImageTimeoutSeconds = 6;
+    internal const string CaptureDescription = "96-DPI WPF rendering, composited on ApplicationBackgroundBrush; no DWM material, native border or shadow.";
+    private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true };
+
+    [STAThread]
+    private static int Main(string[] args)
+    {
+        if (args.Length != 1 && (args.Length != 3 || args[1] != "--image"))
+        { Console.Error.WriteLine("Usage: QuickLaunch.Snapshots <output-directory> [--image <filename.png>]"); return 1; }
+        string output = Path.GetFullPath(args[0]);
+        Directory.CreateDirectory(output);
+        var plan = CreatePlan();
+        if (args.Length == 3)
+        {
+            var image = plan.SingleOrDefault(image => image.File == args[2]);
+            if (image is null) { Console.Error.WriteLine("Unknown snapshot image."); return 1; }
+            try { return ImageRenderer.Run(output, image); }
+            catch (Exception error) { Console.Error.WriteLine(error); return 1; }
+        }
+
+        // No WPF dispatcher here: even a synchronous layout/native/dialog hang
+        // cannot stop the deadline or prevent the next image from being attempted.
+        var report = new SnapshotReport { Expected = plan.Select(image => image.File).ToArray() };
+        try
+        {
+            SaveReport(output, report);
+            using var processJob = new RenderProcessJob();
+            foreach (var image in plan)
+            {
+                report.Current = image.File;
+                SaveReport(output, report); // Durable progress before starting the worker.
+                try
+                {
+                    File.Delete(Path.Combine(output, image.File)); // Never accept a stale PNG.
+                    RenderInWorker(output, image.File);
+                    if (!File.Exists(Path.Combine(output, image.File))) throw new IOException("Worker did not render a PNG.");
+                    report.Rendered.Add(image.File);
+                }
+                catch (Exception error) { report.Failed.Add(new(image.File, error.Message)); }
+                report.Current = null;
+                SaveReport(output, report);
+            }
+        }
+        catch (Exception error)
+        {
+            Console.Error.WriteLine(error);
+            foreach (string file in report.Expected.Except(report.Rendered).Except(report.Failed.Select(f => f.Image).OfType<string>()))
+                report.Failed.Add(new(file, "Batch stopped: " + error.Message));
+            if (report.Failed.Count == 0) report.Failed.Add(new(null, error.Message));
+        }
+        finally
+        {
+            report.Current = null;
+            report.Completed = true;
+            SaveReport(output, report);
+        }
+        Console.WriteLine($"Rendered {report.Rendered.Count}; failed {report.Failed.Count}. See snapshots.json.");
+        return report.Failed.Count == 0 ? 0 : 1;
+    }
+
+    private static void RenderInWorker(string output, string file)
+    {
+        var start = new ProcessStartInfo(Environment.ProcessPath!)
+        {
+            UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden,
+            RedirectStandardError = true
+        };
+        start.ArgumentList.Add(output); start.ArgumentList.Add("--image"); start.ArgumentList.Add(file);
+        using var worker = Process.Start(start) ?? throw new IOException("Could not start image renderer.");
+        Task<string> error = worker.StandardError.ReadToEndAsync();
+        try
+        {
+            if (!worker.WaitForExit(ImageTimeoutSeconds * 1000))
+            {
+                worker.Kill(entireProcessTree: true); worker.WaitForExit(2000);
+                string phase = error.Wait(1000) ? error.Result.Trim() : "Worker output unavailable.";
+                throw new TimeoutException($"{file}: exceeded {ImageTimeoutSeconds} seconds (including setup, render and cleanup). {phase}");
+            }
+            if (worker.ExitCode != 0)
+                throw new IOException(error.Wait(1000) ? error.Result.Trim() : $"Renderer exited with code {worker.ExitCode}.");
+        }
+        finally
+        {
+            // Termination releases every HWND if the dispatcher cannot close it.
+            if (!worker.HasExited) { worker.Kill(entireProcessTree: true); worker.WaitForExit(2000); }
+        }
+    }
+
+    private static void SaveReport(string output, SnapshotReport report)
+    {
+        report.UpdatedAt = DateTimeOffset.Now;
+        string path = Path.Combine(output, "snapshots.json");
+        File.WriteAllText(path + ".tmp", JsonSerializer.Serialize(report, Json));
+        File.Move(path + ".tmp", path, overwrite: true);
+    }
+
+    internal static List<SnapshotImage> CreatePlan()
+    {
+        List<SnapshotImage> images = [];
+        foreach (string theme in new[] { "dark", "light" })
+        foreach (string kind in new[] { "launcher", "settings", "name-dialog", "add-dialog", "edit-dialog", "icon-picker", "item-menu", "delete-confirm" })
+            images.Add(new(kind + (theme == "dark" ? "" : "-light") + ".png", kind, theme));
+        foreach (string theme in new[] { "dark", "light" })
+        foreach (string accent in new[] { "blue", "purple" })
+        foreach (string backdrop in new[] { "acrylic", "mica", "solid" })
+        {
+            images.Add(new($"appearance-{theme}-{accent}-{backdrop}.png", "launcher", theme, accent, backdrop, Selected: true));
+            if (backdrop == "solid") images.Add(new($"appearance-settings-{theme}-{accent}.png", "settings", theme, accent));
+        }
+        images.Add(new("panel-polish.png", "launcher", "dark", Selected: true));
+        return images;
+    }
+
+    private sealed class SnapshotReport
+    {
+        public string[] Expected { get; init; } = [];
+        public List<string> Rendered { get; } = [];
+        public List<SnapshotFailure> Failed { get; } = [];
+        public string? Current { get; set; }
+        public bool Completed { get; set; }
+        public bool TimedOut { get; set; }
+        public DateTimeOffset GeneratedAt { get; } = DateTimeOffset.Now;
+        public DateTimeOffset UpdatedAt { get; set; }
+        public int ImageTimeoutSeconds => SnapshotRunner.ImageTimeoutSeconds;
+        public string Capture => CaptureDescription;
+    }
+    private sealed record SnapshotFailure(string? Image, string Error);
+}
+
+internal sealed record SnapshotImage(string File, string Kind, string Theme, string Accent = "blue", string Backdrop = "solid", bool Selected = false);

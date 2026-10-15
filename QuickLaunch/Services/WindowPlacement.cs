@@ -15,7 +15,7 @@ public static class WindowPlacement
     internal sealed record Desktop(IReadOnlyList<Monitor> Monitors, Point Cursor);
 
     // WPF-UI's UiScrollBar reserves 14 DIP, including its 12 DIP hover track.
-    public const double HeaderHeight = 44, ContentPadding = 12, ScrollBarWidth = 14;
+    public const double HeaderHeight = 48, ContentPadding = 16, ScrollBarWidth = 14;
     public static GridLength HeaderRowHeight => new(HeaderHeight);
     public static Thickness ContentMargin => new(ContentPadding);
     // Two extra DIPs cover layout rounding at fractional monitor scales.

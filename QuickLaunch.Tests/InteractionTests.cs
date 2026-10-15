@@ -127,6 +127,16 @@ public sealed class InteractionTests
         vm.SetWindowSize(null);
         Assert.Equal(revision + 2, vm.Revision);
         Assert.Null(vm.WindowSize); Assert.Null(vm.Snapshot().WindowWidth); Assert.Null(vm.Snapshot().WindowHeight);
+        vm.SetWindowPosition(new(-120, 240));
+        Assert.Equal(revision + 3, vm.Revision);
+        Assert.Equal(-120, vm.Snapshot().WindowLeft); Assert.Equal(240, vm.Snapshot().WindowTop);
+        vm.SetWindowPosition(new(-120, 240));
+        Assert.Equal(revision + 3, vm.Revision);
+        vm.SetWindowPosition(null);
+        Assert.Equal(revision + 4, vm.Revision);
+        Assert.Null(vm.Snapshot().WindowLeft); Assert.Null(vm.Snapshot().WindowTop);
+        vm.SetWindowPosition(null); vm.SetWindowSize(null);
+        Assert.Equal(revision + 4, vm.Revision);
     });
 
     [Fact]
@@ -135,6 +145,8 @@ public sealed class InteractionTests
         long revision = vm.Revision;
         vm.SetWindowSize(new(720, 500));
         Assert.Equal(new Size(720, 500), vm.WindowSize);
+        vm.SetWindowPosition(new(-120, 240));
+        Assert.Equal(new Point(-120, 240), vm.WindowPosition);
         Assert.Equal(revision, vm.Revision);
         vm.FlushAsync().GetAwaiter().GetResult();
     }, readOnly: true);
