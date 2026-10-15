@@ -222,13 +222,13 @@
                                       gong:DragDrop.UseDefaultEffectDataTemplate="False" gong:DragDrop.DragDirectlySelectedOnly="True">
                             <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate><DataTemplate>
-                                <Button Style="{StaticResource TabButton}" Content="{Binding Name}" ToolTip="{Binding Name}" Tag="{Binding}"
+                                <local:GroupTabButton Style="{StaticResource TabButton}" Content="{Binding Name}" ToolTip="{Binding Name}" Tag="{Binding}"
                                         MaxWidth="190" Command="{Binding DataContext.SelectGroupCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                         CommandParameter="{Binding}" PreviewMouseDoubleClick="TabDoubleClick" Loaded="TabLoaded">
                                     <local:TabState.IsSelected><MultiBinding Converter="{StaticResource GroupSelection}">
                                         <Binding /><Binding Path="DataContext.SelectedGroup" RelativeSource="{RelativeSource AncestorType=Window}" />
                                     </MultiBinding></local:TabState.IsSelected>
-                                </Button>
+                                </local:GroupTabButton>
                             </DataTemplate></ItemsControl.ItemTemplate>
                         </ItemsControl>
                         <Button x:Name="AddGroupButton" Style="{StaticResource AddGroupIconButton}" Content="&#xE710;" FontSize="12" ToolTip="新建分组；也可把条目拖到这里"

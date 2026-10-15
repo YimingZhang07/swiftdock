@@ -491,7 +491,10 @@ public partial class LauncherWindow : Window, IDisposable
     {
         if (e.PropertyName == nameof(LauncherViewModel.ToastDuration)) RestartToastTimer();
         if (e.PropertyName == nameof(LauncherViewModel.DragActive) && Launcher.DragActive)
+        {
             foreach (var tile in Descendants<TileListBoxItem>(GroupHost)) tile.CancelClick();
+            foreach (var tab in Descendants<GroupTabButton>(Tabs)) tab.CancelClick();
+        }
     }
     private void ShowToast(bool visible)
     {

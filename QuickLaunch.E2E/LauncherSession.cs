@@ -292,6 +292,9 @@ internal sealed partial class LauncherSession
     public AutomationElement[] Tiles() => Panel.FindAllDescendants(cf => cf.ByControlType(ControlType.ListItem)).Where(IsVisible).ToArray();
     public string[] TileNames() => Tiles().Select(e => e.Name).ToArray();
 
+    public void AssertTileListFocused() => Eventually(() => Panel.FindAllDescendants(cf => cf.ByControlType(ControlType.List))
+        .Any(list => IsVisible(list) && list.Properties.HasKeyboardFocus.Value), "selected group's tile list to have keyboard focus");
+
     public void AssertSelection(int index, string phase = "scenario")
     {
         string lastTiles = "No successful UIA selection read.", lastSelected = "unknown";

@@ -46,6 +46,7 @@ Desktop review should check the real input/foreground behavior, native header/ed
 | --- | --- | --- |
 | 2 | `Accent_preset_survives_startup_and_appearance_changes` | Purple/dark/mica and green/light/acrylic, all five original color phases, config defaults, native backdrop. |
 | 1 | `Keyboard_pointer_menu_escape_and_hotkey` | Alt/arrows, empty-area click, menu Escape, two-stage panel Escape, hotkey hide/show, Ctrl+Tab and mouse tab focus. |
+| 1 | `Tab_click_switches_both_ways_and_drag_reorders` | Real clicks on the other tab and back verify tile names, cleared selection and list focus; dragging the inactive tab verifies visible/persisted tab order without selecting it. |
 | 1 | `Click_and_held_enter_each_launch_once` | Click then held Enter, one record for each, no delayed duplicate. |
 | 1 | `Header_drag_moves_and_persists_position` | Native header drag and persisted position. |
 | 1 | `Right_edge_resize_persists_size` | Native resize and persisted DIPs. |

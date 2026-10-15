@@ -87,10 +87,48 @@ public sealed class LauncherTests(ITestOutputHelper output)
         Eventually(() => app.TileNames().SequenceEqual(new[] { "Echo" }), "Ctrl+Tab to select the other group");
         app.AssertSelection(0);
         app.Click(app.Named("E2E Main", ControlType.Button, app.Panel));
+        Eventually(() => app.TileNames().SequenceEqual(new[] { "Alpha", "Bravo", "Charlie", "Delta" }),
+            "mouse click to switch back to the main group after Ctrl+Tab");
         app.AssertSelection(-1);
         app.Key(VirtualKeyShort.DOWN);
         app.AssertSelection(0);
     }, silentStart: true);
+
+    [DesktopFact]
+    public void Tab_click_switches_both_ways_and_drag_reorders() => Run(output, app =>
+    {
+        string[] mainTiles = ["Alpha", "Bravo", "Charlie", "Delta"];
+        Assert.Equal(mainTiles, app.TileNames());
+        app.Key(VirtualKeyShort.DOWN);
+        app.AssertSelection(0);
+        app.Click(app.Named("E2E Other", ControlType.Button, app.Panel));
+        Eventually(() => app.TileNames().SequenceEqual(new[] { "Echo" }), "real tab click to show Echo");
+        app.AssertSelection(-1);
+        app.AssertTileListFocused();
+        app.Key(VirtualKeyShort.DOWN);
+        app.AssertSelection(0);
+        app.Click(app.Named("E2E Main", ControlType.Button, app.Panel));
+        Eventually(() => app.TileNames().SequenceEqual(mainTiles), "real tab click back to show Alpha through Delta");
+        app.AssertSelection(-1);
+        app.AssertTileListFocused();
+
+        var main = app.Named("E2E Main", ControlType.Button, app.Panel).BoundingRectangle;
+        var other = app.Named("E2E Other", ControlType.Button, app.Panel).BoundingRectangle;
+        Assert.True(main.Right <= other.Left, "Main must start before Other.");
+        // Drag the inactive tab into the left half of Main: insertion slot 0.
+        app.Drag(Center(other), new Point(main.Left + (int)(6 * app.Scale), Center(main).Y));
+        Eventually(() => app.Named("E2E Other", ControlType.Button, app.Panel).BoundingRectangle.Right
+            <= app.Named("E2E Main", ControlType.Button, app.Panel).BoundingRectangle.Left,
+            "real tab drag to reorder Other before Main");
+        Assert.Equal(mainTiles, app.TileNames()); // Releasing a drag must not select its source tab.
+        app.AssertSelection(-1);
+        app.Click(app.Named("E2E Other", ControlType.Button, app.Panel));
+        Eventually(() => app.TileNames().SequenceEqual(new[] { "Echo" }), "reordered tab to remain clickable");
+        app.AssertTileListFocused();
+        using var config = app.ExitAndReadConfig();
+        Assert.Equal(new[] { "E2E Other", "E2E Main" }, config.RootElement.GetProperty("groups")
+            .EnumerateArray().Select(group => group.GetProperty("name").GetString()));
+    });
 
     [DesktopFact]
     public void Click_and_held_enter_each_launch_once() => Run(output, app =>
