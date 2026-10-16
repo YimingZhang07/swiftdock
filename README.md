@@ -85,13 +85,15 @@ SDK 10.0.401 和 NuGet 缓存位于忽略的 `.tools/`，不会替换系统安�
 | --- | --- | --- |
 | `scripts/Validate.ps1` | 每次修改，包括沙箱 | 锁定依赖还原、应用与单测 Release 构建（`-warnaserror`）、快速单测；`artifacts/tests/launcher.trx`。 |
 | `scripts/E2E.ps1` | UI 改动后，在解锁桌面 | 真实输入用例；`artifacts/e2e/e2e.trx`。 |
-| `scripts/Snapshots.ps1` | 视觉评审时，在解锁桌面 | 独立 `QuickLaunch.Snapshots` 工具生成 41 张 PNG 和 `artifacts/validation/snapshots.json`，并检查深色设置文字对比度。 |
+| `scripts/Snapshots.ps1` | 视觉评审时，在解锁桌面 | 独立 `QuickLaunch.Snapshots` 工具生成 51 张 PNG 和 `artifacts/validation/snapshots.json`，并检查深色设置文字对比度。 |
 
 单测覆盖配置、VM、解析、图标、几何、资源和 DI 生命周期；E2E 检查原生输入与窗口连接；视觉布局由快照评审。默认验证不构建或运行桌面工具。测试与快照使用隔离配置，不修改日常配置或登录启动项。真实桌面要求见 [E2E 说明](docs/E2E.md)。
 
 `--e2e-launch-log <file>` 必须配合独立 `--config-dir`，将条目启动委托替换为 JSONL 记录器，每行包含 `id`、`name`、`elevated`，不调用 Shell；未提供此开关时正常启动条目。
 
 ## 发布与性能检查
+
+图标选择器提供简约（原有 60 个字形和 8 色）、系统（运行时读取 Windows 图标库）和彩色（96 个 Fluent UI System Icons）三组。彩色 SVG 内嵌于程序，按像素尺寸在后台渲染并缓存 PNG；系统图标使用资源 ID 保存。第三方许可见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)，该文件也嵌入单文件程序。
 
 ```powershell
 .\scripts\Release.ps1                         # 验证、单文件发布、安装包、便携 ZIP、SHA-256
@@ -110,6 +112,6 @@ SDK 10.0.401 和 NuGet 缓存位于忽略的 `.tools/`，不会替换系统安�
 
 基准会重复显示/隐藏窗口，使用专用生成数据，不启动条目。后台运行可能没有前台权限；这种情况下焦点确认失败单列，渲染耗时不能冒充完整呼出耗时。首次、预热后、闲置恢复及首次/已访问分组分开记录；不强制 GC 或修剪工作集。
 
-`Snapshots.ps1` 输出 launcher、settings-general、settings-appearance、settings-panel、settings-about、add-dialog、edit-dialog、name-dialog、icon-picker、item-menu、delete-confirm 的深/浅色 PNG，以及 `appearance-{dark|light}-{blue|purple}-{acrylic|mica|solid}.png`（12 张）、`appearance-settings-{dark|light}-{blue|purple}.png`（4 张）和 `panel-polish.png`。基础深色文件无后缀，浅色使用 `-light`。窗口不激活并固定在整个虚拟桌面外，确认框不进入模态循环，菜单/选择器不打开原生弹出窗口。每张图使用独立进程，6 秒超时后记录失败并继续；脚本默认 90 秒总运行时限（可用 `-TimeoutSeconds` 调整），超时终止渲染器及其工作进程。`snapshots.json` 在开始和每步结束时更新，始终记录 `rendered` / `failed`，以及运行中的 `current`；旧 PNG 不代表本次成功。PNG 为 WPF 合成图，不包含原生 DWM 材质、边框或阴影；原生材质由 E2E 验证。
+`Snapshots.ps1` 输出 launcher、settings-general、settings-appearance、settings-panel、settings-about、add-dialog（应用）、add-dialog-file、add-dialog-folder、add-dialog-url、edit-dialog、name-dialog、icon-picker、icon-picker-system、icon-picker-color、item-menu、delete-confirm 的深/浅色 PNG，以及 `appearance-{dark|light}-{blue|purple}-{acrylic|mica|solid}.png`（12 张）、`appearance-settings-{dark|light}-{blue|purple}.png`（4 张）和 `panel-polish.png`。基础深色文件无后缀，浅色使用 `-light`。窗口不激活并固定在整个虚拟桌面外，确认框不进入模态循环，菜单/选择器不打开原生弹出窗口。每张图使用独立进程，6 秒超时后记录失败并继续；脚本默认 90 秒总运行时限（可用 `-TimeoutSeconds` 调整），超时终止渲染器及其工作进程。`snapshots.json` 在开始和每步结束时更新，始终记录 `rendered` / `failed`，以及运行中的 `current`；旧 PNG 不代表本次成功。PNG 为 WPF 合成图，不包含原生 DWM 材质、边框或阴影；原生材质由 E2E 验证。
 
 性能日志保留在 `artifacts/benchmarks/`、`artifacts/startup/`，发布包在 `artifacts/release/<版本>/`。启动测量在无托盘的环境可显式使用 `MeasureStartup.ps1 -AllowUnavailableTray`（对应 `--allow-unavailable-tray`，仅性能模式有效）。基准禁用网站请求，避免网络时间影响测量。

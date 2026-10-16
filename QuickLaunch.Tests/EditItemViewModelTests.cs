@@ -120,7 +120,7 @@ public sealed class EditItemViewModelTests
         Assert.Equal(arguments ? "--test" : "", model.Result.Arguments);
         Assert.Equal(arguments ? @"C:\working" : "", model.Result.WorkingDirectory);
         Assert.Equal(kind == LaunchKind.App, model.Result.RunAsAdmin); Assert.Equal("glyph:E943:#5B4FD1", model.Result.Icon);
-        Assert.Equal(kind == LaunchKind.App, model.AdvancedExpanded);
+        Assert.False(model.AdvancedExpanded);
         Assert.Equal(arguments, model.CanSetArguments);
     }
 

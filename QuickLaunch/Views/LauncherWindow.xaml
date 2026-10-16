@@ -172,7 +172,7 @@
                     <Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
                         <StackPanel VerticalAlignment="Center">
                             <Grid Width="{Binding DataContext.State.IconSize, RelativeSource={RelativeSource AncestorType=Window}}" Height="{Binding DataContext.State.IconSize, RelativeSource={RelativeSource AncestorType=Window}}">
-                                <Image Source="{Binding Visual.Image}" RenderOptions.BitmapScalingMode="HighQuality" />
+                                <Image x:Name="TileImage" Source="{Binding Visual.Image}" RenderOptions.BitmapScalingMode="HighQuality" />
                                 <TextBlock x:Name="TileGlyph" Text="{Binding Glyph}" FontSize="{Binding DataContext.State.IconSize, RelativeSource={RelativeSource AncestorType=Window}}"
                                            Foreground="{DynamicResource SystemFillColorCriticalBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
                                 <Ellipse x:Name="ErrorBadge" Fill="{DynamicResource SystemFillColorCriticalBrush}" Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Bottom" />

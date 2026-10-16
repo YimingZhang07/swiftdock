@@ -18,7 +18,16 @@ public sealed class FluentFontFactAttribute : FactAttribute
     }
 }
 
-public sealed class CustomIconTests : IDisposable
+public sealed class SystemIconsFactAttribute : FactAttribute
+{
+    public SystemIconsFactAttribute()
+    {
+        if (!File.Exists(Environment.ExpandEnvironmentVariables(SystemIconCatalog.Libraries[0])))
+            Skip = "Windows imageres.dll is not installed.";
+    }
+}
+
+public sealed class CustomIconTests(Xunit.Abstractions.ITestOutputHelper output) : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "QuickLaunch-custom-icons-" + Guid.NewGuid().ToString("N"));
     private static LaunchItem Web(string? icon = null) => new("Web", "https://example.com", LaunchKind.Url) { Icon = icon };
@@ -48,6 +57,7 @@ public sealed class CustomIconTests : IDisposable
     [InlineData("file:")] [InlineData("file:relative.ico")] [InlineData("file:C:\\test.svg")]
     [InlineData("file:C:\\test.png,1")] [InlineData("file:C:\\test.exe,x")] [InlineData("file:C:\\test.dll,2147483648")]
     [InlineData("file:C:\\bad?.ico")] [InlineData("unknown:E943")]
+    [InlineData("fluent:unknown")] [InlineData("fluent:../apps")] [InlineData("fluent:Apps")]
     public void MalformedIconsNormalizeToNullWithoutRejectingConfig(string? value)
     {
         Assert.Null(IconSpec.Parse(value));
@@ -70,6 +80,8 @@ public sealed class CustomIconTests : IDisposable
     [InlineData("file:C:\\icons\\app.dll,-42", "file:C:\\icons\\app.dll,-42")]
     [InlineData("file:C:\\icons\\app.exe,0", "file:C:\\icons\\app.exe,0")]
     [InlineData("file:C:\\icons\\a,b.ico", "file:C:\\icons\\a,b.ico")]
+    [InlineData("fluent:apps", "fluent:apps")]
+    [InlineData("file:%SystemRoot%\\System32\\imageres.dll,-3", "file:%SystemRoot%\\System32\\imageres.dll,-3")]
     public void ParseAndFormatAreCanonicalAndRoundTrip(string value, string expected)
     {
         Assert.Equal(expected, IconSpec.Parse(value)!.ToString());
@@ -125,7 +137,7 @@ public sealed class CustomIconTests : IDisposable
         byte[] bytes = Encoding.UTF8.GetBytes(legacy.ReplaceLineEndings("\r\n"));
         var config = ConfigValidation.Parse(bytes);
         Assert.Equal(bytes, JsonSerializer.SerializeToUtf8Bytes(config, ConfigJsonContext.Default.AppConfig));
-        foreach (string icon in new[] { "glyph:E943:#2F6FDB", "file:C:\\icons\\app.dll,-42" })
+        foreach (string icon in new[] { "glyph:E943:#2F6FDB", "file:C:\\icons\\app.dll,-42", "fluent:apps" })
         {
             config.Groups[0].Items[0] = config.Groups[0].Items[0] with { Icon = icon };
             byte[] custom = JsonSerializer.SerializeToUtf8Bytes(config, ConfigJsonContext.Default.AppConfig);
@@ -247,6 +259,91 @@ public sealed class CustomIconTests : IDisposable
         Assert.Equal(48, custom.PixelWidth); Assert.NotEqual(Pixels(expected), Pixels(custom));
         var missing = await icons.GetAsync(Web("file:" + path + ",2147483647"), 48);
         Assert.NotNull(missing); Assert.Equal(Pixels(expected), Pixels(missing));
+    }
+
+    [Fact]
+    public async Task EveryFluentColorRendersAndSharesMemoryAndDiskAcrossTargets()
+    {
+        await using var log = new TestLogging();
+        using (var icons = log.CreateIcons(_directory))
+        {
+            Assert.Equal(96, FluentColorCatalog.Icons.Count);
+            foreach (var entry in FluentColorCatalog.Icons)
+            foreach (int pixels in new[] { 32, 64 })
+            {
+                // Empty file target has no fallback: a failed SVG cannot pass via a globe.
+                var item = new LaunchItem("", "", LaunchKind.File) { Icon = entry.Spec };
+                var image = await icons.GetAsync(item, pixels);
+                Assert.True(image is not null, entry.Spec);
+                Assert.True(image.IsFrozen); Assert.Equal(pixels, image.PixelWidth); Assert.Equal(pixels, image.PixelHeight);
+                Assert.Contains(Pixels(image).Where((_, i) => i % 4 == 3), alpha => alpha > 0);
+                Assert.Same(image, await icons.GetAsync(Web(entry.Spec), pixels));
+            }
+            Assert.Equal(192, icons.Extractions);
+        }
+        using (var icons = log.CreateIcons(_directory))
+        {
+            Assert.NotNull(await icons.GetAsync(Web("fluent:apps"), 64));
+            Assert.Equal(1, icons.DiskHits); Assert.Equal(0, icons.Extractions);
+        }
+    }
+
+    [SystemIconsFact]
+    public async Task SystemResourceIdsEnumerateAndExtractWithoutOrdinalFallback()
+    {
+        await using var log = new TestLogging();
+        using var icons = log.CreateIcons(_directory);
+        var entries = await icons.GetSystemIconsAsync();
+        output.WriteLine(string.Join(", ", entries.GroupBy(e => IconSpec.Parse(e.Spec)!.Path)
+            .Select(g => $"{g.Key}: {g.Count()} icons")));
+        var first = Assert.IsType<CatalogIcon>(entries.FirstOrDefault());
+        Assert.StartsWith("file:%SystemRoot%\\System32\\imageres.dll,-", first.Spec);
+        Assert.All(entries, e => Assert.True(IconSpec.Parse(e.Spec)!.Index < 0));
+        Assert.Equal(entries.Count, entries.Select(e => e.Spec).Distinct().Count());
+        var image = await icons.GetAsync(new LaunchItem("", "", LaunchKind.File) { Icon = first.Spec }, 48);
+        Assert.NotNull(image);
+        Assert.Contains(Pixels(image).Where((_, i) => i % 4 == 3), alpha => alpha > 0);
+    }
+
+    [Fact]
+    public async Task SystemPickerRejectsInvisibleResourcesAndCachesSuccessAndFailurePerSize()
+    {
+        Directory.CreateDirectory(_directory);
+        await using var log = new TestLogging();
+        using var icons = log.CreateIcons(_directory);
+        // Windows has fully transparent resources and faint empty frames; black ink
+        // and a thin opaque outline must still be accepted in either theme.
+        foreach (int pixels in new[] { 28, 56 })
+        foreach (string kind in new[] { "transparent", "faint-frame", "speck", "black", "outline", "missing" })
+        {
+            string path = Path.Combine(_directory, $"{kind}-{pixels}.png");
+            if (kind != "missing")
+            {
+                byte[] bytes = new byte[pixels * pixels * 4];
+                for (int y = 0; y < pixels; y++)
+                for (int x = 0; x < pixels; x++)
+                {
+                    int index = (y * pixels + x) * 4;
+                    bool edge = x == 0 || y == 0 || x == pixels - 1 || y == pixels - 1;
+                    bytes[index + 3] = kind switch
+                    {
+                        "faint-frame" when edge => 77, "outline" when edge => 255,
+                        "black" => 255, "speck" when x == pixels / 2 && y == pixels / 2 => 255, _ => 0
+                    };
+                }
+                var bitmap = BitmapSource.Create(pixels, pixels, 96, 96, PixelFormats.Bgra32, null, bytes, pixels * 4);
+                var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                using var stream = File.Create(path); encoder.Save(stream);
+            }
+            var icon = new CatalogIcon(kind, "file:" + path);
+            var image = await icons.GetSystemPickerImageAsync(icon, pixels);
+            bool visible = kind is "black" or "outline";
+            Assert.Equal(visible, image is not null);
+            Assert.Equal(!visible, icons.IsEmptySystemIcon(icon.Spec, pixels));
+            long extractions = icons.Extractions;
+            Assert.Same(image, await icons.GetSystemPickerImageAsync(icon, pixels));
+            Assert.Equal(extractions, icons.Extractions);
+        }
     }
 
     private static byte[] Pixels(BitmapSource image)

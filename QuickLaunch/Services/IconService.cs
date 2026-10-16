@@ -12,6 +12,8 @@ using Microsoft.Extensions.Logging;
 using QuickLaunch.Diagnostics;
 using QuickLaunch.Interop;
 using QuickLaunch.Models;
+using SharpVectors.Converters;
+using SharpVectors.Renderers.Wpf;
 
 namespace QuickLaunch.Services;
 
@@ -28,6 +30,8 @@ public sealed class IconService : IDisposable
     private readonly SemaphoreSlim _ioSlots = new(4);
     private readonly CancellationTokenSource _stop = new();
     private readonly IconThread _thread;
+    private Task<IReadOnlyList<CatalogIcon>>? _systemIcons;
+    private readonly ConcurrentDictionary<(string Spec, int Pixels), Lazy<Task<BitmapSource?>>> _systemPickerImages = new();
     private long _memoryHits, _diskHits, _extractions;
     private bool _disposed;
     public long MemoryHits => Interlocked.Read(ref _memoryHits);
@@ -44,9 +48,51 @@ public sealed class IconService : IDisposable
     public static int PixelSize(double dip, double scale) => Math.Clamp((int)Math.Ceiling(dip * scale), 16, 256);
     public static string SourceKey(LaunchItem item)
     {
+        // Embedded artwork is independent of the launch target: one parse per name/size,
+        // shared by the picker, preview and tiles, then reused from disk next startup.
+        if (IconSpec.Parse(item.Icon) is { IsFluent: true } fluent)
+            return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("fluent-color-1.1.342-v1:" + fluent.FluentName)));
         string source = item.Kind == LaunchKind.Url ? "v1:globe" : $"v1:{item.Kind}:{Environment.ExpandEnvironmentVariables(item.Path).ToUpperInvariant()}";
         if (IconSpec.Parse(item.Icon) is { } custom) source += $"|custom-v1:{custom}|{(custom.IsGlyph ? IconCatalog.FontName : "file")}";
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source)));
+    }
+
+    internal Task<IReadOnlyList<CatalogIcon>> GetSystemIconsAsync() => _systemIcons ??= EnumerateSystemIconsAsync();
+    private async Task<IReadOnlyList<CatalogIcon>> EnumerateSystemIconsAsync()
+    {
+        var dispatcher = await _thread.Ready.WaitAsync(_stop.Token).ConfigureAwait(false);
+        return await dispatcher.InvokeAsync(SystemIconCatalog.Enumerate, DispatcherPriority.Background, _stop.Token).Task.ConfigureAwait(false);
+    }
+
+    internal Task<BitmapSource?> GetSystemPickerImageAsync(CatalogIcon icon, int pixels, CancellationToken cancellation = default)
+    {
+        pixels = Math.Clamp(pixels, 16, 256);
+        // Cache rejected resources as well as images for the session, separately at each DPI.
+        var load = _systemPickerImages.GetOrAdd((icon.Spec, pixels), key => new(() =>
+        {
+            var item = new LaunchItem("", "", LaunchKind.File) { Icon = key.Spec };
+            string source = "system-picker-v1-" + SourceKey(item);
+            return LoadAsync(item, key.Pixels, source, 0, $"{source}-{key.Pixels}-0", systemPicker: true);
+        }));
+        return load.Value.WaitAsync(cancellation);
+    }
+
+    internal bool IsEmptySystemIcon(string spec, int pixels) =>
+        _systemPickerImages.TryGetValue((spec, pixels), out var load) && load.IsValueCreated
+        && load.Value.IsCompletedSuccessfully && load.Value.Result is null;
+
+    internal static bool HasVisiblePixels(BitmapSource? image)
+    {
+        if (image is null) return false;
+        var bitmap = image.Format == PixelFormats.Bgra32 ? image : new FormatConvertedBitmap(image, PixelFormats.Bgra32, null, 0);
+        byte[] bytes = new byte[bitmap.PixelWidth * bitmap.PixelHeight * 4];
+        bitmap.CopyPixels(bytes, bitmap.PixelWidth * 4, 0);
+        // Require at least 1% reasonably opaque ink. This also rejects Windows'
+        // faint empty-frame resources (alpha <= 77), shadows and isolated specks.
+        int required = Math.Max(4, (int)Math.Ceiling(bitmap.PixelWidth * bitmap.PixelHeight * .01));
+        for (int i = 3; i < bytes.Length; i += 4)
+            if (bytes[i] >= 96 && --required == 0) return true;
+        return false;
     }
 
     public async Task<BitmapSource?> GetAsync(LaunchItem item, int pixels, CancellationToken cancellation = default)
@@ -78,11 +124,12 @@ public sealed class IconService : IDisposable
 
     public void Refresh(LaunchItem item)
     {
+        if (IconSpec.Parse(item.Icon) is { IsFluent: true }) return; // Embedded artwork is immutable.
         _revisions.AddOrUpdate(SourceKey(item), 1, (_, revision) => revision + 1);
         if (UsesFavicon(item) && FaviconService.TryUrl(item.Path, out var url)) _favicons.Refresh(url);
     }
 
-    private async Task<BitmapSource?> LoadAsync(LaunchItem item, int pixels, string source, int revision, string key)
+    private async Task<BitmapSource?> LoadAsync(LaunchItem item, int pixels, string source, int revision, string key, bool systemPicker = false)
     {
         await _ioSlots.WaitAsync(_stop.Token);
         try
@@ -103,6 +150,7 @@ public sealed class IconService : IDisposable
                         bitmap.DecodePixelWidth = pixels; bitmap.StreamSource = file; bitmap.EndInit(); bitmap.Freeze();
                         image = bitmap;
                         Interlocked.Increment(ref _diskHits);
+                        if (systemPicker && !HasVisiblePixels(image)) return null;
                     }
                 }
                 catch (Exception ex) when (ex is IOException or InvalidDataException or NotSupportedException or ArgumentException or FormatException or InvalidOperationException or COMException)
@@ -110,8 +158,10 @@ public sealed class IconService : IDisposable
                 if (image is null)
                 {
                     var dispatcher = await _thread.Ready.WaitAsync(_stop.Token);
-                    image = await dispatcher.InvokeAsync(() => Extract(item, pixels), DispatcherPriority.Background, _stop.Token).Task;
+                    image = await dispatcher.InvokeAsync(() => Extract(item, pixels, fallback: !systemPicker), DispatcherPriority.Background, _stop.Token).Task;
                     Interlocked.Increment(ref _extractions);
+                    // This continuation runs on the background loader, never on the UI thread.
+                    if (systemPicker && !HasVisiblePixels(image)) return null;
                     if (image is not null)
                     {
                         try
@@ -150,6 +200,7 @@ public sealed class IconService : IDisposable
     {
         var custom = IconSpec.Parse(item.Icon);
         if (custom is { IsGlyph: true }) return "glyph-v1";
+        if (custom is { IsFluent: true }) return "fluent-color-1.1.342-v1";
         static string FileStamp(string value) => File.Exists(value) && new FileInfo(value) is { Exists: true } file ? $"{file.Length}:{file.LastWriteTimeUtc.Ticks}" : "missing";
         string? customPath = custom?.Path is { } iconPath ? Environment.ExpandEnvironmentVariables(iconPath) : null;
         if (customPath is not null && File.Exists(customPath)) return "file-v1:" + FileStamp(customPath);
@@ -160,21 +211,43 @@ public sealed class IconService : IDisposable
         return stamp;
     }
 
-    private static BitmapSource? Extract(LaunchItem item, int pixels)
+    private static BitmapSource? Extract(LaunchItem item, int pixels, bool fallback = true)
     {
         if (IconSpec.Parse(item.Icon) is { } custom)
         {
             try
             {
-                var image = custom.IsGlyph ? RenderGlyph(custom, pixels) : ExtractFile(custom, pixels);
+                var image = custom.IsFluent ? RenderFluent(custom.FluentName!, pixels)
+                    : custom.IsGlyph ? RenderGlyph(custom, pixels) : ExtractFile(custom, pixels);
                 if (image is not null) return image;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException
                 or FormatException or InvalidOperationException or COMException)
             { /* A custom icon is decorative: a bad/missing source must not mark the launch target broken. */ }
         }
+        if (!fallback) return null;
         if (item.Kind == LaunchKind.Url) return Globe(pixels);
         return ExtractShell(Environment.ExpandEnvironmentVariables(item.Path), pixels);
+    }
+
+    internal static BitmapSource? RenderFluent(string name, int pixels)
+    {
+        if (!FluentColorCatalog.Contains(name)) return null;
+        using var stream = typeof(IconService).Assembly.GetManifestResourceStream($"QuickLaunch.Assets.FluentColor.{name}.svg");
+        if (stream is null) return null;
+        using var reader = new FileSvgReader(new WpfDrawingSettings { IncludeRuntime = false, TextAsGeometry = true });
+        var drawing = reader.Read(stream);
+        if (drawing is null || drawing.Bounds.IsEmpty || drawing.Bounds.Width <= 0 || drawing.Bounds.Height <= 0) return null;
+        // Preserve the SVG viewport (and its intended transparent padding).
+        double size = FluentColorCatalog.Size(name);
+        var visual = new DrawingVisual();
+        using (var context = visual.RenderOpen())
+        {
+            context.PushTransform(new ScaleTransform(pixels / size, pixels / size));
+            context.DrawDrawing(drawing);
+            context.Pop();
+        }
+        return Render(visual, pixels);
     }
 
     private static BitmapSource? ExtractFile(IconSpec spec, int pixels)
@@ -310,5 +383,6 @@ public sealed class IconService : IDisposable
         _disposed = true;
         _stop.Cancel();
         _memory.Clear();
+        _systemPickerImages.Clear();
     }
 }

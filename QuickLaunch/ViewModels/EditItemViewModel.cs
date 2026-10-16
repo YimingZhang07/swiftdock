@@ -18,16 +18,16 @@ public sealed partial class EditItemViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _name = "", _path = "", _arguments = "", _workingDirectory = "", _error = "";
     [ObservableProperty] private bool _runAsAdmin, _advancedExpanded, _isIconPickerOpen;
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(TargetLabel), nameof(TargetPlaceholder), nameof(CanBrowse), nameof(IsFolder), nameof(IsApplication), nameof(CanSetArguments), nameof(PreviewGlyph))]
+    [NotifyPropertyChangedFor(nameof(TargetLabel), nameof(TargetPlaceholder), nameof(CanBrowse), nameof(IsFolder), nameof(IsApplication), nameof(IsFile), nameof(IsUrl), nameof(CanSetArguments), nameof(PreviewGlyph))]
     private LaunchKind _selectedKind;
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand), nameof(BrowseCommand), nameof(SelectLocationCommand), nameof(SelectTypeCommand),
-        nameof(OpenIconPickerCommand), nameof(SelectGlyphCommand), nameof(SelectColorCommand), nameof(SelectIconFileCommand), nameof(ResetIconCommand))]
+        nameof(OpenIconPickerCommand), nameof(SelectGlyphCommand), nameof(SelectColorCommand), nameof(SelectCatalogIconCommand), nameof(SelectIconFileCommand), nameof(ResetIconCommand))]
     [NotifyPropertyChangedFor(nameof(IsEditing))]
     private bool _canEdit = true;
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand), nameof(BrowseCommand), nameof(SelectLocationCommand), nameof(SelectTypeCommand),
-        nameof(OpenIconPickerCommand), nameof(SelectGlyphCommand), nameof(SelectColorCommand), nameof(SelectIconFileCommand), nameof(ResetIconCommand))]
+        nameof(OpenIconPickerCommand), nameof(SelectGlyphCommand), nameof(SelectColorCommand), nameof(SelectCatalogIconCommand), nameof(SelectIconFileCommand), nameof(ResetIconCommand))]
     [NotifyPropertyChangedFor(nameof(IsEditing))]
     private bool _isSaving;
     [ObservableProperty]
@@ -43,6 +43,8 @@ public sealed partial class EditItemViewModel : ObservableObject, IDisposable
     public bool IsEditing => CanEdit && !IsSaving && !_closed;
     public bool IsApplication => SelectedKind == LaunchKind.App;
     public bool IsFolder => SelectedKind == LaunchKind.Folder;
+    public bool IsFile => SelectedKind == LaunchKind.File;
+    public bool IsUrl => SelectedKind == LaunchKind.Url;
     public bool CanBrowse => SelectedKind != LaunchKind.Url;
     public bool IsShortcut => System.IO.Path.GetExtension(ItemEditorValidation.NormalizeTarget(Path)).Equals(".lnk", StringComparison.OrdinalIgnoreCase);
     public bool CanSetArguments => IsApplication && !IsShortcut;
@@ -65,7 +67,7 @@ public sealed partial class EditItemViewModel : ObservableObject, IDisposable
             Name = item?.Name ?? ""; Path = item?.Path ?? ""; Arguments = item?.Arguments ?? "";
             WorkingDirectory = item?.WorkingDirectory ?? ""; RunAsAdmin = item?.RunAsAdmin ?? false;
             SelectedKind = item?.Kind ?? LaunchKind.App; CanEdit = canEdit; Error = ""; Result = null; _autoName = false;
-            AdvancedExpanded = item is { Kind: LaunchKind.App } && (item.Arguments.Length > 0 || item.WorkingDirectory.Length > 0 || item.RunAsAdmin);
+            AdvancedExpanded = false;
             CustomIcon = IconSpec.Normalize(item?.Icon);
             GlyphCode = IconCatalog.Glyphs[0].CodePoint; IconColor = IconCatalog.Colors[0].Hex;
             if (IconSpec.Parse(CustomIcon) is { IsGlyph: true } spec) { GlyphCode = spec.CodePoint; IconColor = spec.Color!; }
@@ -97,6 +99,8 @@ public sealed partial class EditItemViewModel : ObservableObject, IDisposable
     }
     partial void OnSelectedKindChanged(LaunchKind value)
     {
+        // Returning to App must not expand the dialog merely because its type changed.
+        AdvancedExpanded = false;
         if (_initializing || _inferring) return;
         Error = ""; QueueRefresh(false);
     }
@@ -169,6 +173,8 @@ public sealed partial class EditItemViewModel : ObservableObject, IDisposable
     private void SelectGlyph(int code) { if (IsEditing) { GlyphCode = code; ApplyGlyph(); } }
     [RelayCommand(CanExecute = nameof(IsEditing))]
     private void SelectColor(string color) { if (IsEditing) { IconColor = color; ApplyGlyph(); } }
+    [RelayCommand(CanExecute = nameof(IsEditing))]
+    private void SelectCatalogIcon(string spec) { if (IsEditing) CustomIcon = IconSpec.Normalize(spec); }
     private void ApplyGlyph()
     {
         if (!Glyphs.Any(g => g.CodePoint == GlyphCode))

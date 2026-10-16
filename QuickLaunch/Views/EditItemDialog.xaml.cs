@@ -23,12 +23,13 @@ public partial class EditItemDialog : Wpf.Ui.Controls.FluentWindow
     {
         ViewModel = viewModel; _icons = icons; picker.Owner = this;
         InitializeComponent(); DataContext = viewModel;
+        UrlDescription.Text = icons.AutoFetchWebsiteIcons ? "添加后会自动获取网站图标。" : "自动获取网站图标已关闭，可手动选择图标。";
         InitializeIconPicker();
         viewModel.PropertyChanged += ModelChanged;
         viewModel.Accepted += Accept;
         Closed += (_, _) =>
         {
-            _closed = true; IconPopup.IsOpen = false; CancelPreview();
+            _closed = true; IconPopup.IsOpen = false; CancelPreview(); CancelPickerLoads();
             viewModel.PropertyChanged -= ModelChanged; viewModel.Accepted -= Accept;
             picker.Owner = null; viewModel.Dispose();
         };
@@ -44,6 +45,7 @@ public partial class EditItemDialog : Wpf.Ui.Controls.FluentWindow
     private void ModelChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(EditItemViewModel.PreviewTarget)) QueuePreview();
+        if (e.PropertyName == nameof(EditItemViewModel.CustomIcon)) UpdateCatalogSelection();
         if (e.PropertyName == nameof(EditItemViewModel.IsSaving) && ViewModel.IsSaving) CancelPreview();
     }
     protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)

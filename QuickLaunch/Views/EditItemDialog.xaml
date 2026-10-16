@@ -112,7 +112,20 @@
                 </Grid>
                 <ui:Button x:Name="BrowseButton" Grid.Column="1" Content="浏览…" Command="{Binding BrowseCommand}" Visibility="{Binding CanBrowse, Converter={StaticResource Visible}}" Margin="8,0,0,0" />
             </Grid>
-            <StackPanel x:Name="LocationChips" Orientation="Horizontal" Margin="0,12,0,0" Visibility="{Binding IsFolder, Converter={StaticResource Visible}}">
+            <!-- One 54-DIP collapsed slot: 20-DIP header + 32 padding + 2 border.
+                 Only an explicitly expanded App expander can grow this row. -->
+            <Grid x:Name="TypeArea" Margin="0,16,0,0" ClipToBounds="True">
+                <Grid.Style><Style TargetType="Grid">
+                    <Setter Property="Height" Value="54" />
+                    <Style.Triggers><MultiDataTrigger>
+                        <MultiDataTrigger.Conditions>
+                            <Condition Binding="{Binding IsApplication}" Value="True" />
+                            <Condition Binding="{Binding AdvancedExpanded}" Value="True" />
+                        </MultiDataTrigger.Conditions>
+                        <Setter Property="Height" Value="Auto" />
+                    </MultiDataTrigger></Style.Triggers>
+                </Style></Grid.Style>
+            <StackPanel x:Name="LocationChips" Orientation="Horizontal" VerticalAlignment="Top" Visibility="{Binding IsFolder, Converter={StaticResource Visible}}">
                 <TextBlock Text="常用位置" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,10,0" />
                 <Button Content="桌面" Tag="{x:Static services:CommonLocation.Desktop}" Style="{StaticResource LocationChip}" Command="{Binding SelectLocationCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}" />
                 <Button Content="下载" Tag="{x:Static services:CommonLocation.Downloads}" Style="{StaticResource LocationChip}" Command="{Binding SelectLocationCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}" />
@@ -120,7 +133,10 @@
                 <Button Content="图片" Tag="{x:Static services:CommonLocation.Pictures}" Style="{StaticResource LocationChip}" Command="{Binding SelectLocationCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}" />
                 <Button Content="用户目录" Tag="{x:Static services:CommonLocation.Profile}" Style="{StaticResource LocationChip}" Command="{Binding SelectLocationCommand}" CommandParameter="{Binding Tag, RelativeSource={RelativeSource Self}}" Margin="0" />
             </StackPanel>
-            <ui:CardExpander x:Name="AdvancedOptions" IsExpanded="{Binding AdvancedExpanded}" Visibility="{Binding IsApplication, Converter={StaticResource Visible}}" Header="高级选项" Margin="0,16,0,0" ContentPadding="16">
+            <TextBlock Text="使用系统默认程序打开该文件。" VerticalAlignment="Top" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Visibility="{Binding IsFile, Converter={StaticResource Visible}}" />
+            <TextBlock x:Name="UrlDescription" VerticalAlignment="Top" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Visibility="{Binding IsUrl, Converter={StaticResource Visible}}" />
+            <ui:CardExpander x:Name="AdvancedOptions" IsExpanded="{Binding AdvancedExpanded}" Visibility="{Binding IsApplication, Converter={StaticResource Visible}}" VerticalAlignment="Top" Padding="14,16" ContentPadding="16">
+                <ui:CardExpander.Header><TextBlock Text="高级选项" Height="20" /></ui:CardExpander.Header>
                 <StackPanel>
                     <TextBlock x:Name="ShortcutHint" Text="快捷方式使用自身的参数和工作目录。" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" Margin="0,0,0,12" Visibility="{Binding IsShortcut, Converter={StaticResource Visible}}" />
                     <TextBlock Text="启动参数" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
@@ -130,8 +146,9 @@
                     <CheckBox x:Name="ElevateBox" IsChecked="{Binding RunAsAdmin}" IsEnabled="{Binding IsApplication}" Content="以管理员身份运行" />
                 </StackPanel>
             </ui:CardExpander>
+            </Grid>
         </StackPanel>
-        <TextBlock x:Name="Error" Text="{Binding Error}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,16,0,16" />
+        <TextBlock x:Name="Error" Text="{Binding Error}" ToolTip="{Binding Error}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" FontSize="12" Height="18" TextTrimming="CharacterEllipsis" Margin="0,16,0,16" />
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
             <ui:Button x:Name="SaveButton" Content="{Binding SaveLabel}" Appearance="Primary" IsDefault="True" Command="{Binding SaveCommand}" Margin="0,0,8,0" /><ui:Button Content="取消" IsCancel="True" />
         </StackPanel>
@@ -143,11 +160,44 @@
             <Border.Effect><DropShadowEffect BlurRadius="16" ShadowDepth="3" Direction="270" Opacity="0.135" /></Border.Effect>
             <StackPanel>
                 <TextBlock Text="选择图标" Foreground="{DynamicResource TextFillColorPrimaryBrush}" FontSize="13" Margin="4,0,0,8" />
-                <ScrollViewer Height="216" Width="304" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Focusable="False">
+                <UniformGrid x:Name="IconSeries" Columns="3" Margin="0,0,0,8" KeyboardNavigation.TabNavigation="Once" PreviewKeyDown="SeriesKeyDown">
+                    <RadioButton x:Name="SimpleSeries" Content="简约" Tag="0" IsChecked="True" GroupName="IconSeries" Style="{StaticResource IconSizeSegment}" Click="SeriesClicked" />
+                    <RadioButton x:Name="SystemSeries" Content="系统" Tag="1" GroupName="IconSeries" Style="{StaticResource IconSizeSegment}" Click="SeriesClicked" />
+                    <RadioButton x:Name="ColorSeries" Content="彩色" Tag="2" GroupName="IconSeries" Style="{StaticResource IconSizeSegment}" Click="SeriesClicked" />
+                </UniformGrid>
+                <!-- One fixed slot. Catalogs use the space occupied by the simple palette. -->
+                <Grid x:Name="PickerGridArea" Height="288" Width="304">
+                <ScrollViewer x:Name="GlyphScroller" Height="216" VerticalAlignment="Top" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Focusable="False">
                     <UniformGrid x:Name="GlyphGrid" Columns="8" Width="288" HorizontalAlignment="Left" KeyboardNavigation.TabNavigation="Once" PreviewKeyDown="ChoiceKeyDown" />
                 </ScrollViewer>
+                <ListBox x:Name="CatalogRows" Visibility="Collapsed" Background="Transparent" BorderThickness="0" Padding="0" Focusable="False"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.CanContentScroll="True"
+                         VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Standard" VirtualizingPanel.CacheLength="0" VirtualizingPanel.ScrollUnit="Item"
+                         KeyboardNavigation.TabNavigation="Once" PreviewKeyDown="CatalogKeyDown">
+                    <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
+                    <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem">
+                        <Setter Property="Padding" Value="0" /><Setter Property="Margin" Value="0" /><Setter Property="Focusable" Value="False" />
+                        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem"><ContentPresenter /></ControlTemplate></Setter.Value></Setter>
+                    </Style></ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate><DataTemplate>
+                        <ItemsControl ItemsSource="{Binding}" Width="288" HorizontalAlignment="Left">
+                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="8" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate><DataTemplate>
+                                <RadioButton Style="{StaticResource IconChoice}" GroupName="CatalogIcon" Background="Transparent"
+                                             IsChecked="{Binding IsSelected, Mode=OneWay}" Tag="{Binding Spec}" ToolTip="{Binding Name}"
+                                             AutomationProperties.Name="{Binding Name}" AutomationProperties.AutomationId="{Binding Spec}"
+                                             Command="{Binding DataContext.SelectCatalogIconCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" CommandParameter="{Binding Spec}">
+                                    <Image Width="28" Height="28" Loaded="CatalogImageLoaded" Unloaded="CatalogImageUnloaded" RenderOptions.BitmapScalingMode="HighQuality" />
+                                </RadioButton>
+                            </DataTemplate></ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </DataTemplate></ListBox.ItemTemplate>
+                </ListBox>
+                <StackPanel x:Name="PaletteArea" Height="72" VerticalAlignment="Bottom">
                 <TextBlock Text="颜色" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" Margin="4,12,0,4" />
                 <UniformGrid x:Name="PaletteGrid" Columns="8" Width="288" HorizontalAlignment="Left" KeyboardNavigation.TabNavigation="Once" PreviewKeyDown="ChoiceKeyDown" />
+                </StackPanel>
+                </Grid>
                 <Border Height="1" Background="{DynamicResource ControlStrokeColorDefaultBrush}" Margin="4,10,4,8" />
                 <Button x:Name="IconFileButton" Content="从文件选择…" Style="{StaticResource IconPickerLink}" Command="{Binding SelectIconFileCommand}" />
                 <Button x:Name="IconResetButton" Content="恢复默认" Style="{StaticResource IconPickerLink}" Command="{Binding ResetIconCommand}" />

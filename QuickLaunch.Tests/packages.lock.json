@@ -398,6 +398,11 @@
           "Serilog": "4.2.0"
         }
       },
+      "SharpVectors.Wpf": {
+        "type": "Transitive",
+        "resolved": "1.8.6",
+        "contentHash": "FjD8w5D+nBHBLlVOxr4tZpmqN6XOHhMllKKI9PZDeqjet4wS4PUDdpV/7p71SPQoeowvMivYFoKXsszFUmPpfg=="
+      },
       "WPF-UI": {
         "type": "Transitive",
         "resolved": "4.3.0",
@@ -460,6 +465,7 @@
           "Serilog.Extensions.Hosting": "[10.0.0, )",
           "Serilog.Formatting.Compact": "[3.0.0, )",
           "Serilog.Sinks.File": "[7.0.0, )",
+          "SharpVectors.Wpf": "[1.8.6, )",
           "WPF-UI": "[4.3.0, )",
           "gong-wpf-dragdrop": "[4.0.0, )"
         }

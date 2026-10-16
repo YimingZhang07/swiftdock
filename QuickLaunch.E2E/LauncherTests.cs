@@ -290,7 +290,7 @@ public sealed class LauncherTests(ITestOutputHelper output)
     {
         app.Click(app.ById("AddItemButton"));
         var dialog = app.Dialog("添加项目");
-        app.Click(app.ById("UrlCard", dialog), dialog);
+        app.AssertEditorTypeHeight(dialog);
         app.SetText("https://example.com/", dialog, app.ById("PathBox", dialog));
         app.Click(app.ById("IconPreview", dialog), dialog);
         app.Named("代码", ControlType.RadioButton);
@@ -298,18 +298,59 @@ public sealed class LauncherTests(ITestOutputHelper output)
         Eventually(() => app.Named("设备连接", ControlType.RadioButton).Properties.HasKeyboardFocus.Value, "picker Right arrow to move focus");
         app.Key(VirtualKeyShort.RETURN, dialog);
         Assert.True(app.HasWindow("添加项目")); // Picker Enter must not submit the editor.
+        app.Click(app.ById("SystemSeries"), dialog);
+        app.AssertSystemIconPagePacked();
+        var systemChoice = app.FirstSystemIcon();
+        string systemSpec = systemChoice.AutomationId;
+        Assert.StartsWith("file:%SystemRoot%\\System32\\imageres.dll,-", systemSpec);
+        app.Click(systemChoice, dialog);
+        app.Key(VirtualKeyShort.RIGHT, dialog);
+        Eventually(() => !systemChoice.Properties.HasKeyboardFocus.Value, "system grid Right arrow");
+        app.Key(VirtualKeyShort.LEFT, dialog);
+        Eventually(() => systemChoice.Properties.HasKeyboardFocus.Value, "system grid Left arrow");
+        var firstCell = systemChoice.BoundingRectangle;
+        app.Key(VirtualKeyShort.DOWN, dialog);
+        Eventually(() => app.ById("CatalogRows").FindAllDescendants(cf => cf.ByControlType(ControlType.RadioButton))
+            .Any(e => e.Properties.HasKeyboardFocus.Value && Math.Abs(e.BoundingRectangle.Left - firstCell.Left) <= 1
+                && Math.Abs(e.BoundingRectangle.Top - firstCell.Bottom) <= 1), "system Down arrow to reach the packed second row without a gap");
+        app.Key(VirtualKeyShort.UP, dialog);
+        Eventually(() => systemChoice.Properties.HasKeyboardFocus.Value, "system Up arrow to return to the first cell");
+        app.Key(VirtualKeyShort.RETURN, dialog);
         app.Key(VirtualKeyShort.ESCAPE, dialog);
-        Eventually(() => !app.HasNamed("代码", ControlType.RadioButton), "icon picker to close without closing the editor");
+        Eventually(() => !app.HasNamed("系统", ControlType.RadioButton), "icon picker to close without closing the editor");
         Assert.True(app.HasWindow("添加项目"));
         app.Click(app.ById("SaveButton", dialog), dialog);
         Eventually(() => !app.HasWindow("添加项目") && app.TileNames().Contains("example.com"), "new example.com tile");
         Assert.Equal(5, app.Tiles().Length);
+        app.AssertPersistedIcon("example.com", systemSpec);
+        app.AssertTileMatchesIcon("example.com", systemSpec);
         app.Click(app.Tiles().Single(tile => tile.Name == "example.com"), button: MouseButton.Right);
         app.Click(app.Named("编辑…", ControlType.MenuItem));
         dialog = app.Dialog("编辑项目");
+        app.AssertEditorTypeHeight(dialog);
+        app.Click(app.ById("IconPreview", dialog), dialog);
+        Eventually(() => app.ById("SystemSeries").Patterns.SelectionItem.Pattern.IsSelected.Value, "current system icon's tab to open selected");
+        Eventually(() => app.ById(systemSpec).Patterns.SelectionItem.Pattern.IsSelected.Value, "current system item selected");
+        app.Click(app.ById("ColorSeries"), dialog);
+        app.Click(app.ById("fluent:apps"), dialog);
+        app.Key(VirtualKeyShort.RIGHT, dialog);
+        Eventually(() => app.ById("fluent:apps_list").Properties.HasKeyboardFocus.Value, "colour grid Right arrow");
+        app.Key(VirtualKeyShort.RETURN, dialog);
+        app.Key(VirtualKeyShort.ESCAPE, dialog);
+        app.Click(app.ById("IconPreview", dialog), dialog);
+        Eventually(() => app.ById("ColorSeries").Patterns.SelectionItem.Pattern.IsSelected.Value
+            && app.ById("fluent:apps_list").Patterns.SelectionItem.Pattern.IsSelected.Value, "current colour tab and item selected on reopening");
+        app.Key(VirtualKeyShort.ESCAPE, dialog);
         app.SetText("Edited link", dialog, app.ById("NameBox", dialog));
         app.Click(app.ById("SaveButton", dialog), dialog);
         Eventually(() => !app.HasWindow("编辑项目") && app.TileNames().Contains("Edited link"), "context-menu edit to update the tile");
+        app.AssertPersistedIcon("Edited link", "fluent:apps_list");
+        app.AssertTileMatchesIcon("Edited link", "fluent:apps_list", previousSpec: systemSpec);
+        // The image check clears selection. Restore it with real navigation for F2.
+        int editedIndex = Array.IndexOf(app.TileNames(), "Edited link");
+        app.Key(VirtualKeyShort.DOWN);
+        for (int i = 0; i < editedIndex; i++) app.Key(VirtualKeyShort.RIGHT);
+        app.AssertSelection(editedIndex);
         app.Key(VirtualKeyShort.F2);
         dialog = app.Dialog("重命名条目");
         app.SetText("Review link", dialog, app.ById("NameBox", dialog));
@@ -321,9 +362,9 @@ public sealed class LauncherTests(ITestOutputHelper output)
         Eventually(() => app.Tiles().Length == 5 && app.TileNames().Contains("Review link"), "Ctrl+Z to restore the edited item");
         using var config = app.ExitAndReadConfig();
         var item = config.RootElement.GetProperty("groups")[0].GetProperty("items").EnumerateArray().Single(item => item.GetProperty("name").GetString() == "Review link");
-        Assert.StartsWith("glyph:", item.GetProperty("icon").GetString());
+        Assert.Equal("fluent:apps_list", item.GetProperty("icon").GetString());
 
-    });
+    }, backdrop: "solid");
 
     [DesktopFact]
     public void Delete_group_confirmation_can_cancel_then_delete() => Run(output, app =>

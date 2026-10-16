@@ -4,9 +4,19 @@ Run from an unlocked Windows desktop with the repository SDK installed:
 
 ```powershell
 .\scripts\E2E.ps1
+.\scripts\E2E.ps1 -Filter Add_url_with_icon
+.\scripts\E2E.ps1 -Filter 'Add_url_with_icon,Settings_live_preferences'
 ```
 
-The script restores the existing lock file, builds Release with `-warnaserror`, then runs only `QuickLaunch.E2E`. Results go to `artifacts/e2e/e2e.trx`. `Validate.ps1` restores/builds only the app + unit project and runs the fast unit cases. `Snapshots.ps1` independently builds a small rendering tool and emits 41 review PNGs plus `artifacts/validation/snapshots.json`, with a text-contrast guard for dark settings pages.
+The script restores the existing lock file, builds Release with `-warnaserror`, then runs only `QuickLaunch.E2E`. Results go to `artifacts/e2e/e2e.trx`. `Validate.ps1` restores/builds only the app + unit project and runs the fast unit cases. `Snapshots.ps1` independently builds a small rendering tool and emits 51 review PNGs plus `artifacts/validation/snapshots.json`, with a text-contrast guard for dark settings pages.
+
+`-Filter` selects scenario method names by a case-insensitive literal substring. Comma-separated terms are ORed, whitespace is trimmed, and all data rows of each matching scenario run. The script prints the selected names before starting. No match fails explicitly; omitting the filter runs the full suite. The per-scenario supervisor, 60-second deadline, overall timeout and cleanup are unchanged. Use the focused run while iterating and run the full suite once before merge.
+
+Task 27 is covered by `Add_url_with_icon_then_edit_and_undo_delete`: real clicks through all four type chips in both Add and Edit check unchanged window height; system and colour choices are saved and checked in JSON; screen pixels on each tile must match the app's PNG rendering of the chosen spec at the tile's physical pixel size. It also checks system preselection on reopening, keyboard navigation in all three grids, rename, delete and undo. Run this scenario on light/dark desktops at 100% and 200% scale for native window review. The WPF-host test covers the full logical layout/DPI matrix without a desktop.
+
+This icon scenario uses a solid backdrop. Before each tile capture it clears selection with Escape when needed and moves the pointer into the panel's empty bottom strip. The comparison reads the selected spec's PNG from this run's isolated icon cache, preserving its alpha mask. It composites over the surface measured around the tile image, compares every pixel with a small antialiasing filter and one global ±1 physical-pixel alignment tolerance, and requires colour/shape correlation plus low error on both ink and transparent regions. The colour check also rejects a match to the preceding system icon. It does not compare differently sized editor screenshots or infer transparency from the preview's corner. Failure diagnostics include the cache filename, pixel size, correlation, ink/clear-space errors and alignment. A shared WPF-host test uses the actual 32/64px renderings in dark/light backgrounds, including half-pixel positioning, and verifies rejection of the URL globe, previous system icon, another Fluent icon and an absent image; it also verifies cache filenames against the app's writer. The scenario restores selection with real keyboard navigation before its F2 check.
+
+The snapshot plan includes `add-dialog` (App), `add-dialog-file`, `add-dialog-folder`, `add-dialog-url`, `icon-picker-system` and `icon-picker-color`, each in dark and `-light` variants. System snapshots reflect the icons installed on the rendering machine; no Windows artwork is bundled. The renderer waits through background image loads and row repacking until the realized page settles. Empty, faint-frame and unusable system resources are removed and remembered for the session at each pixel size; replacement cells fill the viewport. Catalog grids use the simple palette's space while the popup keeps one height. The existing `Add_url_with_icon_then_edit_and_undo_delete` E2E also checks that the first system page has complete rows with visible ink in every cell. `Snapshots.ps1` validates the completed inventory against `snapshots.json.expected` and reports that count, without a separate hard-coded matrix size.
 
 The suite sends real keyboard and mouse input. Leave the desktop unlocked and do not use the keyboard or mouse during the run. Tests run in one nonparallel collection, with a fresh app/profile per scenario. Background services, a locked/disconnected desktop, and runs without explicit opt-in report **Skipped**, not Passed. For direct `scripts/dotnet.ps1 test QuickLaunch.E2E -c Release`, set `QUICKLAUNCH_E2E=1`; `E2E.ps1` sets and restores that environment variable automatically. Do not opt in from a sandbox.
 
@@ -64,10 +74,10 @@ Desktop review should check the real input/foreground behavior, native header/ed
 | 1 | `Tile_reorder_is_visible_and_persisted` | Default-size real Gong reorder. |
 | 1 | `Large_icon_reorder_crosses_row_boundary_and_is_persisted` | 48 px real Gong cross-row reorder. |
 | 1 | `Settings_live_preferences_are_persisted` | Website icons off, follow-mouse, and reset of all four saved geometry fields in one settings visit. |
-| 1 | `Add_url_with_icon_then_edit_and_undo_delete` | URL host naming, picker arrows/Enter/Escape, context edit, F2 rename, Delete, Ctrl+Z, persisted glyph. |
+| 1 | `Add_url_with_icon_then_edit_and_undo_delete` | Stable Add/Edit height through all four types, URL host naming, all three picker grids and keyboard navigation, current-item preselection, persisted system/Fluent specs and tile pixels, F2 rename, Delete and Ctrl+Z. |
 | 1 | `Delete_group_confirmation_can_cancel_then_delete` | Cancel then accept, persisted surviving group. |
 
-Unit tests cover decision tables and persistence edge cases; E2E covers input/binding/native integration. The 41-image snapshot matrix provides visual evidence for review.
+Unit tests cover decision tables and persistence edge cases; E2E covers input/binding/native integration. The 51-image snapshot matrix provides visual evidence for review.
 
 Snapshot rendering is independent of this suite: `Snapshots.ps1` uses non-activating offscreen surfaces, six-second per-image worker deadlines and a 90-second overall renderer deadline. It continuously writes rendered/failed/current progress to `snapshots.json`, including partial failure. It never runs modal dialogs or requests human input.
 
@@ -202,7 +212,7 @@ keyboard focus or WPF `IsActive`; see the
 
 Settings snapshots include `settings-general`,
 `settings-appearance`, `settings-panel`, and `settings-about`, each with `.png` and
-`-light.png` variants, alongside accent/material images in the 41-image matrix.
+`-light.png` variants, alongside accent/material images in the 51-image matrix.
 `launcher-status.png` and `launcher-status-light.png` show the drag hint as plain text in
 the reserved bottom strip. Review its spacing, ellipsis and cancel link on the desktop
 in both themes with acrylic, mica and solid; offscreen renders do not capture DWM material.

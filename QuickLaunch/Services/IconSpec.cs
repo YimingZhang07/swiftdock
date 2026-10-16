@@ -11,11 +11,15 @@ public sealed record IconSpec
     public string? Color { get; private init; }
     public string? Path { get; private init; }
     public int? Index { get; private init; }
-    public bool IsGlyph => Path is null;
+    public string? FluentName { get; private init; }
+    public bool IsFluent => FluentName is not null;
+    public bool IsGlyph => Path is null && !IsFluent;
 
     public static IconSpec? Parse(string? value)
     {
         if (value is null || value.Length > 32767) return null;
+        if (value.StartsWith("fluent:", StringComparison.Ordinal))
+            return FluentColorCatalog.Contains(value[7..]) ? new() { FluentName = value[7..] } : null;
         if (value.StartsWith("glyph:", StringComparison.Ordinal))
         {
             var parts = value.Split(':');
@@ -38,12 +42,12 @@ public sealed record IconSpec
             string expanded = Environment.ExpandEnvironmentVariables(path);
             if (!System.IO.Path.IsPathFullyQualified(expanded) || expanded.IndexOfAny(['"', '<', '>', '|', '?', '*', '\0']) >= 0
                 || expanded.Any(char.IsControl)) return null;
-            return new() { Path = ItemIdentity.PortablePath(expanded), Index = index };
+            return new() { Path = SystemIconCatalog.PortablePath(expanded), Index = index };
         }
         catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException) { return null; }
     }
 
-    public override string ToString() => IsGlyph ? $"glyph:{CodePoint:X4}:{Color}"
+    public override string ToString() => IsFluent ? "fluent:" + FluentName : IsGlyph ? $"glyph:{CodePoint:X4}:{Color}"
         : "file:" + Path + (Index is { } index ? "," + index.ToString(CultureInfo.InvariantCulture) : "");
     public static string? Normalize(string? value) => Parse(value)?.ToString();
 }

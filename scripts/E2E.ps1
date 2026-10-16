@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([ValidateRange(30, 1800)][int]$TimeoutSeconds = 300)
+param([ValidateRange(30, 1800)][int]$TimeoutSeconds = 300, [string]$Filter = '')
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path $PSScriptRoot -Parent
 $previousOptIn = $env:QUICKLAUNCH_E2E
@@ -162,8 +162,27 @@ try {
     $env:QUICKLAUNCH_E2E = '1'
     $env:QUICKLAUNCH_E2E_RUN_ID = $runId
     $dotnet = Join-Path $repoRoot '.tools/dotnet/dotnet.exe'
-    $runner = Start-Process -FilePath $dotnet -ArgumentList @('test', 'QuickLaunch.E2E/QuickLaunch.E2E.csproj', '-c', 'Release',
-        '--no-build', '--no-restore', '--logger', '"trx;LogFileName=e2e.trx"', '--results-directory', 'artifacts/e2e') `
+    # Discover compiled tests without running any scenario or touching UIA.
+    $discovered = & $dotnet test QuickLaunch.E2E/QuickLaunch.E2E.csproj -c Release --no-build --no-restore --list-tests
+    if ($LASTEXITCODE -ne 0) { throw 'E2E scenario discovery failed.' }
+    $names = @($discovered | ForEach-Object {
+        if ($_ -match '^\s+(QuickLaunch\.E2E\.\w+\.\w+)(?:\(|\s*$)') { $Matches[1] }
+    } | Sort-Object -Unique)
+    $terms = @($Filter.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_.Length -gt 0 })
+    $selected = @($names | Where-Object {
+        $name = $_
+        $terms.Count -eq 0 -or @($terms | Where-Object { $name.IndexOf($_, [StringComparison]::OrdinalIgnoreCase) -ge 0 }).Count -gt 0
+    })
+    if ($selected.Count -eq 0) { throw "No E2E scenarios match '$Filter'." }
+    Write-Output 'Selected E2E scenarios (all data rows of each selected scenario):'
+    $selected | ForEach-Object { Write-Output "  $_" }
+    $testArguments = @('test', 'QuickLaunch.E2E/QuickLaunch.E2E.csproj', '-c', 'Release',
+        '--no-build', '--no-restore', '--logger', '"trx;LogFileName=e2e.trx"', '--results-directory', 'artifacts/e2e')
+    if ($terms.Count -gt 0) {
+        $expression = ($selected | ForEach-Object { "FullyQualifiedName=$_" }) -join '|'
+        $testArguments += @('--filter', ('"' + $expression + '"'))
+    }
+    $runner = Start-Process -FilePath $dotnet -ArgumentList $testArguments `
         -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput (Join-Path $output 'e2e.stdout.log') -RedirectStandardError (Join-Path $output 'e2e.stderr.log')
     $null = $runner.Handle

@@ -23,8 +23,11 @@
     <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
     <PackageReference Include="Serilog.Formatting.Compact" Version="3.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="SharpVectors.Wpf" Version="1.8.6" />
     <PackageReference Include="WPF-UI" Version="4.3.0" />
     <Resource Include="Assets\QuickLaunch.ico" />
+    <EmbeddedResource Include="Assets\FluentColor\*.svg" />
+    <EmbeddedResource Include="..\THIRD-PARTY-NOTICES.md" LogicalName="THIRD-PARTY-NOTICES.md" />
     <InternalsVisibleTo Include="QuickLaunch.Tests" />
     <InternalsVisibleTo Include="QuickLaunch.Snapshots" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />

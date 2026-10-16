@@ -84,6 +84,12 @@
           "Serilog": "4.2.0"
         }
       },
+      "SharpVectors.Wpf": {
+        "type": "Direct",
+        "requested": "[1.8.6, )",
+        "resolved": "1.8.6",
+        "contentHash": "FjD8w5D+nBHBLlVOxr4tZpmqN6XOHhMllKKI9PZDeqjet4wS4PUDdpV/7p71SPQoeowvMivYFoKXsszFUmPpfg=="
+      },
       "WPF-UI": {
         "type": "Direct",
         "requested": "[4.3.0, )",

@@ -129,15 +129,27 @@ internal static class ImageRenderer
                     target = Open(scope.ServiceProvider.GetRequiredService<NameDialog>());
                     break;
                 case "add-dialog":
+                case "add-dialog-file":
+                case "add-dialog-folder":
+                case "add-dialog-url":
                 case "edit-dialog":
                 case "icon-picker":
+                case "icon-picker-system":
+                case "icon-picker-color":
                     var model = scope.ServiceProvider.GetRequiredService<EditItemViewModel>();
-                    model.Initialize(image.Kind == "add-dialog" ? null : group.Items[0]);
+                    model.Initialize(image.Kind.StartsWith("add-dialog", StringComparison.Ordinal) ? null : group.Items[0]);
+                    model.SelectedKind = image.Kind switch
+                    {
+                        "add-dialog-file" => LaunchKind.File, "add-dialog-folder" => LaunchKind.Folder,
+                        "add-dialog-url" => LaunchKind.Url, _ => model.SelectedKind
+                    };
+                    if (image.Kind == "icon-picker-system") model.CustomIcon = (await icons.GetSystemIconsAsync()).FirstOrDefault()?.Spec;
+                    if (image.Kind == "icon-picker-color") model.CustomIcon = "fluent:apps";
                     var editor = (EditItemDialog)Open(scope.ServiceProvider.GetRequiredService<EditItemDialog>());
                     await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                     await editor.TargetRefresh.WaitAsync(TimeSpan.FromSeconds(3));
                     target = editor;
-                    if (image.Kind == "icon-picker")
+                    if (image.Kind.StartsWith("icon-picker", StringComparison.Ordinal))
                     {
                         // Native popups clamp back onto a monitor. Host the actual child
                         // tree offscreen instead; Popup.IsOpen stays false throughout.
@@ -145,6 +157,8 @@ internal static class ImageRenderer
                         editor.IconPopup.Child = null;
                         surface.DataContext = model;
                         Open(ContentHost(surface, editor));
+                        await editor.SelectIconSeriesAsync(image.Kind switch { "icon-picker-system" => 1, "icon-picker-color" => 2, _ => 0 });
+                        await editor.WaitForPickerAsync().WaitAsync(TimeSpan.FromSeconds(3));
                         target = surface; overflow = true;
                     }
                     break;
