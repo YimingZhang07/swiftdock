@@ -131,9 +131,14 @@ internal sealed partial class LauncherSession
 
     public void AssertInactiveBackdrop(string backdrop)
     {
-        if (!SupportsMaterial(backdrop)) return;
         var bounds = Panel.BoundingRectangle;
         using var probe = new HotkeyInputWindow(new Rectangle(bounds.Left - 24, bounds.Top - 24, bounds.Width + 48, bounds.Height + 144));
+        if (SupportsMaterial(backdrop)) AssertInactiveMaterial(backdrop, probe);
+        AssertPinAndInactiveHotkey(probe); // Also runs when DWM falls back to solid.
+    }
+
+    private void AssertInactiveMaterial(string backdrop, HotkeyInputWindow probe)
+    {
         var inputWindow = _automation.FromHandle(probe.Handle).AsWindow();
         void Keep(bool enabled)
         {
@@ -214,17 +219,90 @@ internal sealed partial class LauncherSession
             : "Both OFF and ON delivered typing with panel IsActive=false.";
         Diagnostic(diagnosis);
         Assert.True(errors.Count == 0, diagnosis + Environment.NewLine + string.Join(Environment.NewLine, errors));
-        // Unlike Hotkey(), preserve the inactive foreground during this chord.
-        try
+    }
+
+    private void AssertPinAndInactiveHotkey(HotkeyInputWindow probe)
+    {
+        var inputWindow = _automation.FromHandle(probe.Handle).AsWindow();
+        void AssertProbeFocus()
         {
-            PressKey(VirtualKeyShort.CONTROL); PressKey(VirtualKeyShort.ALT); PressKey(VirtualKeyShort.SHIFT); PressKey(VirtualKeyShort.F11);
+            Assert.Equal(probe.Handle, Desktop.GetForegroundWindow());
+            Assert.Equal(probe.EditHandle, Desktop.GuiInfo().Focus);
         }
-        finally
+        void TypeInProbe(string text)
         {
-            ReleaseKey(VirtualKeyShort.F11); ReleaseKey(VirtualKeyShort.SHIFT); ReleaseKey(VirtualKeyShort.ALT); ReleaseKey(VirtualKeyShort.CONTROL);
+            Foreground(inputWindow);
+            Assert.True(Desktop.GetWindowRect(probe.EditHandle, out var bounds));
+            var point = Center(bounds.Rectangle);
+            SaveCursor(); MoveMouse(point);
+            Desktop.GetWindowThreadProcessId(Desktop.WindowFromPoint(point), out uint process);
+            Assert.Equal((uint)Environment.ProcessId, process);
+            try { PressMouse(MouseButton.Left); } finally { ReleaseMouse(MouseButton.Left); }
+            Eventually(() => Desktop.GetForegroundWindow() == probe.Handle && Desktop.GuiInfo().Focus == probe.EditHandle,
+                "test EDIT owns foreground and keyboard focus before hotkey");
+            probe.ClearEditText();
+            Assert.Equal("", Desktop.ReadEditText(probe.EditHandle));
+            TypeOwnedText(text);
+            Eventually(() => Desktop.ReadEditText(probe.EditHandle) == text, "typing reaches test EDIT before hotkey");
+            AssertProbeFocus();
         }
-        AssertVisible(true); AssertForeground(); AssertTileListFocused();
-        Hotkey(); AssertVisible(false); Hotkey(panelHidden: true);
+        void HotkeyFromProbe()
+        {
+            AssertProbeFocus();
+            // No Foreground() call here: the product alone must change visibility/focus.
+            try
+            {
+                foreach (var key in new[] { VirtualKeyShort.CONTROL, VirtualKeyShort.ALT, VirtualKeyShort.SHIFT, VirtualKeyShort.F11 })
+                {
+                    AssertProbeFocus();
+                    PressKey(key);
+                }
+            }
+            finally
+            {
+                ReleaseKey(VirtualKeyShort.F11); ReleaseKey(VirtualKeyShort.SHIFT); ReleaseKey(VirtualKeyShort.ALT); ReleaseKey(VirtualKeyShort.CONTROL);
+            }
+        }
+        void AssertPin(bool enabled)
+        {
+            var pin = ById("PinButton");
+            Assert.Equal("置顶", pin.Name);
+            Eventually(() => pin.Patterns.Toggle.Pattern.ToggleState.Value == (enabled ? ToggleState.On : ToggleState.Off),
+                $"pin TogglePattern = {enabled}");
+            Eventually(() => ((Desktop.GetWindowLong(PanelHandle, -20) & 0x00000008) != 0) == enabled,
+                $"native WS_EX_TOPMOST = {enabled}");
+        }
+        void AssertSavedPin(bool enabled) => Eventually(() =>
+        {
+            try
+            {
+                using var stream = new FileStream(ConfigFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using var json = JsonDocument.Parse(stream);
+                bool present = json.RootElement.TryGetProperty("alwaysOnTop", out var value);
+                return enabled ? !present : present && value.ValueKind == JsonValueKind.False;
+            }
+            catch (IOException) { return false; }
+        }, enabled ? "alwaysOnTop omitted after pin ON" : "alwaysOnTop false persisted after pin OFF");
+
+        AssertVisible(true); AssertPin(true);
+        TypeInProbe("pinned");
+        HotkeyFromProbe();
+        AssertVisible(false); AssertProbeFocus();
+        // Do not reactivate or click the fixture after hiding: its original focus must survive.
+        TypeOwnedText("hidden");
+        Eventually(() =>
+        {
+            AssertProbeFocus();
+            return Desktop.ReadEditText(probe.EditHandle) == "pinnedhidden";
+        }, "one pinned hotkey hides without stealing foreground or EDIT focus");
+
+        HotkeyFromProbe(); AssertVisible(true); AssertForeground(); AssertTileListFocused();
+        Click(ById("PinButton")); AssertPin(false); AssertSavedPin(false);
+        TypeInProbe("unpinned");
+        HotkeyFromProbe(); AssertVisible(true); AssertForeground(); AssertTileListFocused();
+        Hotkey(); AssertVisible(false);
+        Hotkey(panelHidden: true); AssertForeground(); AssertTileListFocused();
+        Click(ById("PinButton")); AssertPin(true); AssertSavedPin(true);
         Key(VirtualKeyShort.ESCAPE); AssertVisible(false); Hotkey(panelHidden: true);
     }
 

@@ -111,6 +111,10 @@ internal static class ImageRenderer
             switch (image.Kind)
             {
                 case "launcher": target = launcherWindow; break;
+                case "launcher-status":
+                    launcher.SetStatus("拖动中 · Esc 取消 · 松开提交");
+                    target = launcherWindow;
+                    break;
                 case "settings-general":
                 case "settings-appearance":
                 case "settings-panel":

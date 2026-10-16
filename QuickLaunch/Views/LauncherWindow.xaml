@@ -6,7 +6,7 @@
         xmlns:gong="urn:gong-wpf-dragdrop"
         xmlns:drop="clr-namespace:QuickLaunch.DragDrop"
         Title="QuickLaunch" Width="620" Height="500" WindowStyle="None"
-        ResizeMode="CanResize" AllowsTransparency="False" ShowInTaskbar="False" Topmost="True"
+        ResizeMode="CanResize" AllowsTransparency="False" ShowInTaskbar="False" Topmost="{Binding State.AlwaysOnTop, Mode=OneWay}"
         Background="{DynamicResource ApplicationBackgroundBrush}" Foreground="{DynamicResource TextFillColorPrimaryBrush}" FontFamily="Segoe UI, Microsoft YaHei UI"
         UseLayoutRounding="True" Focusable="False" FocusVisualStyle="{x:Null}">
     <WindowChrome.WindowChrome>
@@ -46,7 +46,7 @@
         <Style TargetType="Thumb">
             <Setter Property="Focusable" Value="False" /><Setter Property="FocusVisualStyle" Value="{x:Null}" />
         </Style>
-        <Style x:Key="IconButton" TargetType="Button">
+        <Style x:Key="IconButton" TargetType="{x:Type ButtonBase}">
             <Setter Property="Width" Value="32" /><Setter Property="Height" Value="32" />
             <Setter Property="Margin" Value="0" /><Setter Property="Padding" Value="0" />
             <Setter Property="Background" Value="Transparent" /><Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
@@ -54,7 +54,7 @@
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="Button">
+                    <ControlTemplate TargetType="{x:Type ButtonBase}">
                         <Grid>
                             <Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="4">
                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" />
@@ -68,6 +68,17 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+        <Style x:Key="PinIconButton" TargetType="ToggleButton" BasedOn="{StaticResource IconButton}">
+            <!-- Pin / Unpin exist in both Segoe Fluent Icons and Segoe MDL2 Assets. -->
+            <Setter Property="Content" Value="&#xE77A;" />
+            <Setter Property="ToolTip" Value="置顶" />
+            <Style.Triggers>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter Property="Content" Value="&#xE718;" />
+                    <Setter Property="ToolTip" Value="取消置顶" />
+                </Trigger>
+            </Style.Triggers>
         </Style>
         <Style x:Key="AddGroupIconButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}" />
@@ -206,6 +217,8 @@
                     </TextBlock>
                     <Button x:Name="AddItemButton" Style="{StaticResource IconButton}" Content="&#xECC8;" ToolTip="添加项目（也可拖入文件）" AutomationProperties.Name="添加项目" Command="{Binding AddItemCommand}" IsEnabled="{Binding CanEdit}" />
                     <Button x:Name="SettingsButton" Style="{StaticResource IconButton}" Content="&#xE713;" ToolTip="设置" AutomationProperties.Name="设置" Click="SettingsClick" />
+                    <ToggleButton x:Name="PinButton" Style="{StaticResource PinIconButton}" AutomationProperties.Name="置顶" AutomationProperties.AutomationId="PinButton"
+                                  IsChecked="{Binding State.AlwaysOnTop, Mode=TwoWay}" IsEnabled="{Binding CanEdit}" />
                     <Button x:Name="HidePanelButton" Style="{StaticResource IconButton}" Content="&#xE8BB;" FontSize="10" AutomationProperties.Name="隐藏面板" Command="{Binding HidePanelCommand}"
                             ToolTip="{Binding State.HotkeyDisplay, StringFormat=隐藏 (Esc)  ·  {0} 呼出}" />
                 </StackPanel>
@@ -255,14 +268,13 @@
                 <TextBlock Text="或点击右上角添加项目" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextAlignment="Center" FontSize="12" Margin="0,6,0,0" />
             </StackPanel>
         </Grid>
-        <Grid Grid.RowSpan="2" VerticalAlignment="Bottom" Margin="0,0,0,12">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="5*" /><ColumnDefinition Width="90*" /><ColumnDefinition Width="5*" /></Grid.ColumnDefinitions>
-            <local:ToastSurface x:Name="Toast" Grid.Column="1" HorizontalAlignment="Center" Background="{DynamicResource FlyoutBackground}"
-                               BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="999" Padding="14,6" Visibility="Collapsed" Opacity="0">
+        <Grid Grid.Row="1" VerticalAlignment="Bottom" Height="{x:Static services:WindowPlacement.BottomPadding}" Margin="16,0" ClipToBounds="True">
+            <local:ToastSurface x:Name="Toast" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" Opacity="0">
                 <DockPanel>
                     <Button x:Name="CancelImportButton" DockPanel.Dock="Right" Style="{StaticResource ToastLink}" FontSize="12" Content="取消" AutomationProperties.Name="取消导入"
                             Command="{Binding CancelImportCommand}" Visibility="{Binding Importing, Converter={StaticResource BoolToVisibility}}" />
-                    <TextBlock x:Name="Status" Text="{Binding ToastText}" Foreground="{DynamicResource TextFillColorPrimaryBrush}" TextWrapping="Wrap" FontSize="12" IsHitTestVisible="False" />
+                    <TextBlock x:Name="Status" Text="{Binding ToastText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="NoWrap"
+                               TextTrimming="CharacterEllipsis" TextAlignment="Center" FontSize="12" IsHitTestVisible="False" />
                 </DockPanel>
             </local:ToastSurface>
         </Grid>

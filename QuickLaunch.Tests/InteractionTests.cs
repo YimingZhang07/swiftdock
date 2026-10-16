@@ -10,6 +10,50 @@ namespace QuickLaunch.Tests;
 
 public sealed class InteractionTests
 {
+    [Theory]
+    [InlineData(false, false, true, false)]
+    [InlineData(true, true, false, true)]
+    [InlineData(true, false, true, true)]
+    [InlineData(true, false, false, false)]
+    public void HotkeyHidesVisibleActiveOrPinnedPanel(bool visible, bool active, bool pinned, bool hide) =>
+        Assert.Equal(hide ? LauncherWindow.ToggleAction.Hide : LauncherWindow.ToggleAction.Show,
+            LauncherWindow.ToggleDecision(visible, active, pinned));
+
+    [Fact]
+    public void HotkeyGuardsKeepOwnedDialogsFirstAndIgnoreInteractions()
+    {
+        foreach (bool visible in new[] { false, true })
+        foreach (bool pinned in new[] { false, true })
+        foreach (var guard in new[] { (true, false, false, false), (false, true, false, false),
+            (false, false, true, false), (false, false, false, true), (true, true, true, true) })
+        {
+            Assert.Equal(LauncherWindow.ToggleAction.Ignore, LauncherWindow.ToggleDecision(visible, false, pinned,
+                false, guard.Item1, guard.Item2, guard.Item3, guard.Item4));
+            Assert.Equal(LauncherWindow.ToggleAction.ActivateOwnedDialog, LauncherWindow.ToggleDecision(visible, false, pinned,
+                true, guard.Item1, guard.Item2, guard.Item3, guard.Item4));
+        }
+        Assert.Equal(LauncherWindow.ToggleAction.ActivateOwnedDialog,
+            LauncherWindow.ToggleDecision(true, true, true, ownedDialog: true));
+    }
+
+    [Theory]
+    [InlineData(false)] [InlineData(true)]
+    public Task PinUsesSavePipelineAndRespectsCanEdit(bool readOnly) => OnSta(vm =>
+    {
+        Assert.True(vm.AlwaysOnTop);
+        long revision = vm.Revision;
+        vm.AlwaysOnTop = false;
+        vm.AlwaysOnTop = false;
+        Assert.Equal(readOnly, vm.AlwaysOnTop);
+        Assert.Equal(readOnly ? null : (bool?)false, vm.Snapshot().AlwaysOnTop);
+        Assert.Equal(revision + (readOnly ? 0 : 1), vm.Revision);
+        vm.AlwaysOnTop = true;
+        Assert.True(vm.AlwaysOnTop); Assert.Null(vm.Snapshot().AlwaysOnTop);
+        Assert.Equal(revision + (readOnly ? 0 : 2), vm.Revision);
+        vm.Suspend(true); vm.AlwaysOnTop = false;
+        Assert.True(vm.AlwaysOnTop);
+    }, readOnly: readOnly);
+
     [Fact]
     public async Task CustomIconSurvivesEditRenameMovesDeleteUndoAndPersistence() => await OnSta(vm =>
     {

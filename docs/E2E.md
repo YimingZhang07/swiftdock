@@ -6,7 +6,7 @@ Run from an unlocked Windows desktop with the repository SDK installed:
 .\scripts\E2E.ps1
 ```
 
-The script restores the existing lock file, builds Release with `-warnaserror`, then runs only `QuickLaunch.E2E`. Results go to `artifacts/e2e/e2e.trx`. `Validate.ps1` restores/builds only the app + unit project and runs the fast unit cases. `Snapshots.ps1` independently builds a small rendering tool and emits 39 review PNGs plus `artifacts/validation/snapshots.json`, with a text-contrast guard for dark settings pages.
+The script restores the existing lock file, builds Release with `-warnaserror`, then runs only `QuickLaunch.E2E`. Results go to `artifacts/e2e/e2e.trx`. `Validate.ps1` restores/builds only the app + unit project and runs the fast unit cases. `Snapshots.ps1` independently builds a small rendering tool and emits 41 review PNGs plus `artifacts/validation/snapshots.json`, with a text-contrast guard for dark settings pages.
 
 The suite sends real keyboard and mouse input. Leave the desktop unlocked and do not use the keyboard or mouse during the run. Tests run in one nonparallel collection, with a fresh app/profile per scenario. Background services, a locked/disconnected desktop, and runs without explicit opt-in report **Skipped**, not Passed. For direct `scripts/dotnet.ps1 test QuickLaunch.E2E -c Release`, set `QUICKLAUNCH_E2E=1`; `E2E.ps1` sets and restores that environment variable automatically. Do not opt in from a sandbox.
 
@@ -30,7 +30,7 @@ The cross-row reorder scenario seeds 48 px icons in a 340-DIP-wide window. It ch
 
 One parameterized accent test (two cases) seeds `dark` + `mica` + `purple` and `light` + `acrylic` + `green` before starting the real apphost. They require Windows high contrast to be off; they never change Windows preferences. Before any settings interaction, the harness waits for the panel to be foreground, uses the selected tab's UIA bounds to locate the center of its 14×3-DIP underline, and reads three interior screen pixels. All three must have saturation of at least 20% and hue within 15 degrees of the preset, stable for 350 ms. It repeats the pixel assertion after hiding/showing via the global hotkey, normal `WM_SETTINGCHANGE` / `WM_THEMECHANGED` / `WM_DWMCOLORIZATIONCOLORCHANGED` messages sent to the panel, and real settings clicks that change and restore the theme/material. Config is checked after graceful exit; missing/null `theme`, `backdrop` or `accent` means `system`, `acrylic` or `system` respectively, matching the product's omitted-default format. The green/acrylic case therefore does not call GetProperty on an omitted default. On Windows 11 22H2+, startup/restored panel material and changed/restored settings material also use DWM attribute checks with Windows transparency-off fallback. Successful screen captures are saved as `artifacts/e2e/Accent_preset_{dark_mica_purple|light_acrylic_green}-{phase}.png`; the normal failure screenshot and retained profile still apply. These tests exercise the ordinary host, native activation and appearance-message hook, without app-private hooks.
 
-Every app is shut down using `QuickLaunch.exe --exit --config-dir <its directory>`, then awaited before persisted JSON is read. A timeout is a failure and only then permits last-resort termination, with a diagnostic warning about a possible ghost tray icon. The harness does not use FlaUI's application disposal as a termination shortcut.
+Every app is shut down using `QuickLaunch.exe --exit --config-dir <its directory>`, then awaited before final persisted JSON is read. The pin scenario also polls the atomic config file while running to prove each click is saved. A timeout is a failure and only then permits last-resort termination, with a diagnostic warning about a possible ghost tray icon. The harness does not use FlaUI's application disposal as a termination shortcut.
 
 Appearance notifications use the explicit Unicode `SendMessageTimeoutW` entry point with pointer-sized HWND/WPARAM/LPARAM, a `uint` message ID and a pointer-sized result. Each of `0x001A`, `0x031A` and `0x0320` is sent only to the test panel, with `wParam = lParam = 0`, `SMTO_ABORTIFHUNG` and a 2000 ms timeout. There are no cross-process string pointers or broadcasts to other applications. `WM_SETTINGCHANGE` is a pointer-bearing system message, for which asynchronous cross-process posting is unsuitable ([PostMessage restrictions](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-postmessagew)). Delivery is checked using the nonzero API return, not the window procedure's result, which can validly be zero ([SendMessageTimeout contract](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendmessagetimeoutw)). `SetLastError = true` preserves the error read immediately through `Marshal.GetLastWin32Error`; failures report the message ID, HWND, timeout and numeric Win32 error. An error of zero on failed delivery means no extended error was supplied. All three messages remain mandatory, including on UIPI/access-denied failures; none is silently dropped. The later pixel and settings phases remain unchanged.
 
@@ -45,6 +45,8 @@ Desktop review should check the real input/foreground behavior, native header/ed
 | Cases | Scenario | Behaviors |
 | --- | --- | --- |
 | 2 | `Accent_preset_survives_startup_and_appearance_changes` | Purple/dark/mica and green/light/acrylic, all five color phases, config defaults, native backdrop. |
+| 2 | `Inactive_material_pixels_and_real_focus_survive_prewarm` | Acrylic/mica inactive pixels, real EDIT typing, pin clicks and persistence, native topmost bit, pinned hide retaining focus and unpinned activation. |
+| 1 | `Settings_navigation_and_opacity_drag_persist_after_exit` | Four settings pages, live opacity drag, inactive-material toggle and persistence. |
 | 1 | `Keyboard_pointer_menu_escape_and_hotkey` | Alt/arrows, empty-area click, menu Escape, two-stage panel Escape, hotkey hide/show, Ctrl+Tab and mouse tab focus. |
 | 1 | `Tab_click_switches_both_ways_and_drag_reorders` | Real clicks on the other tab and back verify tile names, cleared selection and list focus; dragging the inactive tab verifies visible/persisted tab order without selecting it. |
 | 1 | `Click_and_held_enter_each_launch_once` | Click then held Enter, one record for each, no delayed duplicate. |
@@ -56,7 +58,7 @@ Desktop review should check the real input/foreground behavior, native header/ed
 | 1 | `Add_url_with_icon_then_edit_and_undo_delete` | URL host naming, picker arrows/Enter/Escape, context edit, F2 rename, Delete, Ctrl+Z, persisted glyph. |
 | 1 | `Delete_group_confirmation_can_cancel_then_delete` | Cancel then accept, persisted surviving group. |
 
-Unit tests cover decision tables and persistence edge cases; E2E covers input/binding/native integration. The 39-image snapshot matrix provides visual evidence for review.
+Unit tests cover decision tables and persistence edge cases; E2E covers input/binding/native integration. The 41-image snapshot matrix provides visual evidence for review.
 
 Snapshot rendering is independent of this suite: `Snapshots.ps1` uses non-activating offscreen surfaces, six-second per-image worker deadlines and a 90-second overall renderer deadline. It continuously writes rendered/failed/current progress to `snapshots.json`, including partial failure. It never runs modal dialogs or requests human input.
 
@@ -72,8 +74,15 @@ window. OFF must visibly change from active (maximum RGB-channel distance greate
 three); its DWM fallback need not equal the theme's solid colour. ON must remain within three RGB levels of the active sample and differ from the
 fallback by more than three. Samples must settle for 800 ms. An indistinguishable active
 sample fails explicitly instead of accepting a no-op. No Windows preferences are changed.
-The same case types into a test-owned EDIT control, presses Esc there, then uses the global
-hotkey from that inactive state and verifies panel focus, hide/show and panel Esc.
+The same case types into a test-owned EDIT control and presses Esc there. With the pinned
+panel still visible, one Ctrl+Alt+Shift+F11 hides it while the fixture retains foreground
+and EDIT focus; more real typing must append to the same text without a focus repair.
+A real click on `PinButton` turns pinning off, exposes UIA TogglePattern OFF, clears native
+`WS_EX_TOPMOST`, and persists `"alwaysOnTop": false`. From the fixture's foreground, one
+hotkey then activates the unpinned panel with tile focus and the next hides it. Clicking
+the pin back on restores the native bit and removes the JSON key. These pin/hotkey checks
+also run when material pixel checks are unavailable. The existing supervised worker and
+60-second deadline apply; the scenario ends with panel Esc and show verification.
 
 DWM attribute support alone does not prove that `WM_NCACTIVATE` preserves
 `DWMSBT_TRANSIENTWINDOW`. These pixel cases are the desktop acceptance check. If acrylic
@@ -83,7 +92,11 @@ keyboard focus or WPF `IsActive`; see the
 
 Settings snapshots include `settings-general`,
 `settings-appearance`, `settings-panel`, and `settings-about`, each with `.png` and
-`-light.png` variants, alongside accent/material images in the 39-image matrix.
+`-light.png` variants, alongside accent/material images in the 41-image matrix.
+`launcher-status.png` and `launcher-status-light.png` show the drag hint as plain text in
+the reserved bottom strip. Review its spacing, ellipsis and cancel link on the desktop
+in both themes with acrylic, mica and solid; offscreen renders do not capture DWM material.
+Also check owned settings/editors/confirmations remain above the panel with pin on and off.
 
 ## Deadlines and focus control
 

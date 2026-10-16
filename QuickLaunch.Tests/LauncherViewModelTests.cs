@@ -220,6 +220,8 @@ public sealed partial class LauncherViewModelTests
         vm.SetImporting(false); Assert.Equal(TimeSpan.FromSeconds(6), vm.ToastDuration);
         h.Actions.Result = new(false, true, "cancelled");
         await vm.LaunchCommand.ExecuteAsync(vm.SelectedGroup.Items[0]); Assert.Contains("cancelled", vm.ToastText);
+        vm.SetStatus("第一条\r\n第二条\n第三条");
+        Assert.Equal("第一条 第二条 第三条", vm.ToastText);
     });
 
     [Fact]

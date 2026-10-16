@@ -113,7 +113,7 @@ internal static class SnapshotRunner
     {
         List<SnapshotImage> images = [];
         foreach (string theme in new[] { "dark", "light" })
-        foreach (string kind in new[] { "launcher", "settings-general", "settings-appearance", "settings-panel", "settings-about", "name-dialog", "add-dialog", "edit-dialog", "icon-picker", "item-menu", "delete-confirm" })
+        foreach (string kind in new[] { "launcher", "launcher-status", "settings-general", "settings-appearance", "settings-panel", "settings-about", "name-dialog", "add-dialog", "edit-dialog", "icon-picker", "item-menu", "delete-confirm" })
             images.Add(new(kind + (theme == "dark" ? "" : "-light") + ".png", kind, theme));
         foreach (string theme in new[] { "dark", "light" })
         foreach (string accent in new[] { "blue", "purple" })

@@ -310,10 +310,25 @@ public partial class LauncherWindow : Window, IDisposable
 
     public void Toggle()
     {
-        if (_ownedWindows > 0) { OwnedWindows.Cast<Window>().LastOrDefault(w => w.IsVisible)?.Activate(); return; }
-        if (Launcher.DragActive || Launcher.MenuOpen || _movingWindow || _sizeMove) return;
-        if (IsVisible && IsActive) HidePanel();
-        else ShowPanel("hotkey", (NativeMethods.GetAsyncKeyState(1) & 0x8000) != 0);
+        switch (ToggleDecision(IsVisible, IsActive, Topmost, _ownedWindows > 0,
+            Launcher.DragActive, Launcher.MenuOpen, _movingWindow, _sizeMove))
+        {
+            case ToggleAction.ActivateOwnedDialog:
+                OwnedWindows.Cast<Window>().LastOrDefault(w => w.IsVisible)?.Activate();
+                break;
+            case ToggleAction.Hide: HidePanel(); break;
+            case ToggleAction.Show: ShowPanel("hotkey", (NativeMethods.GetAsyncKeyState(1) & 0x8000) != 0); break;
+        }
+    }
+
+    internal enum ToggleAction { Ignore, ActivateOwnedDialog, Hide, Show }
+
+    internal static ToggleAction ToggleDecision(bool visible, bool active, bool topmost, bool ownedDialog = false,
+        bool drag = false, bool menu = false, bool moving = false, bool sizeMove = false)
+    {
+        if (ownedDialog) return ToggleAction.ActivateOwnedDialog;
+        if (drag || menu || moving || sizeMove) return ToggleAction.Ignore;
+        return visible && (active || topmost) ? ToggleAction.Hide : ToggleAction.Show;
     }
 
     public void ShowPanel(string source, bool forDrop = false)

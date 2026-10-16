@@ -41,6 +41,8 @@ public sealed record AppConfig
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? KeepBackdropWhenInactive { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? AlwaysOnTop { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Accent { get; init; }
     // Null is the default (on); only an explicit opt-out is written.
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

@@ -84,6 +84,8 @@ internal static class Desktop
     }
     [DllImport("user32.dll")] internal static extern bool GetWindowRect(nint window, out NativeRect rectangle);
     [DllImport("user32.dll")] internal static extern bool IsWindowVisible(nint window);
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongW", ExactSpelling = true)]
+    internal static extern int GetWindowLong(nint window, int index);
     [StructLayout(LayoutKind.Sequential)]
     internal struct GuiThreadInfo
     {

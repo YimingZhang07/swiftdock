@@ -77,6 +77,7 @@ public static class ConfigValidation
             Accent = AppearanceOptions.NormalizeAccent(config.Accent),
             BackdropOpacity = Math.Clamp(config.BackdropOpacity, 0, 100),
             KeepBackdropWhenInactive = config.KeepBackdropWhenInactive == false ? false : null,
+            AlwaysOnTop = config.AlwaysOnTop == false ? false : null,
             WindowWidth = sized ? config.WindowWidth : null,
             WindowLeft = positioned ? config.WindowLeft : null, WindowTop = positioned ? config.WindowTop : null,
             Placement = config.Placement == "cursor" ? "cursor" : null,

@@ -16,11 +16,13 @@ public static class WindowPlacement
 
     // WPF-UI's UiScrollBar reserves 14 DIP, including its 12 DIP hover track.
     public const double HeaderHeight = 48, ContentPadding = 16, ScrollBarWidth = 14;
+    // One 12-DIP status line with breathing room, below the scrollable tile area.
+    public const double BottomPadding = 24;
     public static GridLength HeaderRowHeight => new(HeaderHeight);
-    public static Thickness ContentMargin => new(ContentPadding);
+    public static Thickness ContentMargin => new(ContentPadding, ContentPadding, ContentPadding, BottomPadding);
     // Two extra DIPs cover layout rounding at fractional monitor scales.
     public const double HorizontalChrome = ContentPadding * 2 + ScrollBarWidth + 2;
-    public const double VerticalChrome = HeaderHeight + ContentPadding * 2;
+    public const double VerticalChrome = HeaderHeight + ContentPadding + BottomPadding;
     public static Size MinimumSize(double cellSize) => new(Math.Ceiling(3 * cellSize + HorizontalChrome), Math.Ceiling(VerticalChrome + cellSize));
 
     public static Size ResolveSize(Size? savedSize, Size workArea, Size minimum, int columns, double cellSize, int itemCount, double horizontalChrome)

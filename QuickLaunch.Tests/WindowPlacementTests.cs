@@ -77,9 +77,9 @@ public sealed class WindowPlacementTests
     }
 
     [Theory]
-    [InlineData(0, 248)]
-    [InlineData(7, 248)]
-    [InlineData(13, 332)]
+    [InlineData(0, 256)]
+    [InlineData(7, 256)]
+    [InlineData(13, 340)]
     [InlineData(100, 560)]
     public void WithoutSavedSizeUsesColumnsRowsAndSeventyPercentHeight(int count, double expectedHeight)
     {
@@ -90,16 +90,16 @@ public sealed class WindowPlacementTests
     [Fact]
     public void AutoSizeUsesColumnsThatFitAndMinimumRowHeight()
     {
-        Assert.Equal(new Size(300, 248), WindowPlacement.ResolveSize(null, new(300, 800), WindowPlacement.MinimumSize(84), 6, 84, 4, WindowPlacement.HorizontalChrome));
-        Assert.Equal(new Size(300, 332), WindowPlacement.ResolveSize(null, new(300, 800), WindowPlacement.MinimumSize(84), 6, 84, 7, WindowPlacement.HorizontalChrome));
-        Assert.Equal(new Size(588, 440), WindowPlacement.ResolveSize(null, new(1200, 800), WindowPlacement.MinimumSize(180), 1, 180, 1, WindowPlacement.HorizontalChrome));
+        Assert.Equal(new Size(300, 256), WindowPlacement.ResolveSize(null, new(300, 800), WindowPlacement.MinimumSize(84), 6, 84, 4, WindowPlacement.HorizontalChrome));
+        Assert.Equal(new Size(300, 340), WindowPlacement.ResolveSize(null, new(300, 800), WindowPlacement.MinimumSize(84), 6, 84, 7, WindowPlacement.HorizontalChrome));
+        Assert.Equal(new Size(588, 448), WindowPlacement.ResolveSize(null, new(1200, 800), WindowPlacement.MinimumSize(180), 1, 180, 1, WindowPlacement.HorizontalChrome));
     }
 
     [Theory]
-    [InlineData(84, 300, 164)]
-    [InlineData(92, 324, 172)]
-    [InlineData(100, 348, 180)]
-    [InlineData(180, 588, 260)]
+    [InlineData(84, 300, 172)]
+    [InlineData(92, 324, 180)]
+    [InlineData(100, 348, 188)]
+    [InlineData(180, 588, 268)]
     public void MinimumFitsThreeColumnsAndOneRow(double cell, double width, double height) =>
         Assert.Equal(new Size(width, height), WindowPlacement.MinimumSize(cell));
 

@@ -12,6 +12,20 @@ public sealed class ConfigTests : IDisposable
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "QuickLaunch-config-test-" + Guid.NewGuid().ToString("N"));
     private string ConfigPath => Path.Combine(_directory, "config.json");
 
+    [Theory]
+    [InlineData(null)] [InlineData(true)] [InlineData(false)]
+    public void AlwaysOnTopRoundtripOmitsDefaultAndPersistsOptOut(bool? value)
+    {
+        var original = AppConfig.CreateDefault() with { AlwaysOnTop = value };
+        var loaded = ConfigValidation.Parse(JsonSerializer.SerializeToUtf8Bytes(original, ConfigJsonContext.Default.AppConfig));
+        Assert.Equal(value ?? true, loaded.AlwaysOnTop ?? true);
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(loaded, ConfigJsonContext.Default.AppConfig);
+        using var json = JsonDocument.Parse(bytes);
+        Assert.Equal(value == false, json.RootElement.TryGetProperty("alwaysOnTop", out var stored));
+        if (value == false) Assert.False(stored.GetBoolean());
+        Assert.Equal(loaded.AlwaysOnTop, ConfigValidation.Parse(bytes).AlwaysOnTop);
+    }
+
     [Fact]
     public void ConfigWithoutWindowSizeRoundtripsUnchanged()
     {

@@ -40,6 +40,6 @@ public sealed class ManifestWriterTests
         }, (_, _) => { }, _ => { });
         Assert.Contains("direct write", writer.TryWrite("snapshots.json", "19 images"));
         locked = false;
-        Assert.Null(writer.TryWrite("snapshots.json", "39 images")); Assert.Equal("39 images", saved);
+        Assert.Null(writer.TryWrite("snapshots.json", "41 images")); Assert.Equal("41 images", saved);
     }
 }

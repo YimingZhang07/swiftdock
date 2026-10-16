@@ -5,6 +5,6 @@ namespace QuickLaunch.Views;
 
 public sealed class ToastSurface : Border
 {
-    // Keep the painted surface click-through while allowing the cancel button to receive input.
+    // Keep the status line click-through while allowing the cancel link to receive input.
     protected override HitTestResult? HitTestCore(PointHitTestParameters hitTestParameters) => null;
 }

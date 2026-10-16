@@ -54,6 +54,7 @@ public sealed class LauncherTests(ITestOutputHelper output)
         using var config = app.ExitAndReadConfig();
         Assert.False(config.RootElement.TryGetProperty("keepBackdropWhenInactive", out _));
         Assert.False(config.RootElement.TryGetProperty("backdropOpacity", out _));
+        Assert.False(config.RootElement.TryGetProperty("alwaysOnTop", out _));
     }, theme: "dark", backdrop: backdrop, silentStart: true, test: $"Inactive_material_{backdrop}");
 
     [DesktopTheory]

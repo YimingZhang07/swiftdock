@@ -41,7 +41,7 @@ public sealed partial class LauncherViewModel : ObservableObject, IDisposable
     public bool DragActive => _dragActive;
     public bool Importing => _importing;
     public string StatusText => _statusText;
-    public string ToastText => _toastText;
+    public string ToastText => _toastText.ReplaceLineEndings(" ");
     public bool ToastVisible => _toastVisible;
     public TimeSpan? ToastDuration => Importing || _closing ? null : TimeSpan.FromSeconds(
         new[] { "失败", "错误", "无法", "未能", "尚未保存", "不可", "不能" }.Any(ToastText.Contains) ? 6 : 4);

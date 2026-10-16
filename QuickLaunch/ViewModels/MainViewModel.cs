@@ -33,6 +33,17 @@ public sealed class MainViewModel : ObservableObject, ISettingsState, IDisposabl
     public string Backdrop => _settings.Backdrop ?? "acrylic";
     public int BackdropOpacity => _settings.BackdropOpacity;
     public bool KeepBackdropWhenInactive => _settings.KeepBackdropWhenInactive ?? true;
+    public bool AlwaysOnTop
+    {
+        get => _settings.AlwaysOnTop ?? true;
+        set
+        {
+            _owner.VerifyAccess();
+            if (!CanEdit || AlwaysOnTop == value) return;
+            _settings = _settings with { AlwaysOnTop = value ? null : false };
+            OnPropertyChanged(); Changed();
+        }
+    }
     public string Accent => _settings.Accent ?? "system";
     public bool AutoFetchWebsiteIcons => _settings.AutoFetchWebsiteIcons ?? true;
     public double CellSize => Math.Max(84, IconSize + 52);
