@@ -3,11 +3,18 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
+using System.Windows.Controls;
+using System.Windows.Automation.Peers;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using QuickLaunch.Models;
 using QuickLaunch.Services;
 using QuickLaunch.ViewModels;
+using QuickLaunch.Views;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
+using Button = System.Windows.Controls.Button;
+using TextBlock = System.Windows.Controls.TextBlock;
 using Xunit;
 
 namespace QuickLaunch.Tests;
@@ -15,6 +22,65 @@ namespace QuickLaunch.Tests;
 [Collection("WPF")]
 public sealed class AppearanceTests
 {
+    [Fact]
+    public Task PanelLayoutScalesLiveWithoutScalingDialogOrScrollbars() => WpfTestHost.RunAsync(async () =>
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "QuickLaunch-scale-layout-" + Guid.NewGuid().ToString("N"));
+        await using var store = ConfigService.Open(directory);
+        using var state = new MainViewModel(store);
+        state.SetAutoFetchWebsiteIcons(false); state.SetWindowSize(new(620, 350));
+        using var services = new ServiceCollection().AddLogging().AddIconServices(Path.Combine(directory, "icons")).BuildServiceProvider();
+        var icons = services.GetRequiredService<IconService>();
+        var dialogs = new DialogService(services);
+        LauncherWindow? window = null;
+        using var launcher = new LauncherViewModel(state, new LauncherDialogs(dialogs, () => window!),
+            new LauncherActions(icons, (_, _) => Task.FromResult(new LaunchResult(true, false, "test"))), NullLogger<LauncherViewModel>.Instance);
+        window = new LauncherWindow(NullLogger<LauncherWindow>.Instance, launcher, icons, dialogs) { Width = 620, Height = 350 };
+        var root = (Grid)window.Content;
+        using var settings = new SettingsViewModel(state,
+            new StartupService(@"C:\QuickLaunch\QuickLaunch.exe", directory, "Tests", _ => null, (_, _) => { }),
+            new SettingsViewModelTests.Hotkey(), new SettingsViewModelTests.Actions(), NullLogger<SettingsViewModel>.Instance);
+        var normalDialog = new SettingsAppearancePage { DataContext = settings };
+        var drag = new ContentControl { ContentTemplate = (DataTemplate)window.Resources["TileDragAdorner"], Content = state.Groups[0].Items[0] };
+        try
+        {
+            foreach (int scale in new[] { 80, 100, 150, 100 })
+            {
+                state.SetScale(scale);
+                var size = new Size(window.Width, window.Height);
+                root.Measure(size); root.Arrange(new Rect(size));
+                await Dispatcher.Yield(DispatcherPriority.ApplicationIdle); root.UpdateLayout();
+                double factor = scale / 100d;
+                var tile = (TileListBoxItem)window.SelectedList.ItemContainerGenerator.ContainerFromIndex(0);
+                var label = (TextBlock)tile.Template.FindName("TileLabel", tile);
+                // GetChildren includes raw peers; the label is excluded from control view.
+                // E2E must use RawViewWalker rather than a control-view descendant search.
+                var listPeer = UIElementAutomationPeer.CreatePeerForElement(window.SelectedList);
+                var tilePeer = listPeer.GetChildren()[0];
+                var labelPeer = Assert.Single(tilePeer.GetChildren(), peer => peer.GetAutomationId() == "TileLabel");
+                Assert.Equal(AutomationControlType.Text, labelPeer.GetAutomationControlType());
+                Assert.False(labelPeer.IsControlElement());
+                Assert.Equal(88 * factor, tile.Width, 8);
+                Assert.Equal(12 * factor, label.FontSize, 8); Assert.Equal(28 * factor, label.Height, 8);
+                Assert.Equal(48 * factor, root.RowDefinitions[0].Height.Value, 8);
+                Assert.Equal(32 * factor, ((Button)window.FindName("SettingsButton")).Width, 8);
+                var panel = Assert.Single(LauncherWindow.Descendants<TilePanel>(window.SelectedList));
+                Assert.Equal(6, panel.Geometry.Columns);
+                Assert.Equal(state.CellSize, panel.Geometry.RowHeight, 8);
+                Assert.Equal(92 * factor, panel.ItemWidth, 8);
+                Assert.Equal(14, LauncherWindow.Descendants<System.Windows.Controls.Primitives.ScrollBar>(root)
+                    .First(bar => bar.Orientation == Orientation.Vertical).Width);
+                normalDialog.Measure(new Size(590, 430)); normalDialog.Arrange(new Rect(0, 0, 590, 430)); normalDialog.UpdateLayout();
+                Assert.Equal(20, LauncherWindow.Descendants<TextBlock>(normalDialog)
+                    .Single(text => System.Windows.Automation.AutomationProperties.GetAutomationId(text) == "SettingsAppearanceTitle").FontSize);
+                drag.Measure(new Size(400, 200)); drag.Arrange(new Rect(0, 0, 400, 200)); drag.UpdateLayout();
+                Assert.Equal(10 * factor, LauncherWindow.Descendants<Border>(drag).First().Padding.Left, 8);
+                Assert.Equal(IntPtr.Zero, new System.Windows.Interop.WindowInteropHelper(window).Handle);
+            }
+        }
+        finally { state.Suspend(true); window.Dispose(); }
+    });
+
     [Theory]
     [InlineData(null, null, null)]
     [InlineData("system", "acrylic", "system")]

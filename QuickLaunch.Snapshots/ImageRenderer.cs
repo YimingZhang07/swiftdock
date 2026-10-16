@@ -61,6 +61,7 @@ internal static class ImageRenderer
         using var state = new MainViewModel(store);
         state.SetAutoFetchWebsiteIcons(false);
         state.SetWindowSize(new Size(620, 350));
+        state.SetScale(image.Scale);
         state.SetTheme(image.Theme); state.SetAccent(image.Accent); state.SetBackdrop(image.Backdrop);
         var group = state.Groups[0];
         group.Items.Clear();
@@ -82,7 +83,7 @@ internal static class ImageRenderer
             new LauncherActions(icons, (_, _) => Task.FromResult(new LaunchResult(true, false, "Snapshot"))),
             NullLogger<LauncherViewModel>.Instance);
         launcherWindow = new LauncherWindow(NullLogger<LauncherWindow>.Instance, launcher, icons, dialogs)
-            { Width = 620, Height = 350 };
+            { Width = state.WindowSize!.Value.Width, Height = state.WindowSize.Value.Height };
         var opened = new List<Window> { launcherWindow };
         HwndSource? menuSource = null;
         using var scope = services.CreateScope();

@@ -123,6 +123,9 @@ internal static class SnapshotRunner
             if (backdrop == "solid") images.Add(new($"appearance-settings-{theme}-{accent}.png", "settings-appearance", theme, accent));
         }
         images.Add(new("panel-polish.png", "launcher", "dark", Selected: true));
+        foreach (string theme in new[] { "dark", "light" })
+        foreach (int scale in new[] { 80, 150 })
+            images.Add(new($"launcher-{scale}-{theme}.png", "launcher", theme, Selected: true, Scale: scale));
         return images;
     }
 
@@ -143,4 +146,4 @@ internal static class SnapshotRunner
     private sealed record SnapshotFailure(string? Image, string Error);
 }
 
-internal sealed record SnapshotImage(string File, string Kind, string Theme, string Accent = "blue", string Backdrop = "solid", bool Selected = false);
+internal sealed record SnapshotImage(string File, string Kind, string Theme, string Accent = "blue", string Backdrop = "solid", bool Selected = false, int Scale = 100);

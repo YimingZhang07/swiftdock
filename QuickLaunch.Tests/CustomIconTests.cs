@@ -99,7 +99,7 @@ public sealed class CustomIconTests(Xunit.Abstractions.ITestOutputHelper output)
     }
 
     [Fact]
-    public void LegacyJsonIsByteIdenticalAndCustomIconRoundTrips()
+    public void LegacyJsonMigratesAndCustomIconRoundTrips()
     {
         // Literal baseline from the pre-icon schema, including its property ordering/indentation.
         const string legacy = """
@@ -136,7 +136,7 @@ public sealed class CustomIconTests(Xunit.Abstractions.ITestOutputHelper output)
             """;
         byte[] bytes = Encoding.UTF8.GetBytes(legacy.ReplaceLineEndings("\r\n"));
         var config = ConfigValidation.Parse(bytes);
-        Assert.Equal(bytes, JsonSerializer.SerializeToUtf8Bytes(config, ConfigJsonContext.Default.AppConfig));
+        Assert.Equal(80, config.Scale); Assert.Null(config.IconSize);
         foreach (string icon in new[] { "glyph:E943:#2F6FDB", "file:C:\\icons\\app.dll,-42", "fluent:apps" })
         {
             config.Groups[0].Items[0] = config.Groups[0].Items[0] with { Icon = icon };
@@ -145,7 +145,7 @@ public sealed class CustomIconTests(Xunit.Abstractions.ITestOutputHelper output)
             Assert.Equal(icon, ConfigValidation.Parse(custom).Groups[0].Items[0].Icon);
         }
         config.Groups[0].Items[0] = config.Groups[0].Items[0] with { Icon = null };
-        Assert.Equal(bytes, JsonSerializer.SerializeToUtf8Bytes(config, ConfigJsonContext.Default.AppConfig));
+        Assert.Equal(80, config.Scale); Assert.Null(config.IconSize);
     }
 
     [Theory]

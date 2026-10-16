@@ -28,7 +28,9 @@ public sealed class MainViewModel : ObservableObject, ISettingsState, IDisposabl
     public HotkeyConfig Hotkey => _settings.Hotkey;
     public string HotkeyDisplay => Hotkey.Display;
     public int Columns => _settings.Columns;
-    public int IconSize => _settings.IconSize;
+    public int Scale => _settings.Scale ?? 100;
+    public PanelMetrics Metrics => new(Scale);
+    public int IconSize => Metrics.IconSize;
     public string Theme => _settings.Theme ?? "system";
     public string Backdrop => _settings.Backdrop ?? "acrylic";
     public int BackdropOpacity => _settings.BackdropOpacity;
@@ -46,8 +48,8 @@ public sealed class MainViewModel : ObservableObject, ISettingsState, IDisposabl
     }
     public string Accent => _settings.Accent ?? "system";
     public bool AutoFetchWebsiteIcons => _settings.AutoFetchWebsiteIcons ?? true;
-    public double CellSize => Math.Max(84, IconSize + 52);
-    public double TileSize => CellSize - 4;
+    public double CellSize => Metrics.CellSize;
+    public double TileSize => Metrics.TileSize;
     public Size? WindowSize => _settings.WindowWidth is { } width && _settings.WindowHeight is { } height ? new(width, height) : null;
     public Point? WindowPosition => _settings.WindowLeft is { } left && _settings.WindowTop is { } top ? new(left, top) : null;
     public string Placement => _settings.Placement ?? "lastPosition";
@@ -123,13 +125,19 @@ public sealed class MainViewModel : ObservableObject, ISettingsState, IDisposabl
         OnPropertyChanged(nameof(AutoFetchWebsiteIcons));
         Changed();
     }
-    public void SetIconSize(int size)
+    public void SetScale(int scale)
     {
         _owner.VerifyAccess();
         if (!CanEdit) return;
-        if (size is < 16 or > 128) throw new ArgumentOutOfRangeException(nameof(size));
-        if (IconSize == size) return;
-        _settings = _settings with { IconSize = size };
+        scale = PanelMetrics.Normalize(scale);
+        if (Scale == scale) return;
+        // The view clamps again to its actual monitor and uses the current size when shown.
+        var size = WindowSize is { } saved ? WindowPlacement.RescaleSize(saved, Scale, scale,
+            new(double.PositiveInfinity, double.PositiveInfinity)) : (Size?)null;
+        _settings = _settings with { Scale = scale == 100 ? null : scale, IconSize = null,
+            WindowWidth = size?.Width, WindowHeight = size?.Height };
+        OnPropertyChanged(nameof(Scale));
+        OnPropertyChanged(nameof(Metrics));
         OnPropertyChanged(nameof(IconSize));
         OnPropertyChanged(nameof(CellSize));
         OnPropertyChanged(nameof(TileSize));

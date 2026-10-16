@@ -33,11 +33,11 @@
             <StackPanel Margin="44,0,0,6" IsEnabled="{Binding CanEditBackdrop}">
                 <Grid MinHeight="36">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="160" /><ColumnDefinition Width="44" /></Grid.ColumnDefinitions>
-                    <TextBlock Text="不透明度" VerticalAlignment="Center" />
-                    <Slider x:Name="BackdropOpacitySlider" Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
-                            SmallChange="1" LargeChange="10" VerticalAlignment="Center" Value="{Binding BackdropOpacity, UpdateSourceTrigger=PropertyChanged}"
-                            AutomationProperties.Name="不透明度" />
-                    <TextBlock Grid.Column="2" Text="{Binding BackdropOpacity, StringFormat={}{0}%}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                    <TextBlock Text="透明度" VerticalAlignment="Center" />
+                    <Slider x:Name="TransparencySlider" Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True"
+                            SmallChange="5" LargeChange="10" VerticalAlignment="Center" Value="{Binding Transparency, UpdateSourceTrigger=PropertyChanged}"
+                            AutomationProperties.Name="透明度" />
+                    <TextBlock Grid.Column="2" Text="{Binding Transparency, StringFormat={}{0}%}" HorizontalAlignment="Right" VerticalAlignment="Center" />
                 </Grid>
                 <Grid MinHeight="36">
                     <TextBlock Text="失去焦点时保持透明" VerticalAlignment="Center" />
@@ -61,14 +61,14 @@
             </ui:CardControl>
             <ui:CardControl>
                 <ui:CardControl.Icon><ui:SymbolIcon Symbol="Grid24" /></ui:CardControl.Icon>
-                <ui:CardControl.Header><StackPanel><TextBlock Text="图标大小" /><TextBlock Text="调整面板中的图标和条目间距" Style="{StaticResource SettingDescription}" /></StackPanel></ui:CardControl.Header>
-                <Border Background="{DynamicResource LayerFillColorDefaultBrush}" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" Padding="3">
-                    <StackPanel x:Name="IconSizes" IsEnabled="{Binding CanEdit}" Orientation="Horizontal" KeyboardNavigation.TabNavigation="Once" KeyboardNavigation.DirectionalNavigation="Cycle" PreviewKeyDown="SegmentKeyDown">
-                        <RadioButton x:Name="SmallIcons" Content="小" Tag="32" IsChecked="{Binding IconSize, Converter={StaticResource Selection}, ConverterParameter=32}" GroupName="IconSize" Style="{StaticResource IconSizeSegment}" ToolTip="32 DIP" />
-                        <RadioButton x:Name="MediumIcons" Content="中" Tag="40" IsChecked="{Binding IconSize, Converter={StaticResource Selection}, ConverterParameter=40}" GroupName="IconSize" Style="{StaticResource IconSizeSegment}" ToolTip="40 DIP" />
-                        <RadioButton x:Name="LargeIcons" Content="大" Tag="48" IsChecked="{Binding IconSize, Converter={StaticResource Selection}, ConverterParameter=48}" GroupName="IconSize" Style="{StaticResource IconSizeSegment}" ToolTip="48 DIP" />
-                    </StackPanel>
-                </Border>
+                <ui:CardControl.Header><StackPanel><TextBlock Text="缩放" /><TextBlock Text="调整面板中的图标、文字和间距" Style="{StaticResource SettingDescription}" /></StackPanel></ui:CardControl.Header>
+                <Grid IsEnabled="{Binding CanEdit}">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="160" /><ColumnDefinition Width="44" /></Grid.ColumnDefinitions>
+                    <Slider x:Name="ScaleSlider" Minimum="80" Maximum="150" TickFrequency="10" IsSnapToTickEnabled="True"
+                            SmallChange="10" LargeChange="20" VerticalAlignment="Center" Value="{Binding Scale, UpdateSourceTrigger=PropertyChanged}"
+                            AutomationProperties.Name="缩放" />
+                    <TextBlock Grid.Column="1" Text="{Binding Scale, StringFormat={}{0}%}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                </Grid>
             </ui:CardControl>
         </StackPanel>
     </ScrollViewer>

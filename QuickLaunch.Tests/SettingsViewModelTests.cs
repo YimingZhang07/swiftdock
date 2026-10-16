@@ -20,11 +20,11 @@ public sealed class SettingsViewModelTests
         Assert.Equal("当前已注册：Alt+Space", model.Status);
         Assert.Equal("C:\\profile", model.DirectoryLabel);
         Assert.Empty(state.Calls); Assert.Empty(writes);
-        model.IconSize = 48; model.Placement = "cursor"; model.AutoFetchWebsiteIcons = false;
-        Assert.Equal(["size:48", "placement:cursor", "favicons:False"], state.Calls);
-        state.SetIconSize(32); state.SetPlacement("lastPosition"); state.SetAutoFetchWebsiteIcons(true);
+        model.Scale = 120; model.Placement = "cursor"; model.AutoFetchWebsiteIcons = false;
+        Assert.Equal(["scale:120", "placement:cursor", "favicons:False"], state.Calls);
+        state.SetScale(80); state.SetPlacement("lastPosition"); state.SetAutoFetchWebsiteIcons(true);
         Assert.Equal(6, state.Calls.Count);
-        Assert.Equal(32, model.IconSize); Assert.Equal("lastPosition", model.Placement); Assert.True(model.AutoFetchWebsiteIcons);
+        Assert.Equal(80, model.Scale); Assert.Equal("lastPosition", model.Placement); Assert.True(model.AutoFetchWebsiteIcons);
         state.Calls.Clear();
         model.Theme = "dark"; model.Backdrop = "solid"; model.Accent = "purple";
         Assert.Equal(["theme:dark", "backdrop:solid", "accent:purple"], state.Calls);
@@ -77,7 +77,7 @@ public sealed class SettingsViewModelTests
         Assert.Equal("当前配置只读，不能修改。", model.Status);
         Assert.False(model.ApplyCommand.CanExecute(null)); Assert.False(model.ResetSizeCommand.CanExecute(null));
         model.ApplyCommand.Execute(null); model.ResetSizeCommand.Execute(null);
-        model.IconSize = 48; model.Placement = "cursor"; model.AutoFetchWebsiteIcons = false; model.StartupEnabled = true;
+        model.Scale = 120; model.Placement = "cursor"; model.AutoFetchWebsiteIcons = false; model.StartupEnabled = true;
         model.Theme = "dark"; model.Backdrop = "solid"; model.Accent = "purple";
         Assert.Empty(state.Calls); Assert.Equal(0, startupWrites); Assert.Equal(0, hotkey.Attempts); Assert.Equal(0, actions.Resets);
         int changes = 0; model.ApplyCommand.CanExecuteChanged += (_, _) => changes++;
@@ -92,8 +92,8 @@ public sealed class SettingsViewModelTests
         var state = new SettingsState(); var hotkey = new Hotkey { Registered = false };
         var model = Create(state, Startup(), hotkey, new());
         Assert.Equal("注册失败，错误码 1409；请选择其他组合。", model.Status); Assert.True(model.StatusError);
-        model.Dispose(); state.SetIconSize(48);
-        Assert.Equal(40, model.IconSize);
+        model.Dispose(); state.SetScale(120);
+        Assert.Equal(100, model.Scale);
     }
 
     private static SettingsViewModel Create(SettingsState state, StartupService startup, Hotkey hotkey, Actions actions) =>
@@ -107,7 +107,7 @@ public sealed class SettingsViewModelTests
         public bool CanEdit { get; private set; } = true;
         public string DirectoryPath { get; init; } = @"C:\profile";
         public HotkeyConfig Hotkey { get; private set; } = new();
-        public int IconSize { get; private set; } = 40;
+        public int Scale { get; private set; } = 100;
         public string Placement { get; private set; } = "lastPosition";
         public string Theme { get; private set; } = "system";
         public string Backdrop { get; private set; } = "acrylic";
@@ -119,7 +119,7 @@ public sealed class SettingsViewModelTests
         private void Changed(string name) => PropertyChanged?.Invoke(this, new(name));
         internal void SetEditable(bool value) { CanEdit = value; Changed(nameof(CanEdit)); }
         public void ApplySettings(HotkeyConfig hotkey) { Hotkey = hotkey; Calls.Add("hotkey"); Changed(nameof(Hotkey)); }
-        public void SetIconSize(int size) { IconSize = size; Calls.Add($"size:{size}"); Changed(nameof(IconSize)); }
+        public void SetScale(int scale) { Scale = scale; Calls.Add($"scale:{scale}"); Changed(nameof(Scale)); }
         public void SetPlacement(string placement) { Placement = placement; Calls.Add($"placement:{placement}"); Changed(nameof(Placement)); }
         public void SetTheme(string theme) { Theme = theme; Calls.Add($"theme:{theme}"); Changed(nameof(Theme)); }
         public void SetBackdrop(string backdrop) { Backdrop = backdrop; Calls.Add($"backdrop:{backdrop}"); Changed(nameof(Backdrop)); }

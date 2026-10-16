@@ -20,10 +20,10 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
 
     [ObservableProperty] private bool _alt, _control, _shift, _windows;
     [ObservableProperty] private string _mainKey;
-    [ObservableProperty] private int _iconSize;
+    [ObservableProperty] private int _scale;
     [ObservableProperty] private string _placement;
     [ObservableProperty] private string _theme, _backdrop, _accent;
-    [ObservableProperty] private int _backdropOpacity;
+    [ObservableProperty] private int _transparency;
     [ObservableProperty] private bool _keepBackdropWhenInactive;
     [ObservableProperty] private bool _autoFetchWebsiteIcons, _startupEnabled;
     [ObservableProperty] private bool _startupAvailable = true;
@@ -48,12 +48,12 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         _state = state; _startup = startup; _hotkey = hotkey; _actions = actions; _log = log;
         _appearance = appearance;
         _theme = state.Theme; _backdrop = state.Backdrop; _accent = state.Accent;
-        _backdropOpacity = state.BackdropOpacity; _keepBackdropWhenInactive = state.KeepBackdropWhenInactive;
+        _transparency = 100 - state.BackdropOpacity; _keepBackdropWhenInactive = state.KeepBackdropWhenInactive;
         if (_appearance is not null) _appearance.BackdropChanged += AppearanceChanged;
         _canEdit = state.CanEdit;
         _alt = state.Hotkey.Modifiers.Contains("Alt"); _control = state.Hotkey.Modifiers.Contains("Control");
         _shift = state.Hotkey.Modifiers.Contains("Shift"); _windows = state.Hotkey.Modifiers.Contains("Windows");
-        _mainKey = state.Hotkey.Key; _iconSize = state.IconSize; _placement = state.Placement;
+        _mainKey = state.Hotkey.Key; _scale = state.Scale; _placement = state.Placement;
         _autoFetchWebsiteIcons = state.AutoFetchWebsiteIcons;
         SetStatus(!CanEdit ? "当前配置只读，不能修改。" : hotkey.Registered
             ? $"当前已注册：{hotkey.Current!.Display}" : $"注册失败，错误码 {hotkey.Error}；请选择其他组合。", !CanEdit || !hotkey.Registered);
@@ -68,15 +68,15 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         try
         {
             CanEdit = _state.CanEdit;
-            IconSize = _state.IconSize; Placement = _state.Placement;
+            Scale = _state.Scale; Placement = _state.Placement;
             Theme = _state.Theme; Backdrop = _state.Backdrop; Accent = _state.Accent;
-            BackdropOpacity = _state.BackdropOpacity; KeepBackdropWhenInactive = _state.KeepBackdropWhenInactive;
+            Transparency = 100 - _state.BackdropOpacity; KeepBackdropWhenInactive = _state.KeepBackdropWhenInactive;
             AutoFetchWebsiteIcons = _state.AutoFetchWebsiteIcons;
         }
         finally { _syncing = false; }
     }
 
-    partial void OnIconSizeChanged(int value) { if (!_syncing && CanEdit) _state.SetIconSize(value); }
+    partial void OnScaleChanged(int value) { if (!_syncing && CanEdit) _state.SetScale(value); }
     partial void OnPlacementChanged(string value) { if (!_syncing && CanEdit) _state.SetPlacement(value); }
     partial void OnThemeChanged(string value) { if (!_syncing && CanEdit) _state.SetTheme(value); }
     partial void OnBackdropChanged(string value)
@@ -84,7 +84,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         if (!_syncing && CanEdit) _state.SetBackdrop(value);
         OnPropertyChanged(nameof(CanEditBackdrop));
     }
-    partial void OnBackdropOpacityChanged(int value) { if (!_syncing && CanEditBackdrop) _state.SetBackdropOpacity(value); }
+    partial void OnTransparencyChanged(int value) { if (!_syncing && CanEditBackdrop) _state.SetBackdropOpacity(100 - value); }
     partial void OnKeepBackdropWhenInactiveChanged(bool value) { if (!_syncing && CanEditBackdrop) _state.SetKeepBackdropWhenInactive(value); }
     partial void OnAccentChanged(string value) { if (!_syncing && CanEdit) _state.SetAccent(value); }
     private void AppearanceChanged()

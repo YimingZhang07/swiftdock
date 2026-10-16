@@ -18,24 +18,34 @@ public static class WindowPlacement
     public const double HeaderHeight = 48, ContentPadding = 16, ScrollBarWidth = 14;
     // One 12-DIP status line with breathing room, below the scrollable tile area.
     public const double BottomPadding = 24;
-    public static GridLength HeaderRowHeight => new(HeaderHeight);
-    public static Thickness ContentMargin => new(ContentPadding, ContentPadding, ContentPadding, BottomPadding);
     // Two extra DIPs cover layout rounding at fractional monitor scales.
     public const double HorizontalChrome = ContentPadding * 2 + ScrollBarWidth + 2;
     public const double VerticalChrome = HeaderHeight + ContentPadding + BottomPadding;
-    public static Size MinimumSize(double cellSize) => new(Math.Ceiling(3 * cellSize + HorizontalChrome), Math.Ceiling(VerticalChrome + cellSize));
+    public static Size MinimumSize(double cellSize, double factor = 1) => new(
+        Math.Ceiling(3 * cellSize + ContentPadding * 2 * factor + ScrollBarWidth + 2),
+        Math.Ceiling(VerticalChrome * factor + cellSize));
 
-    public static Size ResolveSize(Size? savedSize, Size workArea, Size minimum, int columns, double cellSize, int itemCount, double horizontalChrome)
+    public static Size RescaleSize(Size size, int oldScale, int newScale, Size workArea)
+    {
+        var metrics = new PanelMetrics(newScale);
+        var minimum = MinimumSize(metrics.CellSize, metrics.Factor);
+        double ratio = newScale / (double)oldScale;
+        return new(Math.Min(Math.Max(size.Width * ratio, minimum.Width), workArea.Width),
+            Math.Min(Math.Max(size.Height * ratio, minimum.Height), workArea.Height));
+    }
+
+    public static Size ResolveSize(Size? savedSize, Size workArea, Size minimum, int columns, double cellSize, int itemCount,
+        double horizontalChrome, double verticalChrome = VerticalChrome)
     {
         double width = Math.Min(Math.Max(savedSize?.Width ?? columns * cellSize + horizontalChrome, minimum.Width), workArea.Width);
-        double height = savedSize?.Height ?? AutoHeight(width, workArea.Height, cellSize, itemCount, horizontalChrome);
+        double height = savedSize?.Height ?? AutoHeight(width, workArea.Height, cellSize, itemCount, horizontalChrome, verticalChrome);
         return new(width, Math.Min(Math.Max(height, minimum.Height), workArea.Height));
     }
 
-    private static double AutoHeight(double width, double workHeight, double cellSize, int itemCount, double horizontalChrome)
+    private static double AutoHeight(double width, double workHeight, double cellSize, int itemCount, double horizontalChrome, double verticalChrome)
     {
         int columns = Math.Max(1, (int)((width - horizontalChrome) / cellSize));
-        return Math.Min(Math.Max(2, Math.Ceiling(Math.Max(1, itemCount) / (double)columns)) * cellSize + VerticalChrome, workHeight * .7);
+        return Math.Min(Math.Max(2, Math.Ceiling(Math.Max(1, itemCount) / (double)columns)) * cellSize + verticalChrome, workHeight * .7);
     }
 
     public static Rect ResolvePlacement(string? mode, Point? savedPosition, Size desiredSize, IReadOnlyList<Monitor> monitors, Point cursor)
@@ -89,17 +99,18 @@ public static class WindowPlacement
     }
 
     internal static (Rect Bounds, Monitor Monitor, Size Size) ResolvePanel(string? mode, Point? position, Size? savedSize,
-        Size minimum, int columns, double cellSize, int itemCount, Desktop desktop)
+        Size minimum, int columns, double cellSize, int itemCount, Desktop desktop, int panelScale = 100)
     {
+        var metrics = new PanelMetrics(panelScale);
         var origin = desktop.Monitors.MinBy(m => DistanceSquared(mode != "cursor" && position is { } saved ? saved : desktop.Cursor, m.Bounds));
-        var desired = savedSize ?? ResolveSize(null, origin.WorkSize, minimum, columns, cellSize, itemCount, HorizontalChrome);
+        var desired = savedSize ?? ResolveSize(null, origin.WorkSize, minimum, columns, cellSize, itemCount, metrics.HorizontalChrome, metrics.VerticalChrome);
         var (monitor, savedPosition) = SelectMonitor(mode, position, desired, desktop.Monitors, desktop.Cursor);
-        var size = ResolveSize(savedSize, monitor.WorkSize, minimum, columns, cellSize, itemCount, HorizontalChrome);
+        var size = ResolveSize(savedSize, monitor.WorkSize, minimum, columns, cellSize, itemCount, metrics.HorizontalChrome, metrics.VerticalChrome);
         return (PlaceOnMonitor(monitor, savedPosition, size), monitor, size);
     }
 
     internal static void PlacePanel(Window window, Desktop desktop, string? mode, Point? position, int columns,
-        double cellSize, int itemCount, Size? savedSize, bool currentMonitor = false)
+        double cellSize, int itemCount, Size? savedSize, bool currentMonitor = false, int panelScale = 100)
     {
         if (desktop.Monitors.Count == 0) return;
         nint hwnd = new WindowInteropHelper(window).EnsureHandle();
@@ -109,7 +120,10 @@ public static class WindowPlacement
             var monitor = desktop.Monitors.MaxBy(m => IntersectionArea(rect, m.Bounds));
             desktop = desktop with { Cursor = new(monitor.Bounds.Left + monitor.Bounds.Width / 2, monitor.Bounds.Top + monitor.Bounds.Height / 2) };
         }
-        var placement = ResolvePanel(mode, position, savedSize, new(window.MinWidth, window.MinHeight), columns, cellSize, itemCount, desktop);
+        var minimum = MinimumSize(cellSize, panelScale / 100d);
+        var placement = ResolvePanel(mode, position, savedSize, minimum, columns, cellSize, itemCount, desktop, panelScale);
+        window.MinWidth = Math.Min(minimum.Width, placement.Monitor.WorkSize.Width);
+        window.MinHeight = Math.Min(minimum.Height, placement.Monitor.WorkSize.Height);
         window.MaxWidth = placement.Monitor.WorkSize.Width; window.MaxHeight = placement.Monitor.WorkSize.Height;
         window.Width = placement.Size.Width; window.Height = placement.Size.Height;
         var bounds = placement.Bounds;
@@ -147,13 +161,13 @@ public static class WindowPlacement
         window.MaxHeight = (info.Work.Bottom - info.Work.Top) / scale;
     }
 
-    public static void FitContent(Window window, double cellSize, int itemCount, Size? savedSize = null)
+    public static void FitContent(Window window, double cellSize, int itemCount, Size? savedSize = null, int panelScale = 100)
     {
         if (savedSize.HasValue) return;
-        ResizeInPlace(window, cellSize, itemCount);
+        ResizeInPlace(window, cellSize, itemCount, panelScale: panelScale);
     }
 
-    public static void ResizeInPlace(Window window, double cellSize, int itemCount, int? autoColumns = null)
+    public static void ResizeInPlace(Window window, double cellSize, int itemCount, int? autoColumns = null, int panelScale = 100)
     {
         nint hwnd = new WindowInteropHelper(window).Handle;
         if (hwnd == 0 || !NativeMethods.GetWindowRect(hwnd, out var rect)) return;
@@ -163,9 +177,10 @@ public static class WindowPlacement
         double scale = Math.Max(1, NativeMethods.GetDpiForWindow(hwnd)) / 96.0;
         var workArea = new Size((info.Work.Right - info.Work.Left) / scale, (info.Work.Bottom - info.Work.Top) / scale);
         window.MaxWidth = workArea.Width; window.MaxHeight = workArea.Height;
-        double desiredWidth = autoColumns is { } columns ? columns * cellSize + HorizontalChrome : window.Width;
+        var metrics = new PanelMetrics(panelScale);
+        double desiredWidth = autoColumns is { } columns ? columns * cellSize + metrics.HorizontalChrome : window.Width;
         window.Width = Math.Min(Math.Max(desiredWidth, window.MinWidth), workArea.Width);
-        window.Height = Math.Min(Math.Max(AutoHeight(window.Width, workArea.Height, cellSize, itemCount, HorizontalChrome), window.MinHeight), workArea.Height);
+        window.Height = Math.Min(Math.Max(AutoHeight(window.Width, workArea.Height, cellSize, itemCount, metrics.HorizontalChrome, metrics.VerticalChrome), window.MinHeight), workArea.Height);
         int width = (int)Math.Round(window.Width * scale), height = (int)Math.Round(window.Height * scale);
         int x = Math.Clamp(rect.Left, info.Work.Left, Math.Max(info.Work.Left, info.Work.Right - width));
         int y = Math.Clamp(rect.Top, info.Work.Top, Math.Max(info.Work.Top, info.Work.Bottom - height));

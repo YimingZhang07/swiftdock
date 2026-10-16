@@ -14,8 +14,8 @@ public sealed class TilePanel : WrapPanel
     static TilePanel()
     {
         // ItemsPanel bindings can resolve after its first measure during Show().
-        ItemWidthProperty.OverrideMetadata(typeof(TilePanel), new FrameworkPropertyMetadata(84d, FrameworkPropertyMetadataOptions.AffectsMeasure));
-        ItemHeightProperty.OverrideMetadata(typeof(TilePanel), new FrameworkPropertyMetadata(84d, FrameworkPropertyMetadataOptions.AffectsMeasure));
+        ItemWidthProperty.OverrideMetadata(typeof(TilePanel), new FrameworkPropertyMetadata(92d, FrameworkPropertyMetadataOptions.AffectsMeasure));
+        ItemHeightProperty.OverrideMetadata(typeof(TilePanel), new FrameworkPropertyMetadata(92d, FrameworkPropertyMetadataOptions.AffectsMeasure));
     }
     internal TileGeometry Geometry => TileGeometry.Create(ActualWidth, ItemWidth, ItemHeight);
 
@@ -83,7 +83,7 @@ public sealed class TabInsetConverter : IMultiValueConverter
         if (values is not [double width, double cell, int icon] || cell <= 0) return new Thickness();
         var geometry = TileGeometry.Create(width, cell, cell);
         // The tab's own 10-DIP padding plus this inset lines its text up with the icon.
-        return new Thickness(Math.Max(0, (geometry.ColumnWidth - icon) / 2 - 10), 0, 0, 0);
+        return new Thickness(Math.Max(0, (geometry.ColumnWidth - icon) / 2 - 10 * icon / 40d), 0, 0, 0);
     }
     public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }

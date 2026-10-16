@@ -93,70 +93,53 @@ public sealed class InteractionTests
     }
 
     [Theory]
-    [InlineData(32, 1, 40)] [InlineData(40, 1, 48)] [InlineData(48, 1, 48)]
-    [InlineData(48, -1, 40)] [InlineData(40, -1, 32)] [InlineData(32, -1, 32)]
-    [InlineData(36, 1, 40)] [InlineData(36, -1, 32)] [InlineData(44, 1, 48)] [InlineData(44, -1, 40)]
-    [InlineData(16, 1, 32)] [InlineData(16, -1, 32)] [InlineData(128, 1, 48)] [InlineData(128, -1, 48)]
-    [InlineData(36, 0, 36)]
-    public void IconSizeStepsToNextPreset(int size, int direction, int expected) => Assert.Equal(expected, IconSizePresets.Step(size, direction));
+    [InlineData(80, 1, 90)] [InlineData(100, 1, 110)] [InlineData(150, 1, 150)]
+    [InlineData(150, -1, 140)] [InlineData(100, -1, 90)] [InlineData(80, -1, 80)]
+    [InlineData(100, 0, 100)]
+    public void ScaleWheelStepsByTen(int scale, int direction, int expected) => Assert.Equal(expected, PanelMetrics.Step(scale, direction));
 
     [Theory]
-    [InlineData(16)] [InlineData(32)] [InlineData(36)] [InlineData(40)] [InlineData(48)] [InlineData(128)]
-    public async Task SetIconSizeNotifiesAndUsesSavePipeline(int size)
+    [InlineData(80)] [InlineData(100)] [InlineData(150)]
+    public async Task SetScaleNotifiesAndRescalesSavedSizeThroughSavePipeline(int scale)
     {
         var writer = new RecordingWriter();
         await OnSta(vm =>
         {
+            vm.SetWindowSize(new(720, 400));
             var notifications = new List<string?>();
             vm.PropertyChanged += (_, e) => notifications.Add(e.PropertyName);
             long revision = vm.Revision;
-            vm.SetIconSize(size);
-            Assert.Equal(size, vm.IconSize); Assert.Equal(size, vm.Snapshot().IconSize);
-            Assert.Equal(Math.Max(84, size + 52), vm.CellSize); Assert.Equal(vm.CellSize - 4, vm.TileSize);
+            vm.SetScale(scale);
+            Assert.Equal(scale, vm.Scale); Assert.Equal(scale, vm.Snapshot().Scale ?? 100);
+            Assert.Equal(40 * scale / 100, vm.IconSize);
+            Assert.Equal(92 * scale / 100d, vm.CellSize, 8); Assert.Equal(88 * scale / 100d, vm.TileSize, 8);
+            Assert.Equal(720 * scale / 120d, vm.WindowSize!.Value.Width, 8);
+            Assert.Equal(400 * scale / 120d, vm.WindowSize.Value.Height, 8);
             Assert.Equal(revision + 1, vm.Revision);
-            Assert.Equal(new[] { "IconSize", "CellSize", "TileSize" }, notifications.Where(n => n != "StorageStatus" && n != "StorageWarning"));
-            notifications.Clear(); vm.SetIconSize(size);
+            Assert.Equal(new[] { "Scale", "Metrics", "IconSize", "CellSize", "TileSize" }, notifications.Where(n => n != "StorageStatus" && n != "StorageWarning"));
+            notifications.Clear(); vm.SetScale(scale);
             Assert.Empty(notifications); Assert.Equal(revision + 1, vm.Revision);
             vm.FlushAsync().GetAwaiter().GetResult();
-            Assert.Equal("已保存", vm.StorageStatus);
-            Assert.Equal(size, ConfigValidation.Parse(writer.Bytes!).IconSize);
-        }, iconSize: 64, writer: writer);
+            Assert.Equal(scale, ConfigValidation.Parse(writer.Bytes!).Scale ?? 100);
+        }, scale: 120, writer: writer);
     }
 
-    [Theory]
-    [InlineData(15)] [InlineData(129)] [InlineData(int.MinValue)] [InlineData(int.MaxValue)]
-    public async Task SetIconSizeRejectsInvalidRange(int size) => await OnSta(vm =>
-    {
-        long revision = vm.Revision;
-        Assert.Throws<ArgumentOutOfRangeException>(() => vm.SetIconSize(size));
-        Assert.Equal(32, vm.IconSize); Assert.Equal(revision, vm.Revision);
-    });
-
     [Fact]
-    public async Task ReadOnlyIconSizeIsUnchanged() => await OnSta(vm =>
+    public async Task ReadOnlyScaleIsUnchanged() => await OnSta(vm =>
     {
         var notifications = new List<string?>();
         vm.PropertyChanged += (_, e) => notifications.Add(e.PropertyName);
         long revision = vm.Revision;
-        vm.SetIconSize(48); vm.SetIconSize(129);
-        Assert.Equal(32, vm.IconSize); Assert.Equal(32, vm.Snapshot().IconSize);
+        vm.SetScale(150); vm.SetScale(int.MaxValue);
+        Assert.Equal(120, vm.Scale); Assert.Equal(120, vm.Snapshot().Scale);
         Assert.Equal(revision, vm.Revision); Assert.Empty(notifications);
         vm.FlushAsync().GetAwaiter().GetResult();
-    }, readOnly: true);
-
-    [Theory]
-    [InlineData(16, 84, 80)] [InlineData(32, 84, 80)] [InlineData(40, 92, 88)]
-    [InlineData(48, 100, 96)] [InlineData(128, 180, 176)]
-    public async Task TileSizingPreservesStoredIconSize(int icon, double cell, double tile) => await OnSta(vm =>
-    {
-        Assert.Equal(icon, vm.IconSize); Assert.Equal(icon, vm.Snapshot().IconSize);
-        Assert.Equal(cell, vm.CellSize); Assert.Equal(tile, vm.TileSize);
-    }, iconSize: icon);
+    }, readOnly: true, legacyIcon: 48);
 
     [Fact]
-    public async Task NewProfilesUse32DipIconsAndSilentStorageStatus() => await OnSta(vm =>
+    public async Task NewProfilesUse100PercentAndSilentStorageStatus() => await OnSta(vm =>
     {
-        Assert.Equal(32, vm.IconSize); Assert.Equal("", vm.StorageWarning);
+        Assert.Equal(100, vm.Scale); Assert.Equal(40, vm.IconSize); Assert.Equal("", vm.StorageWarning);
     });
 
     [Fact]
@@ -286,7 +269,8 @@ public sealed class InteractionTests
         public void Write(string path, byte[] bytes) => Bytes = bytes;
     }
 
-    private static Task OnSta(Action<MainViewModel> action, Func<DateTimeOffset>? clock = null, bool readOnly = false, int? iconSize = null, IConfigWriter? writer = null)
+    private static Task OnSta(Action<MainViewModel> action, Func<DateTimeOffset>? clock = null, bool readOnly = false,
+        int? scale = null, IConfigWriter? writer = null, int? legacyIcon = null)
     {
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var thread = new Thread(() =>
@@ -295,15 +279,20 @@ public sealed class InteractionTests
             ConfigService? store = null;
             try
             {
-                if (iconSize is { } icon)
+                if (scale is not null || legacyIcon is not null)
                 {
                     Directory.CreateDirectory(directory);
                     new AtomicConfigWriter().Write(Path.Combine(directory, "config.json"), System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
-                        AppConfig.CreateDefault() with { IconSize = icon }, ConfigJsonContext.Default.AppConfig));
+                        AppConfig.CreateDefault() with { Scale = scale, IconSize = legacyIcon }, ConfigJsonContext.Default.AppConfig));
                 }
                 store = ConfigService.Open(directory, readOnly: readOnly, writer: writer); var vm = new MainViewModel(store, clock);
+                byte[]? original = File.Exists(store.FilePath) ? File.ReadAllBytes(store.FilePath) : null;
                 action(vm);
-                if (readOnly) Assert.False(File.Exists(store.FilePath));
+                if (readOnly)
+                {
+                    if (original is null) Assert.False(File.Exists(store.FilePath));
+                    else Assert.Equal(original, File.ReadAllBytes(store.FilePath));
+                }
                 else store.SaveAsync(vm.Snapshot(), vm.Revision).GetAwaiter().GetResult();
                 vm.Suspend(true);
                 done.TrySetResult();

@@ -42,7 +42,7 @@ internal sealed partial class LauncherSession
     private string Executable => Path.Combine(_repo, "QuickLaunch", "bin", "Release", "net10.0-windows10.0.19041.0", "win-x64", "QuickLaunch.exe");
 
     public static void Run(ITestOutputHelper output, Action<LauncherSession> scenario,
-        bool websiteIcons = false, int iconSize = 32, int windowWidth = 620,
+        bool websiteIcons = false, int? iconSize = null, int windowWidth = 620, int windowHeight = 320,
         string? theme = null, string? backdrop = null, string? accent = null, bool silentStart = false,
         [CallerMemberName] string test = "", [CallerMemberName] string method = "")
     {
@@ -59,7 +59,7 @@ internal sealed partial class LauncherSession
         nint previousDpi = Desktop.SetThreadDpiAwarenessContext(-4); // PerMonitorV2, this test thread only
         try
         {
-            try { session.Start(websiteIcons, iconSize, windowWidth, theme, backdrop, accent, silentStart); scenario(session); }
+            try { session.Start(websiteIcons, iconSize, windowWidth, windowHeight, theme, backdrop, accent, silentStart); scenario(session); }
             catch (Exception ex) { failures.Add(ex); session.SaveFailure(ex); }
             try { session.Stop(); session.AssertLaunches(); }
             catch (Exception ex) { failures.Add(ex); session.SaveFailure(ex); }
@@ -81,12 +81,12 @@ internal sealed partial class LauncherSession
         if (failures.Count > 0) throw new AggregateException(failures);
     }
 
-    private void Start(bool websiteIcons, int iconSize, int windowWidth, string? theme, string? backdrop, string? accent, bool silentStart)
+    private void Start(bool websiteIcons, int? iconSize, int windowWidth, int windowHeight, string? theme, string? backdrop, string? accent, bool silentStart)
     {
         Assert.True(File.Exists(Executable), $"Release app is missing: {Executable}. Run scripts/E2E.ps1 or build QuickLaunch -c Release first.");
         Assert.True(Desktop.UnavailableReason() is null, "The interactive desktop became unavailable after test discovery.");
         ReleaseAndDrainInput("before starting instance", releaseAllUsed: true);
-        Seed(websiteIcons, iconSize, windowWidth, theme, backdrop, accent);
+        Seed(websiteIcons, iconSize, windowWidth, windowHeight, theme, backdrop, accent);
         _automation = new UIA3Automation { TransactionTimeout = TimeSpan.FromSeconds(2), ConnectionTimeout = TimeSpan.FromSeconds(2) };
         List<string> arguments = ["--config-dir", Path.GetDirectoryName(ConfigFile)!, "--diagnostics-dir", Path.Combine(_temp, "diagnostics"),
             "--e2e-launch-log", LaunchFile];
@@ -146,7 +146,7 @@ internal sealed partial class LauncherSession
         return false;
     }
 
-    private void Seed(bool websiteIcons, int iconSize, int windowWidth, string? theme, string? backdrop, string? accent)
+    private void Seed(bool websiteIcons, int? iconSize, int windowWidth, int windowHeight, string? theme, string? backdrop, string? accent)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(ConfigFile)!);
         Directory.CreateDirectory(Path.Combine(_temp, "diagnostics"));
@@ -160,9 +160,9 @@ internal sealed partial class LauncherSession
         {
             // F12 is reserved for Windows debuggers; F11 keeps the unusual chord registerable.
             version = 1, hotkey = new { modifiers = new[] { "Control", "Alt", "Shift" }, key = "F11" },
-            iconSize, columns = 6, autoFetchWebsiteIcons = websiteIcons,
+            iconSize, scale = iconSize is null ? 100 : (int?)null, columns = 6, autoFetchWebsiteIcons = websiteIcons,
             theme, backdrop, accent,
-            windowWidth, windowHeight = 320, windowLeft = 80, windowTop = 80,
+            windowWidth, windowHeight, windowLeft = 80, windowTop = 80,
             lastGroupId = PrimaryGroupId,
             groups = new[]
             {

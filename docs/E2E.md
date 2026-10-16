@@ -65,19 +65,35 @@ Desktop review should check the real input/foreground behavior, native header/ed
 | --- | --- | --- |
 | 2 | `Accent_preset_survives_startup_and_appearance_changes` | Purple/dark/mica and green/light/acrylic, all five color phases, config defaults, native backdrop. |
 | 2 | `Inactive_material_pixels_and_real_focus_survive_prewarm` | Acrylic/mica inactive pixels, real EDIT typing, pin clicks and persistence, native topmost bit, pinned hide retaining focus and unpinned activation. |
-| 1 | `Settings_navigation_and_opacity_drag_persist_after_exit` | Four settings pages, live opacity drag, inactive-material toggle and persistence. |
+| 1 | `Settings_navigation_and_transparency_drag_persist_after_exit` | Four settings pages, live transparency drag snapping to 5%, inverted backdropOpacity persistence, and inactive-material toggle. |
 | 1 | `Keyboard_pointer_menu_escape_and_hotkey` | Alt/arrows, empty-area click, menu Escape, two-stage panel Escape, hotkey hide/show, Ctrl+Tab and mouse tab focus. |
 | 1 | `Tab_click_switches_both_ways_and_drag_reorders` | Real clicks on the other tab and back verify tile names, cleared selection and list focus; dragging the inactive tab verifies visible/persisted tab order without selecting it. |
 | 1 | `Click_and_held_enter_each_launch_once` | Click then held Enter, one record for each, no delayed duplicate. |
 | 1 | `Header_drag_moves_and_persists_position` | Native header drag and persisted position. |
 | 1 | `Right_edge_resize_persists_size` | Native resize and persisted DIPs. |
 | 1 | `Tile_reorder_is_visible_and_persisted` | Default-size real Gong reorder. |
-| 1 | `Large_icon_reorder_crosses_row_boundary_and_is_persisted` | 48 px real Gong cross-row reorder. |
-| 1 | `Settings_live_preferences_are_persisted` | Website icons off, follow-mouse, and reset of all four saved geometry fields in one settings visit. |
+| 1 | `Large_icon_reorder_crosses_row_boundary_and_is_persisted` | Legacy iconSize 48 migrates to scale 120; real Gong cross-row reorder and persisted migration. |
+| 1 | `Settings_live_preferences_are_persisted` | Real slider keys to 150% and back to 100%, tile bounds/label height/window size ratios and persistence, unchanged Settings size; website icons off, follow-mouse, reset. |
 | 1 | `Add_url_with_icon_then_edit_and_undo_delete` | Stable Add/Edit height through all four types, URL host naming, all three picker grids and keyboard navigation, current-item preselection, persisted system/Fluent specs and tile pixels, F2 rename, Delete and Ctrl+Z. |
 | 1 | `Delete_group_confirmation_can_cancel_then_delete` | Cancel then accept, persisted surviving group. |
 
-Unit tests cover decision tables and persistence edge cases; E2E covers input/binding/native integration. The 51-image snapshot matrix provides visual evidence for review.
+Unit tests cover decision tables and persistence edge cases; E2E covers input/binding/native integration. The snapshot matrix provides visual evidence for review.
+
+For Task 28 iteration, run `Settings_navigation_and_transparency_drag_persist_after_exit`,
+`Settings_live_preferences_are_persisted`, and
+`Large_icon_reorder_crosses_row_boundary_and_is_persisted`; run the full suite once before merge.
+Scale checks use actual tile and label UIA bounds and persisted window DIPs, with small
+layout-rounding tolerances. Input stays in Settings throughout the live resize.
+The label lookup walks the tile's raw-view children with FlaUI's `RawViewWalker` and
+matches AutomationId `TileLabel`. Template TextBlocks are not control elements, so
+control-view descendant searches cannot find this label. Geometry reads do not filter
+on `IsOffscreen`, since Settings can cover the panel.
+Bounds must be positive and contained within the tile before comparing label height.
+The no-HWND WPF layout test verifies the peer's ID, Text type and `IsControlElement=false`;
+E2E logs its actual ID, offscreen flag and bounds at each scale.
+The snapshot plan adds `launcher-80-dark.png`, `launcher-80-light.png`,
+`launcher-150-dark.png`, and `launcher-150-light.png`; existing `settings-appearance`
+variants capture the updated transparency and scale controls.
 
 Snapshot rendering is independent of this suite: `Snapshots.ps1` uses non-activating offscreen surfaces, six-second per-image worker deadlines and a 90-second overall renderer deadline. It continuously writes rendered/failed/current progress to `snapshots.json`, including partial failure. It never runs modal dialogs or requests human input.
 
@@ -85,8 +101,9 @@ Settings tests navigate through `SettingsGeneralNav`, `SettingsAppearanceNav`,
 `SettingsPanelNav`, and `SettingsAboutNav` using control AutomationIds.
 The NavigationView uses `Transition=None` and `TransitionDuration=0`, including its
 first page. The existing navigation unit test checks both properties before navigating.
-The opacity test drags the real slider, observes a change before mouse-up, and checks both
-settings in JSON after `--exit` while Settings is still open. Solid/fallback disables
+The transparency test drags the real slider, observes a change before mouse-up, checks
+5% snapping and inverted `backdropOpacity`, and checks both settings in JSON after
+`--exit` while Settings is still open. Solid/fallback disables
 both indented backdrop controls.
 
 The keyboard/hotkey scenario ends with an optional real tray-input phase. It searches

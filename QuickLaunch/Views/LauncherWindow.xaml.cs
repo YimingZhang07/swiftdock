@@ -19,6 +19,7 @@ namespace QuickLaunch.Views;
 public partial class LauncherWindow : Window, IDisposable
 {
     private readonly Dictionary<LaunchGroup, TileListBox> _grids = [];
+    private readonly PanelResources _panelResources;
     private CancellationTokenSource _shutdown = new();
     private readonly IDialogService _dialogs;
     private readonly TrayTogglePolicy _trayToggle = new(() => Environment.TickCount64, H.NotifyIcon.Core.CursorUtilities.GetDoubleClickTime);
@@ -26,6 +27,7 @@ public partial class LauncherWindow : Window, IDisposable
     private readonly DispatcherTimer _toastCollapse = new(DispatcherPriority.Normal) { Interval = TimeSpan.FromMilliseconds(150) };
     private ThemeService? _theme;
     private int _cornerHresult;
+    private int _appliedScale;
     public string BackdropMode { get; private set; } = "solid";
     private bool _closing, _movingWindow;
     private bool _sizeMove, _sizing;
@@ -58,6 +60,9 @@ public partial class LauncherWindow : Window, IDisposable
         WindowDragArea.AddHandler(MouseLeftButtonDownEvent, new MouseButtonEventHandler(WindowDragMouseDown), handledEventsToo: true);
         Log = log;
         Launcher = launcher;
+        _appliedScale = ViewModel.Scale;
+        _panelResources = (PanelResources)Resources["PanelMetrics"];
+        _panelResources.Factor = ViewModel.Metrics.Factor;
         Icons = icons;
         Icons.AutoFetchWebsiteIcons = ViewModel.AutoFetchWebsiteIcons;
         _dialogs = dialogs;
@@ -118,19 +123,36 @@ public partial class LauncherWindow : Window, IDisposable
         }
         if (e.PropertyName == nameof(MainViewModel.Placement) && IsVisible && !_warming && !_sizeMove) PlacePanel();
         if (e.PropertyName == nameof(MainViewModel.IconSize) && IsLoaded) _ = LoadIconsAsync();
-        if (e.PropertyName == nameof(MainViewModel.CellSize))
+        if (e.PropertyName == nameof(MainViewModel.Scale)) ApplyPanelScale();
+    }
+
+    private void ApplyPanelScale()
+    {
+        // Read the old actual size before changing minimum/layout metrics. An unshown
+        // panel's saved size has already been rescaled by the model.
+        var desired = IsLoaded
+            ? WindowPlacement.RescaleSize(new(Width, Height), _appliedScale, ViewModel.Scale, new(double.PositiveInfinity, double.PositiveInfinity))
+            : ViewModel.WindowSize ?? WindowPlacement.RescaleSize(new(Width, Height), _appliedScale, ViewModel.Scale, new(double.PositiveInfinity, double.PositiveInfinity));
+        _appliedScale = ViewModel.Scale;
+        _panelResources.Factor = ViewModel.Metrics.Factor;
+        UpdateMinimumSize();
+        nint hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd != 0)
         {
-            UpdateMinimumSize();
-            if (IsVisible && !_sizeMove && ViewModel.WindowSize is null)
-                WindowPlacement.ResizeInPlace(this, CellSize, SelectedGroup.Items.Count, ViewModel.Columns);
+            var position = NativeMethods.GetWindowRect(hwnd, out var rect) ? new Point(rect.Left, rect.Top) : ViewModel.WindowPosition;
+            WindowPlacement.PlacePanel(this, WindowPlacement.ReadDesktop(hwnd), null, position, ViewModel.Columns,
+                CellSize, SelectedGroup.Items.Count, desired, panelScale: ViewModel.Scale);
+            ViewModel.SetWindowSize(new(Width, Height));
+            if (NativeMethods.GetWindowRect(hwnd, out rect)) ViewModel.SetWindowPosition(new(rect.Left, rect.Top));
         }
+        else { Width = desired.Width; Height = desired.Height; ViewModel.SetWindowSize(desired); }
     }
 
     private void UpdateMinimumSize()
     {
-        var size = WindowPlacement.MinimumSize(CellSize);
-        MinWidth = Math.Min(size.Width, ViewModel.WindowSize?.Width ?? size.Width);
-        MinHeight = Math.Min(size.Height, ViewModel.WindowSize?.Height ?? size.Height);
+        var size = WindowPlacement.MinimumSize(CellSize, ViewModel.Metrics.Factor);
+        MinWidth = Math.Min(size.Width, MaxWidth);
+        MinHeight = Math.Min(size.Height, MaxHeight);
     }
 
     public void ResetWindowSize()
@@ -147,7 +169,7 @@ public partial class LauncherWindow : Window, IDisposable
         var desktop = WindowPlacement.ReadDesktop(new WindowInteropHelper(this).EnsureHandle());
         WindowPlacement.PlacePanel(this, desktop, defaultOnCurrentMonitor || followCursor ? "cursor" : ViewModel.Placement,
             defaultOnCurrentMonitor || followCursor ? null : ViewModel.WindowPosition, ViewModel.Columns, CellSize,
-            SelectedGroup.Items.Count, ViewModel.WindowSize, defaultOnCurrentMonitor);
+            SelectedGroup.Items.Count, ViewModel.WindowSize, defaultOnCurrentMonitor, ViewModel.Scale);
     }
 
     public void InitializeNative(ThemeService? theme = null)
@@ -268,6 +290,7 @@ public partial class LauncherWindow : Window, IDisposable
     internal void RefreshDpi()
     {
         WindowPlacement.UpdateWorkAreaLimits(this);
+        UpdateMinimumSize();
         Log.WindowDpi(NativeMethods.GetDpiForWindow(new WindowInteropHelper(this).Handle), Left, Top, ActualWidth, ActualHeight);
         _ = LoadIconsAsync();
     }
@@ -317,7 +340,7 @@ public partial class LauncherWindow : Window, IDisposable
 
     public void FitContent()
     {
-        if (!_sizeMove) WindowPlacement.FitContent(this, CellSize, SelectedGroup.Items.Count, ViewModel.WindowSize);
+        if (!_sizeMove) WindowPlacement.FitContent(this, CellSize, SelectedGroup.Items.Count, ViewModel.WindowSize, ViewModel.Scale);
     }
 
     public void Toggle()
@@ -547,13 +570,13 @@ public partial class LauncherWindow : Window, IDisposable
         e.Handled = true;
     }
 
-    private void IconsMouseWheel(object sender, MouseWheelEventArgs e) => HandleIconSizeWheel(e, Keyboard.Modifiers);
+    private void IconsMouseWheel(object sender, MouseWheelEventArgs e) => HandleScaleWheel(e, Keyboard.Modifiers);
 
-    internal void HandleIconSizeWheel(MouseWheelEventArgs e, ModifierKeys modifiers)
+    internal void HandleScaleWheel(MouseWheelEventArgs e, ModifierKeys modifiers)
     {
         if (!modifiers.HasFlag(ModifierKeys.Control) || !CanEdit || Launcher.DragActive || Launcher.ExternalDragActive || e.Delta == 0) return;
         var list = SelectedList;
-        ViewModel.SetIconSize(IconSizePresets.Step(ViewModel.IconSize, e.Delta));
+        ViewModel.SetScale(PanelMetrics.Step(ViewModel.Scale, e.Delta));
         e.Handled = true;
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => { if (list == SelectedList) list.RevealSelection(); });
     }
@@ -613,6 +636,8 @@ public partial class LauncherWindow : Window, IDisposable
             {
                 if (item.Visual.Image is not null && item.Visual.RequestedPixels == pixels
                     && (!IconService.UsesFavicon(item) || !Icons.AutoFetchWebsiteIcons || item.Visual.WebsiteIconExpires > DateTimeOffset.UtcNow)) return;
+                // Never stretch a previous, smaller rendering while the new pixel size loads.
+                if (item.Visual.RequestedPixels != pixels) item.Visual.Image = null;
                 int generation = item.Visual.BeginRequest(pixels);
                 if (IconService.UsesFavicon(item))
                 {

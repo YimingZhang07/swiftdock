@@ -12,19 +12,19 @@ namespace QuickLaunch.E2E;
 public sealed class LauncherTests(ITestOutputHelper output)
 {
     [DesktopFact]
-    public void Settings_navigation_and_opacity_drag_persist_after_exit() => Run(output, app =>
+    public void Settings_navigation_and_transparency_drag_persist_after_exit() => Run(output, app =>
     {
         bool supported = app.SupportsMaterial("acrylic");
         app.Click(app.ById("SettingsButton"));
         var settings = app.Dialog("设置");
-        foreach (var (page, control) in new[] { ("General", "MainKey"), ("Appearance", "BackdropOpacitySlider"),
+        foreach (var (page, control) in new[] { ("General", "MainKey"), ("Appearance", "TransparencySlider"),
             ("Panel", "ResetSizeButton"), ("About", "DirectoryLabel") })
         {
             app.NavigateSettings(settings, page); app.ById(control, settings);
         }
         app.ById("OpenLogsButton", settings); // Never opens Explorer during automation.
         app.NavigateSettings(settings, "Appearance");
-        var slider = app.ById("BackdropOpacitySlider", settings);
+        var slider = app.ById("TransparencySlider", settings);
         var toggle = app.ById("KeepBackdropWhenInactiveBox", settings);
         Assert.Equal(ToggleState.On, toggle.Patterns.Toggle.Pattern.ToggleState.Value);
         app.Click(app.ById("SolidBackdrop", settings), settings);
@@ -35,13 +35,14 @@ public sealed class LauncherTests(ITestOutputHelper output)
             Assert.False(slider.IsEnabled); Assert.False(toggle.IsEnabled);
             return;
         }
-        app.DragBackdropOpacity(settings, 65);
+        app.DragTransparency(settings, 65);
         int value = (int)slider.Patterns.RangeValue.Pattern.Value.Value;
         Assert.InRange(value, 50, 80);
         app.Click(toggle, settings);
         // Leave settings open: --exit must flush the latest debounced value too.
         using var config = app.ExitAndReadConfig();
-        Assert.Equal(value, config.RootElement.GetProperty("backdropOpacity").GetInt32());
+        Assert.Equal(0, value % 5);
+        Assert.Equal(100 - value, config.RootElement.GetProperty("backdropOpacity").GetInt32());
         Assert.False(config.RootElement.GetProperty("keepBackdropWhenInactive").GetBoolean());
     }, theme: "dark", backdrop: "acrylic");
 
@@ -257,15 +258,17 @@ public sealed class LauncherTests(ITestOutputHelper output)
         Eventually(() => app.TileNames().SequenceEqual(expected), "48 px cross-row tile order Bravo, Charlie, Delta, Alpha");
         Assert.Equal(expected, app.Tiles().OrderBy(tile => tile.BoundingRectangle.Top).ThenBy(tile => tile.BoundingRectangle.Left).Select(tile => tile.Name));
         using var config = app.ExitAndReadConfig();
-        Assert.Equal(48, config.RootElement.GetProperty("iconSize").GetInt32());
+        Assert.Equal(120, config.RootElement.GetProperty("scale").GetInt32());
+        Assert.False(config.RootElement.TryGetProperty("iconSize", out _));
         Assert.Equal(expected, config.RootElement.GetProperty("groups")[0].GetProperty("items").EnumerateArray().Select(item => item.GetProperty("name").GetString()));
-    }, iconSize: 48, windowWidth: 340);
+    }, iconSize: 48, windowWidth: 400, windowHeight: 380);
 
     [DesktopFact]
     public void Settings_live_preferences_are_persisted() => Run(output, app =>
     {
         app.Click(app.ById("SettingsButton"));
         var dialog = app.Dialog("设置");
+        app.AssertLivePanelScale(dialog);
         app.NavigateSettings(dialog, "Panel");
         var toggle = app.ById("WebsiteIconsBox", dialog);
         Assert.Equal(ToggleState.On, toggle.Patterns.Toggle.Pattern.ToggleState.Value);

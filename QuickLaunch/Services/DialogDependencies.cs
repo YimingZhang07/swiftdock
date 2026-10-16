@@ -9,7 +9,7 @@ public interface ISettingsState : INotifyPropertyChanged
     bool CanEdit { get; }
     string DirectoryPath { get; }
     HotkeyConfig Hotkey { get; }
-    int IconSize { get; }
+    int Scale { get; }
     string Placement { get; }
     string Theme { get; }
     string Backdrop { get; }
@@ -18,7 +18,7 @@ public interface ISettingsState : INotifyPropertyChanged
     string Accent { get; }
     bool AutoFetchWebsiteIcons { get; }
     void ApplySettings(HotkeyConfig hotkey);
-    void SetIconSize(int size);
+    void SetScale(int scale);
     void SetPlacement(string placement);
     void SetTheme(string theme);
     void SetBackdrop(string backdrop);

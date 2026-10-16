@@ -69,12 +69,12 @@ internal sealed partial class LauncherSession
         ById($"Settings{page}Title", settings);
     }
 
-    public void DragBackdropOpacity(Window settings, int percent)
+    public void DragTransparency(Window settings, int percent)
     {
-        var slider = ById("BackdropOpacitySlider", settings);
-        Assert.True(slider.IsEnabled, "Opacity must be enabled when the material is supported.");
+        var slider = ById("TransparencySlider", settings);
+        Assert.True(slider.IsEnabled, "Transparency must be enabled when the material is supported.");
         Click(slider, settings); Key(VirtualKeyShort.HOME, settings);
-        Eventually(() => slider.Patterns.RangeValue.Pattern.Value.Value == 0, "opacity slider at zero");
+        Eventually(() => slider.Patterns.RangeValue.Pattern.Value.Value == 0, "transparency slider at zero");
         var bounds = slider.BoundingRectangle;
         int inset = (int)Math.Round(10 * Desktop.GetDpiForWindow(settings.Properties.NativeWindowHandle.Value) / 96.0);
         var from = new Point(bounds.Left + inset, Center(bounds).Y);
@@ -88,9 +88,84 @@ internal sealed partial class LauncherSession
                 Assert.Equal(settings.Properties.NativeWindowHandle.Value, Desktop.GetForegroundWindow());
                 MoveMouse(new Point(from.X + (to.X - from.X) * step / 15, from.Y)); Thread.Sleep(20);
             }
-            Eventually(() => slider.Patterns.RangeValue.Pattern.Value.Value > 0, "opacity changes while thumb is still held");
+            Eventually(() => slider.Patterns.RangeValue.Pattern.Value.Value > 0, "transparency changes while thumb is still held");
         }
         finally { ReleaseMouse(MouseButton.Left); }
+    }
+
+    public void AssertLivePanelScale(Window settings)
+    {
+        NavigateSettings(settings, "Appearance");
+        var slider = ById("ScaleSlider", settings);
+        Assert.Equal(100, slider.Patterns.RangeValue.Pattern.Value.Value);
+        var subject = Tiles()[0];
+        var rawView = _automation.TreeWalkerFactory.GetRawViewWalker();
+        AutomationElement? labelElement = null;
+        Rectangle LabelBounds()
+        {
+            // Template TextBlocks are raw-view peers, not control elements. Keep the
+            // walk inside this tile and read geometry without an IsOffscreen filter.
+            labelElement = null;
+            for (var child = rawView.GetFirstChild(subject); child is not null; child = rawView.GetNextSibling(child))
+            {
+                if (child.AutomationId != "TileLabel") continue;
+                labelElement = child;
+                return child.BoundingRectangle;
+            }
+            return Rectangle.Empty;
+        }
+        var panel = Panel.BoundingRectangle;
+        var tile = subject.BoundingRectangle;
+        Rectangle label = Rectangle.Empty;
+        Eventually(() =>
+        {
+            label = LabelBounds();
+            return label.Width > 0 && label.Height > 0 && tile.Contains(label);
+        }, $"nonempty raw-view TileLabel bounds inside tile '{subject.Name}'");
+        Diagnostic($"scale 100% label: {DescribeElement(labelElement!)}; bounds={label}");
+        var dialog = settings.BoundingRectangle;
+        void AssertGeometry(double ratio)
+        {
+            Eventually(() =>
+            {
+                var current = Panel.BoundingRectangle;
+                var currentTile = subject.BoundingRectangle;
+                var currentLabel = LabelBounds();
+                return currentLabel.Width > 0 && currentLabel.Height > 0 && currentTile.Contains(currentLabel)
+                    && Math.Abs(current.Width - panel.Width * ratio) <= 3 * Scale
+                    && Math.Abs(current.Height - panel.Height * ratio) <= 3 * Scale
+                    && Math.Abs(currentTile.Width - tile.Width * ratio) <= 2 * Scale
+                    && Math.Abs(currentTile.Height - tile.Height * ratio) <= 2 * Scale
+                    && Math.Abs(currentLabel.Height - label.Height * ratio) <= 2 * Scale;
+            }, $"panel, tile bounds and label height at {ratio:P0}");
+            Diagnostic($"scale {ratio:P0} label: {DescribeElement(labelElement!)}; bounds={labelElement!.BoundingRectangle}");
+            Assert.Equal(dialog, settings.BoundingRectangle);
+            Assert.Equal(settings.Properties.NativeWindowHandle.Value, Desktop.GetForegroundWindow());
+        }
+        void AssertSaved(int percent)
+        {
+            Eventually(() =>
+            {
+                try
+                {
+                    using var stream = new FileStream(ConfigFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                    using var json = JsonDocument.Parse(stream);
+                    var root = json.RootElement;
+                    bool present = root.TryGetProperty("scale", out var value);
+                    return (percent == 100 ? !present : present && value.GetInt32() == percent)
+                        && !root.TryGetProperty("iconSize", out _)
+                        && Math.Abs(root.GetProperty("windowWidth").GetDouble() - panel.Width / Scale * percent / 100) <= 3
+                        && Math.Abs(root.GetProperty("windowHeight").GetDouble() - panel.Height / Scale * percent / 100) <= 3;
+                }
+                catch (IOException) { return false; }
+            }, $"scale {percent} and resized panel persisted");
+        }
+        Click(slider, settings); Key(VirtualKeyShort.END, settings);
+        Eventually(() => slider.Patterns.RangeValue.Pattern.Value.Value == 150, "scale slider at 150%");
+        AssertGeometry(1.5); AssertSaved(150);
+        for (int i = 0; i < 5; i++) Key(VirtualKeyShort.LEFT, settings);
+        Eventually(() => slider.Patterns.RangeValue.Pattern.Value.Value == 100, "scale slider back at 100%");
+        AssertGeometry(1); AssertSaved(100);
     }
 
     public bool SupportsMaterial(string backdrop)

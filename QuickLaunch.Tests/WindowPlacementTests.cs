@@ -6,6 +6,33 @@ namespace QuickLaunch.Tests;
 
 public sealed class WindowPlacementTests
 {
+    [Theory]
+    [InlineData(80, 73.6, 263, 144, 483.2, 217.6)]
+    [InlineData(100, 92, 324, 180, 600, 272)]
+    [InlineData(150, 138, 478, 270, 892, 408)]
+    public void ScaledMetricsFitColumnsRowsAndMinimum(int scale, double cell, double minWidth, double minHeight, double width, double height)
+    {
+        var metrics = new PanelMetrics(scale);
+        Assert.Equal(cell, metrics.CellSize, 8);
+        var minimum = WindowPlacement.MinimumSize(cell, metrics.Factor);
+        Assert.Equal(new Size(minWidth, minHeight), minimum);
+        var size = WindowPlacement.ResolveSize(null, new(2000, 1200), minimum, 6, cell, 12, metrics.HorizontalChrome, metrics.VerticalChrome);
+        Assert.Equal(width, size.Width, 8); Assert.Equal(height, size.Height, 8);
+        var threeRows = WindowPlacement.ResolveSize(null, new(2000, 1200), minimum, 6, cell, 13, metrics.HorizontalChrome, metrics.VerticalChrome);
+        Assert.Equal(height + cell, threeRows.Height, 8);
+    }
+
+    [Theory]
+    [InlineData(620, 320, 100, 150, 1200, 800, 930, 480)]
+    [InlineData(930, 480, 150, 100, 1200, 800, 620, 320)]
+    [InlineData(620, 320, 100, 80, 1200, 800, 496, 256)]
+    [InlineData(1000, 700, 100, 150, 1200, 800, 1200, 800)]
+    [InlineData(100, 100, 100, 150, 1200, 800, 478, 270)]
+    [InlineData(620, 320, 100, 150, 250, 200, 250, 200)]
+    public void ScaleChangeResizesAndClamps(double width, double height, int oldScale, int newScale,
+        double workWidth, double workHeight, double expectedWidth, double expectedHeight) =>
+        Assert.Equal(new Size(expectedWidth, expectedHeight), WindowPlacement.RescaleSize(new(width, height), oldScale, newScale, new(workWidth, workHeight)));
+
     private static readonly WindowPlacement.Monitor[] Monitors =
     [
         new(new(-1920, 0, 1920, 1080), new(-1920, 0, 1920, 1040), 96),

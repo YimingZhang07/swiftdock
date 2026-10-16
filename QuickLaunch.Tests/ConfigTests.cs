@@ -9,6 +9,24 @@ namespace QuickLaunch.Tests;
 
 public sealed class ConfigTests : IDisposable
 {
+    [Theory]
+    [InlineData(null, null, 100)] [InlineData(null, 32, 80)] [InlineData(null, 40, 100)] [InlineData(null, 48, 120)]
+    [InlineData(100, 48, 100)] [InlineData(150, 32, 150)]
+    [InlineData(int.MinValue, null, 80)] [InlineData(84, null, 80)] [InlineData(85, null, 90)]
+    [InlineData(104, null, 100)] [InlineData(105, null, 110)] [InlineData(int.MaxValue, null, 150)]
+    public void ScaleNormalizesMigratesAndRoundtripsWithDefaultsOmitted(int? scale, int? legacyIcon, int expected)
+    {
+        var original = AppConfig.CreateDefault() with { Scale = scale, IconSize = legacyIcon };
+        var config = ConfigValidation.Parse(JsonSerializer.SerializeToUtf8Bytes(original, ConfigJsonContext.Default.AppConfig));
+        Assert.Equal(expected, config.Scale ?? 100); Assert.Null(config.IconSize);
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(config, ConfigJsonContext.Default.AppConfig);
+        using var json = JsonDocument.Parse(bytes);
+        Assert.False(json.RootElement.TryGetProperty("iconSize", out _));
+        Assert.Equal(expected != 100, json.RootElement.TryGetProperty("scale", out var stored));
+        if (expected != 100) Assert.Equal(expected, stored.GetInt32());
+        Assert.Equal(bytes, JsonSerializer.SerializeToUtf8Bytes(ConfigValidation.Parse(bytes), ConfigJsonContext.Default.AppConfig));
+    }
+
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "QuickLaunch-config-test-" + Guid.NewGuid().ToString("N"));
     private string ConfigPath => Path.Combine(_directory, "config.json");
 
@@ -80,7 +98,7 @@ public sealed class ConfigTests : IDisposable
     }
 
     [Fact]
-    public void OldConfigRemainsByteIdentical()
+    public void OldConfigMigratesIconSize()
     {
         const string json = """
             {
@@ -104,7 +122,9 @@ public sealed class ConfigTests : IDisposable
             }
             """;
         byte[] bytes = Encoding.UTF8.GetBytes(json.Replace("\r\n", "\n").Replace("\n", Environment.NewLine));
-        Assert.Equal(bytes, JsonSerializer.SerializeToUtf8Bytes(ConfigValidation.Parse(bytes), ConfigJsonContext.Default.AppConfig));
+        var migrated = ConfigValidation.Parse(bytes);
+        Assert.Equal(80, migrated.Scale); Assert.Null(migrated.IconSize);
+        Assert.DoesNotContain("iconSize", JsonSerializer.Serialize(migrated, ConfigJsonContext.Default.AppConfig));
     }
 
     [Fact]
@@ -130,7 +150,7 @@ public sealed class ConfigTests : IDisposable
     [InlineData(double.NegativeInfinity, 400d)]
     public void InvalidWindowSizeClearsBothDimensionsAndPreservesConfig(double? width, double? height)
     {
-        var original = AppConfig.CreateDefault() with { Columns = 4, IconSize = 64, WindowWidth = width, WindowHeight = height };
+        var original = AppConfig.CreateDefault() with { Columns = 4, Scale = 120, WindowWidth = width, WindowHeight = height };
         var normalized = ConfigValidation.Normalize(original);
         Assert.Equal(original with { WindowWidth = null, WindowHeight = null }, normalized);
         string json = JsonSerializer.Serialize(normalized, ConfigJsonContext.Default.AppConfig);

@@ -30,7 +30,12 @@ public sealed record AppConfig
     // Accept the retired setting when reading older profiles; normalization clears it.
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool HideOnDeactivate { get; init; }
-    public int IconSize { get; init; } = 32;
+    // Read legacy profiles; normalization migrates this to Scale and clears it.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? IconSize { get; init; }
+    // Null means 100%; explicit 100 also wins over a legacy iconSize during migration.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Scale { get; init; }
     // Null preserves the original defaults: system theme/accent and acrylic panel.
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Theme { get; init; }

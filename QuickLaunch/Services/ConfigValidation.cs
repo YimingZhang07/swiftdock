@@ -41,8 +41,8 @@ public static class ConfigValidation
     {
         if (config.Version != 1) throw new InvalidDataException("不支持的旧配置版本。");
         ValidateHotkey(config.Hotkey);
-        if (config.Columns is < 1 or > 12 || config.IconSize is < 16 or > 128)
-            throw new InvalidDataException("columns 必须为 1–12，iconSize 必须为 16–128。");
+        if (config.Columns is < 1 or > 12)
+            throw new InvalidDataException("columns 必须为 1–12。");
         if (config.Groups is null) throw new InvalidDataException("groups 不能为 null。");
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         void Id(string? id)
@@ -72,7 +72,9 @@ public static class ConfigValidation
         static bool ValidSize(double? value) => value is > 0 and <= 10000 && double.IsFinite(value.Value);
         bool sized = ValidSize(config.WindowWidth) && ValidSize(config.WindowHeight);
         bool positioned = config.WindowLeft is >= -100000 and <= 100000 && config.WindowTop is >= -100000 and <= 100000;
-        return config with { HideOnDeactivate = false, AutoFetchWebsiteIcons = config.AutoFetchWebsiteIcons == false ? false : null,
+        int scale = PanelMetrics.Normalize(config.Scale ?? (config.IconSize is { } icon ? PanelMetrics.FromLegacyIconSize(icon) : 100));
+        return config with { Scale = scale == 100 ? null : scale, IconSize = null,
+            HideOnDeactivate = false, AutoFetchWebsiteIcons = config.AutoFetchWebsiteIcons == false ? false : null,
             Theme = AppearanceOptions.NormalizeTheme(config.Theme), Backdrop = AppearanceOptions.NormalizeBackdrop(config.Backdrop),
             Accent = AppearanceOptions.NormalizeAccent(config.Accent),
             BackdropOpacity = Math.Clamp(config.BackdropOpacity, 0, 100),

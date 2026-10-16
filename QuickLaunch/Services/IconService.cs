@@ -45,7 +45,8 @@ public sealed class IconService : IDisposable
         _directory = directory; _log = log; _favicons = favicons; _thread = thread;
     }
 
-    public static int PixelSize(double dip, double scale) => Math.Clamp((int)Math.Ceiling(dip * scale), 16, 256);
+    // A 60-DIP panel icon exceeds 256 pixels on high-DPI monitors.
+    public static int PixelSize(double dip, double scale) => Math.Clamp((int)Math.Ceiling(dip * scale), 16, 512);
     public static string SourceKey(LaunchItem item)
     {
         // Embedded artwork is independent of the launch target: one parse per name/size,
@@ -66,7 +67,7 @@ public sealed class IconService : IDisposable
 
     internal Task<BitmapSource?> GetSystemPickerImageAsync(CatalogIcon icon, int pixels, CancellationToken cancellation = default)
     {
-        pixels = Math.Clamp(pixels, 16, 256);
+        pixels = Math.Clamp(pixels, 16, 512);
         // Cache rejected resources as well as images for the session, separately at each DPI.
         var load = _systemPickerImages.GetOrAdd((icon.Spec, pixels), key => new(() =>
         {
@@ -98,7 +99,7 @@ public sealed class IconService : IDisposable
     public async Task<BitmapSource?> GetAsync(LaunchItem item, int pixels, CancellationToken cancellation = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        pixels = Math.Clamp(pixels, 16, 256);
+        pixels = Math.Clamp(pixels, 16, 512);
         string source = SourceKey(item);
         int revision = _revisions.GetValueOrDefault(source);
         string key = $"{source}-{pixels}-{revision}";
@@ -115,7 +116,7 @@ public sealed class IconService : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return UsesFavicon(item) && FaviconService.TryUrl(item.Path, out var url)
-            ? _favicons.GetAsync(url, Math.Clamp(pixels, 16, 256), cancellation) : Task.FromResult<BitmapSource?>(null);
+            ? _favicons.GetAsync(url, Math.Clamp(pixels, 16, 512), cancellation) : Task.FromResult<BitmapSource?>(null);
     }
 
     internal static bool UsesFavicon(LaunchItem item) => item.Kind == LaunchKind.Url && string.IsNullOrWhiteSpace(item.Icon);

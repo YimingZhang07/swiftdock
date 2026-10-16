@@ -118,9 +118,9 @@ public sealed class BackdropSettingsTests
         bool supported = AppearanceOptions.IsSupported(Wpf.Ui.Controls.WindowBackdropType.Acrylic);
         Assert.Equal(supported, model.CanEditBackdrop);
         state.SetBackdropOpacity(45); state.SetKeepBackdropWhenInactive(false);
-        Assert.Equal(45, model.BackdropOpacity); Assert.False(model.KeepBackdropWhenInactive);
+        Assert.Equal(55, model.Transparency); Assert.False(model.KeepBackdropWhenInactive);
         state.SetBackdrop("solid"); Assert.False(model.CanEditBackdrop);
-        state.Calls.Clear(); model.BackdropOpacity = 70; model.KeepBackdropWhenInactive = true;
+        state.Calls.Clear(); model.Transparency = 70; model.KeepBackdropWhenInactive = true;
         Assert.Empty(state.Calls);
         state.SetBackdrop("acrylic"); Assert.Equal(supported, model.CanEditBackdrop);
         preferences = (true, false, false); appearance.Apply(); Assert.False(model.CanEditBackdrop);
@@ -138,11 +138,34 @@ public sealed class BackdropSettingsTests
         var state = new SettingsViewModelTests.SettingsState();
         var actions = new SettingsViewModelTests.Actions();
         using var model = CreateModel(state, actions: actions);
-        model.BackdropOpacity = 42; model.KeepBackdropWhenInactive = false;
+        model.Transparency = 58; model.KeepBackdropWhenInactive = false;
         Assert.Equal(new[] { "opacity:42", "keep:False" }, state.Calls);
         model.OpenLogsCommand.Execute(null); Assert.Equal(1, actions.LogOpens);
-        model.Dispose(); state.SetBackdropOpacity(80); Assert.Equal(42, model.BackdropOpacity);
+        model.Dispose(); state.SetBackdropOpacity(80); Assert.Equal(58, model.Transparency);
     }
+
+    [Fact]
+    public Task TransparencyPreservesOffTickValuesUntilSliderInputAndInvertsOpacity() => WpfTestHost.RunAsync(() =>
+    {
+        var state = new SettingsViewModelTests.SettingsState();
+        state.SetBackdropOpacity(37); state.Calls.Clear();
+        using var model = CreateModel(state);
+        var page = new SettingsAppearancePage { DataContext = model };
+        var slider = (Slider)page.FindName("TransparencySlider");
+        page.Measure(new Size(590, 430)); page.Arrange(new Rect(0, 0, 590, 430)); page.UpdateLayout();
+        Assert.Equal(63, slider.Value); Assert.Equal(63, model.Transparency); Assert.Empty(state.Calls);
+        Assert.Equal("透明度", System.Windows.Automation.AutomationProperties.GetName(slider));
+        Assert.True(slider.IsSnapToTickEnabled); Assert.Equal(5, slider.TickFrequency);
+        Slider.IncreaseSmall.Execute(null, slider);
+        Assert.Equal(70, slider.Value); Assert.Equal(30, state.BackdropOpacity);
+        Slider.DecreaseSmall.Execute(null, slider);
+        Assert.Equal(65, slider.Value); Assert.Equal(35, state.BackdropOpacity);
+        Slider.IncreaseLarge.Execute(null, slider);
+        Assert.Equal(75, slider.Value); Assert.Equal(25, state.BackdropOpacity);
+        state.SetBackdropOpacity(0); Assert.Equal(100, slider.Value);
+        state.SetBackdropOpacity(100); Assert.Equal(0, slider.Value);
+        return Task.CompletedTask;
+    });
 
     [Fact]
     public Task SettingsPagesFitAtNormalTextSizeWithoutDesktopWindows() => WpfTestHost.RunAsync(async () =>
