@@ -4,17 +4,115 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows;
+using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
+using System.Windows.Threading;
+using System.Diagnostics;
 using System.Xml.Linq;
 using QuickLaunch.Services;
+using QuickLaunch.Views;
 using Wpf.Ui.Appearance;
+using Wpf.Ui.Extensions;
 using Wpf.Ui.Markup;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace QuickLaunch.Tests;
 
 [Collection("WPF")]
-public sealed class ThemeTests
+public sealed class ThemeTests(ITestOutputHelper output)
 {
+    [Fact]
+    public Task CommonAppliesReloadOnceWithoutGrowingDictionaries() => WpfTestHost.RunAsync(async () =>
+    {
+        new WpfThemeApplication().ApplyTheme(ApplicationTheme.Dark);
+        var state = new SettingsViewModelTests.SettingsState();
+        state.SetTheme("dark");
+        var toggle = new Wpf.Ui.Controls.ToggleSwitch { IsChecked = true };
+        var content = new StackPanel { Children = { toggle, new Slider { Value = 5 } } };
+        var window = new Window { Content = content };
+        content.Measure(new Size(300, 100)); content.Arrange(new Rect(0, 0, 300, 100)); content.UpdateLayout();
+        static int DictionaryCount(ResourceDictionary root) => 1 + root.MergedDictionaries.Sum(DictionaryCount);
+        int dictionaries = DictionaryCount(Application.Current.Resources), reloads = 0;
+        var application = new MeasuredThemeApplication();
+        void Reloaded(ApplicationTheme _, Color __) => reloads++;
+        ApplicationThemeManager.Changed += Reloaded;
+        var measured = new List<int>();
+        var watch = Stopwatch.StartNew();
+        void Record(string phase)
+        {
+            int count = DictionaryCount(Application.Current.Resources);
+            output.WriteLine($"{phase}: {watch.Elapsed.TotalMilliseconds:F2} ms; ApplyTheme calls={application.Reloads}; Changed events={reloads}; dictionaries={count}");
+            Assert.Equal(dictionaries, count);
+            measured.Add(application.Reloads); application.Reloads = 0; reloads = 0; watch.Restart();
+        }
+        try
+        {
+            using var theme = new ThemeService(Dispatcher.CurrentDispatcher, state, application, () => (true, false, true));
+            Record("startup/system");
+            state.SetAccent("purple"); Record("accent/purple");
+            state.SetBackdrop("mica"); Record("backdrop/mica");
+            theme.QueueUpdate(); theme.QueueUpdate(); theme.QueueUpdate();
+            await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+            Record("three queued notifications");
+            for (int index = 0; index < 12; index++) { theme.Apply(); Record($"repeat/{index}"); }
+            Assert.All(measured, count => Assert.Equal(1, count));
+        }
+        finally { ApplicationThemeManager.Changed -= Reloaded; window.Close(); }
+    });
+
+    private sealed class MeasuredThemeApplication : IThemeApplication
+    {
+        private readonly WpfThemeApplication _inner = new();
+        public ApplicationTheme CurrentTheme => _inner.CurrentTheme;
+        public int Reloads { get; set; }
+        public void ApplyTheme(ApplicationTheme theme) { Reloads++; _inner.ApplyTheme(theme); }
+        public void ApplyAccent(Color color, ApplicationTheme theme) => _inner.ApplyAccent(color, theme);
+        public void ApplySystemAccent(ApplicationTheme theme) => _inner.ApplySystemAccent(theme);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task ExistingControlFillsFollowAccentThenTheme(bool switchTheme) => WpfTestHost.RunAsync(async () =>
+    {
+        var state = new SettingsViewModelTests.SettingsState();
+        state.SetTheme(switchTheme ? "light" : "dark");
+        state.SetAccent("orange");
+        using var theme = new ThemeService(Dispatcher.CurrentDispatcher, state, new WpfThemeApplication(), () => (false, false, true));
+        var toggle = new Wpf.Ui.Controls.ToggleSwitch { IsChecked = true };
+        var slider = new Slider { Minimum = 0, Maximum = 100, Value = 65, Width = 200 };
+        var content = new StackPanel { Children = { toggle, slider } };
+        // Keep a real Window resource/invalidation parent, but never Show or create an HWND.
+        var window = new Window { Content = content };
+        async Task<Color[]> RenderFills()
+        {
+            content.Measure(new Size(300, 100)); content.Arrange(new Rect(0, 0, 300, 100));
+            await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+            content.UpdateLayout();
+            new RenderTargetBitmap(300, 100, 96, 96, PixelFormats.Pbgra32).Render(content);
+            var checkedFill = (Rectangle)toggle.Template.FindName("ActiveToggleRectangle", toggle);
+            // WPF-UI 4.3.0's slider has a neutral track and an accent-filled thumb;
+            // there is no separate value-fill segment in its shipped template.
+            var thumbFill = LauncherWindow.Descendants<Ellipse>(slider).Single();
+            return [((SolidColorBrush)checkedFill.Fill).Color, ((SolidColorBrush)thumbFill.Fill).Color];
+        }
+        try
+        {
+            var original = await RenderFills(); // Resolve both existing templates before changing accent.
+            state.SetAccent("purple");
+            if (switchTheme) state.SetTheme("dark");
+            var expected = AppearanceOptions.Accents.Single(a => a.Value == "purple").Color.UpdateBrightness(10);
+            var actual = await RenderFills();
+            Assert.All(original, color => Assert.NotEqual(expected, color));
+            Assert.Equal(new[] { expected, expected }, actual);
+            // The direct launcher brush uses the explicit secondary dark shade, never grey.
+            Assert.Equal(AppearanceOptions.Accents.Single(a => a.Value == "purple").Color.UpdateBrightness(17),
+                ((SolidColorBrush)window.FindResource("AccentFillColorDefaultBrush")).Color);
+        }
+        finally { window.Close(); }
+    });
+
     [Fact]
     public Task LibraryDictionariesResolveAllSourceResourcesInEveryTheme() => WpfTestHost.RunAsync(CheckLibraryResourcesAsync);
 

@@ -79,16 +79,16 @@ public sealed class AppearanceTests
         var calls = new ThemeCalls();
         var preferences = (Dark: true, HighContrast: false, Transparency: true);
         using var theme = new ThemeService(Dispatcher.CurrentDispatcher, state, calls, () => preferences);
-        Assert.Equal(["theme:Dark", "system-accent"], calls.Calls);
+        Assert.Equal(["system-accent:Dark", "theme:Dark"], calls.Calls);
         calls.Calls.Clear(); state.SetTheme("light");
-        Assert.Equal(["theme:Light", "system-accent"], calls.Calls);
+        Assert.Equal(["system-accent:Light", "theme:Light"], calls.Calls);
         foreach (var preset in AppearanceOptions.Accents)
         {
             calls.Calls.Clear(); state.SetAccent(preset.Value);
-            Assert.Equal(["theme:Light", $"accent:{preset.Color}:Light"], calls.Calls);
+            Assert.Equal([$"accent:{preset.Color}:Light", "theme:Light"], calls.Calls);
         }
         calls.Calls.Clear(); state.SetTheme("dark");
-        Assert.Equal(["theme:Dark", $"accent:{AppearanceOptions.Accents[^1].Color}:Dark"], calls.Calls);
+        Assert.Equal(["theme:Dark", $"accent:{AppearanceOptions.Accents[^1].Color}:Dark", "theme:Dark"], calls.Calls);
         preferences = (false, false, true); theme.Apply(); Assert.True(theme.IsDark);
         state.SetTheme("system"); Assert.False(theme.IsDark);
         calls.Calls.Clear(); preferences = (true, true, true); theme.Apply();
@@ -97,7 +97,7 @@ public sealed class AppearanceTests
         calls.Calls.Clear(); state.SetTheme("dark"); state.SetAccent("purple");
         Assert.Equal(["theme:HighContrast", "theme:HighContrast"], calls.Calls);
         calls.Calls.Clear(); preferences = (false, false, false); theme.Apply();
-        Assert.Equal(["theme:Dark", $"accent:{AppearanceOptions.Accents[3].Color}:Dark"], calls.Calls);
+        Assert.Equal(["theme:Dark", $"accent:{AppearanceOptions.Accents[3].Color}:Dark", "theme:Dark"], calls.Calls);
         Assert.Contains("透明效果已关闭", theme.BackdropDescription);
         calls.Calls.Clear(); theme.Dispose(); state.SetAccent("blue");
         Assert.Empty(calls.Calls);
@@ -120,7 +120,7 @@ public sealed class AppearanceTests
         Assert.Equal(ApplicationTheme.HighContrast, ApplicationThemeManager.GetAppTheme());
         Assert.DoesNotContain("AccentFillColorDefaultBrush", Application.Current.Resources.Keys.Cast<object>());
         Assert.IsAssignableFrom<Brush>(Application.Current.FindResource("AccentFillColorDefaultBrush"));
-        application.ApplyTheme(ApplicationTheme.Light); application.ApplySystemAccent();
+        application.ApplyTheme(ApplicationTheme.Light); application.ApplySystemAccent(ApplicationTheme.Light);
         Assert.Equal(ApplicationAccentColorManager.GetColorizationColor(), ApplicationAccentColorManager.SystemAccent);
         return Task.CompletedTask;
     });
@@ -144,9 +144,10 @@ public sealed class AppearanceTests
 
     private sealed class ThemeCalls : IThemeApplication
     {
+        public ApplicationTheme CurrentTheme { get; private set; } = ApplicationTheme.Unknown;
         internal List<string> Calls { get; } = [];
-        public void ApplyTheme(ApplicationTheme theme) => Calls.Add($"theme:{theme}");
-        public void ApplySystemAccent() => Calls.Add("system-accent");
+        public void ApplyTheme(ApplicationTheme theme) { CurrentTheme = theme; Calls.Add($"theme:{theme}"); }
+        public void ApplySystemAccent(ApplicationTheme theme) => Calls.Add($"system-accent:{theme}");
         public void ApplyAccent(Color color, ApplicationTheme theme) => Calls.Add($"accent:{color}:{theme}");
     }
 }

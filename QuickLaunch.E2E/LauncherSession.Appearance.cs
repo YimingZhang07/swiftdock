@@ -140,15 +140,22 @@ internal sealed partial class LauncherSession
     private void AssertInactiveMaterial(string backdrop, HotkeyInputWindow probe)
     {
         var inputWindow = _automation.FromHandle(probe.Handle).AsWindow();
+        bool checkSettingsFrame = true;
         void Keep(bool enabled)
         {
+            Foreground();
+            var before = checkSettingsFrame ? CapturePanelFrame("before-settings") : null;
             Click(ById("SettingsButton"));
             var settings = Dialog("设置"); NavigateSettings(settings, "Appearance");
             var toggle = ById("KeepBackdropWhenInactiveBox", settings);
             bool current = toggle.Patterns.Toggle.Pattern.ToggleState.Value == ToggleState.On;
             if (current != enabled) Click(toggle, settings);
             Eventually(() => (toggle.Patterns.Toggle.Pattern.ToggleState.Value == ToggleState.On) == enabled, $"keep inactive = {enabled}");
+            nint settingsHandle = settings.Properties.NativeWindowHandle.Value;
             Click(Named("关闭", ControlType.Button, settings), settings);
+            Eventually(() => !Desktop.IsWindowVisible(settingsHandle), "settings HWND closed");
+            if (before is not null) AssertPanelFrameUnchanged(before, "after-settings");
+            checkSettingsFrame = false;
             Eventually(() => !HasWindow("设置"), "settings closed");
             Foreground();
         }

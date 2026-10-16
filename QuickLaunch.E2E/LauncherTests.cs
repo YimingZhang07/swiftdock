@@ -332,14 +332,22 @@ public sealed class LauncherTests(ITestOutputHelper output)
             app.Click(app.Named("E2E Other", ControlType.Button, app.Panel), button: MouseButton.Right);
             app.Click(app.Named("删除分组…", ControlType.MenuItem));
         }
+        var beforeCancel = app.CapturePanelFrame("before-cancel-confirmation");
         OpenConfirmation();
         var dialog = app.Dialog("删除分组");
+        nint dialogHandle = dialog.Properties.NativeWindowHandle.Value;
         app.Click(app.Named("取消", ControlType.Button, dialog), dialog);
+        Eventually(() => !Desktop.IsWindowVisible(dialogHandle), "cancelled confirmation HWND to close");
+        app.AssertPanelFrameUnchanged(beforeCancel, "after-cancel-confirmation");
         Eventually(() => !app.HasWindow("删除分组"), "cancelled confirmation to close");
         Assert.True(app.HasTab("E2E Other"));
+        var beforeDelete = app.CapturePanelFrame("before-delete-confirmation");
         OpenConfirmation();
         dialog = app.Dialog("删除分组");
+        dialogHandle = dialog.Properties.NativeWindowHandle.Value;
         app.Click(app.Named("删除", ControlType.Button, dialog), dialog);
+        Eventually(() => !Desktop.IsWindowVisible(dialogHandle), "deleted confirmation HWND to close");
+        app.AssertPanelFrameUnchanged(beforeDelete, "after-delete-confirmation");
         Eventually(() => !app.HasWindow("删除分组") && !app.HasTab("E2E Other"), "second group to be removed");
         Assert.True(app.HasTab("E2E Main"));
         using var config = app.ExitAndReadConfig();

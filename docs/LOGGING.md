@@ -20,6 +20,22 @@ Serilog 4.3's built-in batching queues at most 512 events, in batches of up to 6
 
 Source-generated `LoggerMessage` methods define the event names. Favicon diagnostics include origins only; Shell/error messages strip web URL paths and queries. File contents are never diagnostic payloads. `benchmark.json` contains performance measurements. The E2E launch recorder's `id`, `name`, `elevated` JSONL is a separate test fixture.
 
+`theme.apply` records the source, target theme/accent, number of theme-dictionary reloads,
+synchronous elapsed milliseconds, recursive merged-dictionary counts before/after, and
+tracked dialog count. Sources distinguish startup, Theme/Accent/Backdrop setting changes,
+Windows user-preference categories, and panel messages `0x001A` (WM_SETTINGCHANGE),
+`0x0015` (WM_SYSCOLORCHANGE), `0x031A` (WM_THEMECHANGED), and `0x0320`
+(WM_DWMCOLORIZATIONCOLORCHANGED). Notifications queued before the background dispatcher
+callback are combined into one Apply; later notifications can schedule another. Opening
+or closing a dialog does not itself call Apply, but its native material work can coincide
+with these notifications. Use timestamps and sources to distinguish repeated notification
+batches from a slow Apply when investigating UIA timeouts.
+
+Normal Apply publishes the palette before one dictionary reload. A custom palette changing
+the actual WPF-UI theme needs a preliminary reload because the explicit-palette overload
+reads `GetAppTheme()`; system accent uses the overload accepting a target theme directly.
+High contrast performs one reload and keeps the existing override cleanup.
+
 ## Reading and measuring
 
 ```powershell

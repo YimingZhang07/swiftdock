@@ -2,6 +2,13 @@ using Microsoft.Extensions.Logging;
 
 namespace QuickLaunch.Diagnostics;
 
+internal static partial class ThemeLogEvents
+{
+    [LoggerMessage(32, LogLevel.Information, "Theme apply: {source}, {theme}/{accent}; {reloads} reloads in {milliseconds} ms; dictionaries {before}->{after}; {dialogs} dialogs", EventName = "theme.apply")]
+    internal static partial void ThemeApplied(this ILogger logger, string source, string theme, string accent,
+        int reloads, double milliseconds, int before, int after, int dialogs);
+}
+
 internal static partial class LoggingLogEvents
 {
     [LoggerMessage(1, LogLevel.Warning, "File logging disabled: {Message}", EventName = "log.fallback")]

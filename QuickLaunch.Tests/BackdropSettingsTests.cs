@@ -21,6 +21,20 @@ namespace QuickLaunch.Tests;
 public sealed class BackdropSettingsTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NonClientActivationSuppressesFramePaintingAndAllowsDeactivation(bool active)
+    {
+        var calls = new List<(nint Window, int Message, nint Active, nint Paint)>();
+        nint DefaultProc(nint hwnd, int message, nint wParam, nint lParam)
+        { calls.Add((hwnd, message, wParam, lParam)); return 42; }
+        Assert.Equal((nint)42, LauncherWindow.RefreshNonClientActivation(123, active, DefaultProc));
+        Assert.Equal(active ? (nint)42 : 1, LauncherWindow.PreserveNonClientActivation(123, active ? 1 : 0, 456, DefaultProc));
+        Assert.Equal(new[] { ((nint)123, NativeMethods.WmNcActivate, active ? (nint)1 : 0, (nint)(-1)),
+            ((nint)123, NativeMethods.WmNcActivate, (nint)1, (nint)(-1)) }, calls);
+    }
+
+    [Theory]
     [InlineData(-1, 0)]
     [InlineData(int.MinValue, 0)]
     [InlineData(0, 0)]
@@ -247,8 +261,9 @@ public sealed class BackdropSettingsTests
 
     private sealed class NoThemeChanges : IThemeApplication
     {
+        public ApplicationTheme CurrentTheme => ApplicationTheme.Dark;
         public void ApplyTheme(ApplicationTheme theme) { }
-        public void ApplySystemAccent() { }
+        public void ApplySystemAccent(ApplicationTheme theme) { }
         public void ApplyAccent(Color color, ApplicationTheme theme) { }
     }
 }

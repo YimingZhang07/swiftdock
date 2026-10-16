@@ -1,9 +1,13 @@
 ﻿using System.Windows;
 using System.Windows.Threading;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Windows.Interop;
 using System.Windows.Media;
 using Microsoft.Win32;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using QuickLaunch.Diagnostics;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
 using Wpf.Ui.Extensions;
@@ -15,8 +19,10 @@ public sealed class ThemeService : IDisposable
     private readonly Dispatcher _dispatcher;
     private readonly ISettingsState? _state;
     private readonly IThemeApplication _application;
+    private readonly ILogger<ThemeService> _log;
     private readonly Func<(bool Dark, bool HighContrast, bool Transparency)> _readPreferences;
     private readonly HashSet<FluentWindow> _dialogs = [];
+    private readonly HashSet<string> _queuedSources = [];
     private bool _disposed, _queued;
     private bool _backdropFailed;
     public bool IsDark { get; private set; }
@@ -30,56 +36,81 @@ public sealed class ThemeService : IDisposable
     public string BackdropDescription => AppearanceOptions.DescribeBackdrop(Backdrop,
         AppearanceOptions.IsSupported(AppearanceOptions.BackdropType(Backdrop)), TransparencyEnabled, HighContrast, _backdropFailed);
 
-    public ThemeService(Dispatcher dispatcher, ISettingsState? state = null)
-        : this(dispatcher, state, new WpfThemeApplication(), ReadPreferences) { }
+    public ThemeService(Dispatcher dispatcher, ISettingsState? state = null, ILogger<ThemeService>? log = null)
+        : this(dispatcher, state, new WpfThemeApplication(), ReadPreferences, log) { }
 
     internal ThemeService(Dispatcher dispatcher, ISettingsState? state, IThemeApplication application,
-        Func<(bool Dark, bool HighContrast, bool Transparency)> readPreferences)
+        Func<(bool Dark, bool HighContrast, bool Transparency)> readPreferences, ILogger<ThemeService>? log = null)
     {
         _dispatcher = dispatcher; _state = state; _application = application; _readPreferences = readPreferences;
+        _log = log ?? NullLogger<ThemeService>.Instance;
         if (_state is not null) _state.PropertyChanged += StateChanged;
         SystemEvents.UserPreferenceChanged += PreferencesChanged;
-        Apply();
+        Apply("startup");
     }
 
     private void StateChanged(object? sender, PropertyChangedEventArgs args)
     {
-        if (args.PropertyName is nameof(ISettingsState.Theme) or nameof(ISettingsState.Accent) or nameof(ISettingsState.Backdrop)) Apply();
+        if (args.PropertyName is nameof(ISettingsState.Theme) or nameof(ISettingsState.Accent) or nameof(ISettingsState.Backdrop)) Apply("setting:" + args.PropertyName);
     }
 
-    private void PreferencesChanged(object sender, UserPreferenceChangedEventArgs args) => QueueUpdate();
-    public void QueueUpdate()
+    private void PreferencesChanged(object sender, UserPreferenceChangedEventArgs args) => QueueUpdate("preference:" + args.Category);
+    public void QueueUpdate(string source = "notification")
     {
         if (_disposed || _dispatcher.HasShutdownStarted) return;
         _dispatcher.BeginInvoke(() =>
         {
-            if (_disposed || _queued) return;
+            if (_disposed) return;
+            _queuedSources.Add(source);
+            if (_queued) return;
             _queued = true;
-            _dispatcher.BeginInvoke(DispatcherPriority.Background, () => { _queued = false; Apply(); });
+            _dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
+            {
+                string sources = string.Join(",", _queuedSources);
+                _queuedSources.Clear(); _queued = false; Apply(sources);
+            });
         });
     }
 
-    internal void Apply()
+    internal void Apply(string source = "explicit")
     {
         if (_disposed) return;
+        long started = Stopwatch.GetTimestamp();
+        int dictionariesBefore = CountDictionaries(), reloads = 0;
+        void Reload(ApplicationTheme value) { _application.ApplyTheme(value); reloads++; }
         var preferences = _readPreferences();
         HighContrast = preferences.HighContrast; TransparencyEnabled = preferences.Transparency;
         IsDark = !HighContrast && (_state?.Theme switch { "dark" => true, "light" => false, _ => preferences.Dark });
         // Theme and accent belong to WPF-UI. Apply our backdrop policy afterwards:
         // its default watcher would re-enable Mica even when transparency is off.
         var theme = HighContrast ? ApplicationTheme.HighContrast : IsDark ? ApplicationTheme.Dark : ApplicationTheme.Light;
-        _application.ApplyTheme(theme);
         // High contrast uses the library's contrast palette, never a personal accent.
         if (!HighContrast)
         {
             if (AppearanceOptions.Accents.FirstOrDefault(preset => preset.Value == _state?.Accent) is { } accent)
+            {
+                // The 4.3.0 explicit-palette overload reads GetAppTheme(). Only a real
+                // theme transition needs this preliminary reload; same-theme startup,
+                // accent/backdrop changes and notifications all reload once, below.
+                if (_application.CurrentTheme != theme) Reload(theme);
                 _application.ApplyAccent(accent.Color, theme);
-            else _application.ApplySystemAccent();
+            }
+            else _application.ApplySystemAccent(theme); // This overload accepts the target theme directly.
         }
+        // Resolve the library's control brushes only after publishing the final palette.
+        Reload(theme);
         _backdropFailed = false;
         foreach (var dialog in _dialogs) ApplyDialogBackdrop(dialog);
         Changed?.Invoke();
         BackdropChanged?.Invoke();
+        _log.ThemeApplied(source, theme.ToString(), _state?.Accent ?? "system", reloads,
+            Stopwatch.GetElapsedTime(started).TotalMilliseconds, dictionariesBefore, CountDictionaries(), _dialogs.Count);
+    }
+
+    private static int CountDictionaries()
+    {
+        static int Count(ResourceDictionary dictionary) => 1 + dictionary.MergedDictionaries.Sum(Count);
+        return Application.Current is { } application ? Count(application.Resources) : 0;
     }
 
     internal void ReportBackdrop(bool failed)
@@ -163,13 +194,15 @@ public sealed class ThemeService : IDisposable
 
 internal interface IThemeApplication
 {
+    ApplicationTheme CurrentTheme { get; }
     void ApplyTheme(ApplicationTheme theme);
-    void ApplySystemAccent();
+    void ApplySystemAccent(ApplicationTheme theme);
     void ApplyAccent(Color color, ApplicationTheme theme);
 }
 
 internal sealed class WpfThemeApplication : IThemeApplication
 {
+    public ApplicationTheme CurrentTheme => ApplicationThemeManager.GetAppTheme();
     // WPF-UI 4.3.0 writes accent overrides into Application.Resources. Remove those
     // overrides when entering high contrast so its theme dictionary can win again.
     private static readonly string[] AccentKeys =
@@ -187,7 +220,8 @@ internal sealed class WpfThemeApplication : IThemeApplication
             foreach (string key in AccentKeys) Application.Current.Resources.Remove(key);
         ApplicationThemeManager.Apply(theme, WindowBackdropType.None, updateAccent: false);
     }
-    public void ApplySystemAccent() => ApplicationAccentColorManager.ApplySystemAccent();
+    public void ApplySystemAccent(ApplicationTheme theme) => ApplicationAccentColorManager.Apply(
+        ApplicationAccentColorManager.GetColorizationColor(), theme, systemAccentColor: true);
     public void ApplyAccent(Color color, ApplicationTheme theme)
     {
         // The single-color overload subtracts 45 saturation points from the dark

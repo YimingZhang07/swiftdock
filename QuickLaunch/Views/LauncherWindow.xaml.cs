@@ -212,7 +212,19 @@ public partial class LauncherWindow : Window, IDisposable
         if (hwnd == 0) return;
         bool active = IsActive || AppearanceOptions.KeepNonClientActive(NativeMethods.WmNcActivate,
             ViewModel.KeepBackdropWhenInactive, BackdropMode, IsVisible, _warming);
-        NativeMethods.DefWindowProc(hwnd, NativeMethods.WmNcActivate, active ? 1 : 0, 0);
+        RefreshNonClientActivation(hwnd, active, NativeMethods.DefWindowProc);
+    }
+
+    // Match WindowChromeWorker: -1 prevents DefWindowProc painting a classic caption/frame.
+    // Native-call boundaries can be exercised without a desktop HWND.
+    internal static nint RefreshNonClientActivation(nint hwnd, bool active, Func<nint, int, nint, nint, nint> defaultProc) =>
+        defaultProc(hwnd, NativeMethods.WmNcActivate, active ? 1 : 0, -1);
+
+    internal static nint PreserveNonClientActivation(nint hwnd, nint wParam, nint lParam, Func<nint, int, nint, nint, nint> defaultProc)
+    {
+        nint result = defaultProc(hwnd, NativeMethods.WmNcActivate, 1, -1);
+        // A FALSE request must return TRUE to allow real deactivation to finish.
+        return wParam == 0 ? 1 : result;
     }
 
     internal nint WindowMessage(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)
@@ -232,13 +244,11 @@ public partial class LauncherWindow : Window, IDisposable
         if (AppearanceOptions.KeepNonClientActive(message, ViewModel.KeepBackdropWhenInactive, BackdropMode, IsVisible, _warming))
         {
             handled = true;
-            nint result = NativeMethods.DefWindowProc(hwnd, message, 1, lParam);
-            // A FALSE request must return TRUE to allow real deactivation to finish.
-            return wParam == 0 ? 1 : result;
+            return PreserveNonClientActivation(hwnd, wParam, lParam, NativeMethods.DefWindowProc);
         }
         // Equivalent to SystemThemeWatcher, including transparency/high-contrast setting changes.
         // Keep the hook active even before a silent launcher's first Loaded event.
-        if (message is 0x001A or 0x0015 or 0x031A or 0x0320) _theme?.QueueUpdate();
+        if (message is 0x001A or 0x0015 or 0x031A or 0x0320) _theme?.QueueUpdate($"window:0x{message:X4}");
         // Suppress native cues and the captionless system-menu loop entered by Alt release.
         if (message is NativeMethods.WmChangeUiState or NativeMethods.WmUpdateUiState
             || message == NativeMethods.WmSysCommand && (wParam.ToInt64() & 0xFFF0) == NativeMethods.ScKeyMenu)

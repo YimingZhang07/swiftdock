@@ -74,6 +74,23 @@ window. OFF must visibly change from active (maximum RGB-channel distance greate
 three); its DWM fallback need not equal the theme's solid colour. ON must remain within three RGB levels of the active sample and differ from the
 fallback by more than three. Samples must settle for 800 ms. An indistinguishable active
 sample fails explicitly instead of accepting a no-op. No Windows preferences are changed.
+Frame checks exercise owned dialogs: both cancel and delete in the existing group-delete
+scenario, plus the first Settings visit in the inactive-material case. They capture the
+same screen bands before opening and after the owned HWND closes, before UIA window
+rediscovery. The pure `FrameDetector`, shared with unit tests, samples device-pixel
+insets 2–7 on all four sides and compares them with insets 18–23, excluding corners.
+A frame pixel has all RGB channels at least 210 and luminance at least 50 above its
+inner reference. Two sides with at least 20% coverage fail; a post-dialog increase of
+more than 10 percentage points on any side also fails. The clean result must persist
+for 350 ms within three seconds. Per-side coverage and mean edge/inner luminance are
+written to ordinary scenario diagnostics; only the existing failure screenshots remain.
+
+Calibration uses the reviewer's old/fixed desktop PNGs in `QuickLaunch.Tests/TestData/Frames`.
+Their sampled pixels are unchanged; the unused centers are blanked to keep both fixtures
+under 47 KB combined. The old frame scores 25.7%/100%/100%/100% (top/right/bottom/left),
+the fixed frame 0% everywhere. Pixels 0–1 look normal in both images, which is why the
+former outer-ring check missed this bug. The native-call unit tests still check `lParam=-1`
+and deactivation return semantics without an HWND. Material ON/OFF pixel assertions remain.
 The same case types into a test-owned EDIT control and presses Esc there. With the pinned
 panel still visible, one Ctrl+Alt+Shift+F11 hides it while the fixture retains foreground
 and EDIT focus; more real typing must append to the same text without a focus repair.
