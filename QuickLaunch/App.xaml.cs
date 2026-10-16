@@ -217,7 +217,9 @@ public partial class App : Application
         menu.Items.Add(new Separator());
         menu.Items.Add(new MenuItem { Header = "退出", Command = new RelayCommand(() => _ = ExitAsync()) });
         _tray = new TaskbarIcon { ContextMenu = menu, NoLeftClickDelay = true,
-            LeftClickCommand = new RelayCommand(() => ShowMain("tray")) };
+            LeftClickCommand = new RelayCommand(() => { if (!_exiting) _window?.ToggleFromTray(); }),
+            DoubleClickCommand = null };
+        _tray.TrayLeftMouseDown += TrayMouseDown;
         UpdateTrayIcon();
         _tray.TrayIcon.MessageWindow.DpiChanged += TrayDisplayChanged;
         _tray.TrayIcon.MessageWindow.TaskbarCreated += TrayDisplayChanged;
@@ -237,6 +239,8 @@ public partial class App : Application
         previous?.Dispose();
     }
 
+    private void TrayMouseDown(object sender, RoutedEventArgs e) => _window?.CaptureTrayMouseDown();
+
     private void TrayDisplayChanged(object? sender, EventArgs e)
     {
         if (!_exiting && !Dispatcher.HasShutdownStarted) Dispatcher.BeginInvoke(UpdateTrayIcon);
@@ -247,6 +251,7 @@ public partial class App : Application
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= TrayDisplayChanged;
         if (_tray is not null)
         {
+            _tray.TrayLeftMouseDown -= TrayMouseDown;
             _tray.TrayIcon.MessageWindow.DpiChanged -= TrayDisplayChanged;
             _tray.TrayIcon.MessageWindow.TaskbarCreated -= TrayDisplayChanged;
             _tray.Dispose();

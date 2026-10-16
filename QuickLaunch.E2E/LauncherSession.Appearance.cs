@@ -139,7 +139,7 @@ internal sealed partial class LauncherSession
 
     private void AssertInactiveMaterial(string backdrop, HotkeyInputWindow probe)
     {
-        var inputWindow = _automation.FromHandle(probe.Handle).AsWindow();
+        var inputWindow = RequireVisibleWindowElement(probe.Handle, "material fixture/FromHandle").AsWindow();
         bool checkSettingsFrame = true;
         void Keep(bool enabled)
         {
@@ -230,7 +230,7 @@ internal sealed partial class LauncherSession
 
     private void AssertPinAndInactiveHotkey(HotkeyInputWindow probe)
     {
-        var inputWindow = _automation.FromHandle(probe.Handle).AsWindow();
+        var inputWindow = RequireVisibleWindowElement(probe.Handle, "pin fixture/FromHandle").AsWindow();
         void AssertProbeFocus()
         {
             Assert.Equal(probe.Handle, Desktop.GetForegroundWindow());

@@ -21,6 +21,7 @@ public partial class LauncherWindow : Window, IDisposable
     private readonly Dictionary<LaunchGroup, TileListBox> _grids = [];
     private CancellationTokenSource _shutdown = new();
     private readonly IDialogService _dialogs;
+    private readonly TrayTogglePolicy _trayToggle = new(() => Environment.TickCount64, H.NotifyIcon.Core.CursorUtilities.GetDoubleClickTime);
     private readonly DispatcherTimer _toastTimer = new(DispatcherPriority.Normal);
     private readonly DispatcherTimer _toastCollapse = new(DispatcherPriority.Normal) { Interval = TimeSpan.FromMilliseconds(150) };
     private ThemeService? _theme;
@@ -61,6 +62,7 @@ public partial class LauncherWindow : Window, IDisposable
         Icons.AutoFetchWebsiteIcons = ViewModel.AutoFetchWebsiteIcons;
         _dialogs = dialogs;
         DataContext = launcher;
+        Deactivated += (_, _) => _trayToggle.Deactivated();
         QueryContinueDrag += Launcher.QueryContinueDrag;
         Launcher.GroupSelected += ApplySelectedGroup;
         Launcher.FocusSelectionRequested += FocusSelection;
@@ -320,14 +322,25 @@ public partial class LauncherWindow : Window, IDisposable
 
     public void Toggle()
     {
-        switch (ToggleDecision(IsVisible, IsActive, Topmost, _ownedWindows > 0,
-            Launcher.DragActive, Launcher.MenuOpen, _movingWindow, _sizeMove))
+        ApplyToggle(ToggleDecision(IsVisible, IsActive, Topmost, _ownedWindows > 0,
+            Launcher.DragActive, Launcher.MenuOpen, _movingWindow, _sizeMove), "hotkey",
+            (NativeMethods.GetAsyncKeyState(1) & 0x8000) != 0);
+    }
+
+    public void CaptureTrayMouseDown() => _trayToggle.MouseDown(IsActive);
+
+    public void ToggleFromTray() => ApplyToggle(_trayToggle.Click(IsVisible, IsActive, Topmost, _ownedWindows > 0,
+        Launcher.DragActive, Launcher.MenuOpen, _movingWindow, _sizeMove), "tray");
+
+    private void ApplyToggle(ToggleAction action, string source, bool forDrop = false)
+    {
+        switch (action)
         {
             case ToggleAction.ActivateOwnedDialog:
                 OwnedWindows.Cast<Window>().LastOrDefault(w => w.IsVisible)?.Activate();
                 break;
             case ToggleAction.Hide: HidePanel(); break;
-            case ToggleAction.Show: ShowPanel("hotkey", (NativeMethods.GetAsyncKeyState(1) & 0x8000) != 0); break;
+            case ToggleAction.Show: ShowPanel(source, forDrop); break;
         }
     }
 

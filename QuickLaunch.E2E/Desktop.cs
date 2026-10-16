@@ -8,6 +8,21 @@ namespace QuickLaunch.E2E;
 
 internal static class Desktop
 {
+    [DllImport("user32.dll", EntryPoint = "FindWindowW", CharSet = CharSet.Unicode)]
+    internal static extern nint FindWindow(string className, string? title);
+    [DllImport("user32.dll")] internal static extern nint GetAncestor(nint window, uint flags);
+    [DllImport("user32.dll")] internal static extern uint GetDoubleClickTime();
+    [DllImport("user32.dll", EntryPoint = "GetClassNameW", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(nint window, StringBuilder name, int capacity);
+    internal static string WindowClass(nint window)
+    {
+        var name = new StringBuilder(256);
+        return window != 0 && GetClassName(window, name, name.Capacity) != 0 ? name.ToString() : "<unavailable>";
+    }
+    internal static int? WindowCloaking(nint window) =>
+        DwmGetWindowAttribute(window, 14, out int value, sizeof(int)) >= 0 ? value : null; // DWMWA_CLOAKED
+    internal static bool IsDiscoverableWindow(nint window) => window != 0 && IsWindowVisible(window) && WindowCloaking(window) == 0;
+
     public static string? UnavailableReason()
     {
         if (!OperatingSystem.IsWindows()) return "E2E requires Windows.";
@@ -45,13 +60,19 @@ internal static class Desktop
     }
 
     internal static nint[] ProcessWindowHandles(int processId)
+        => TopLevelWindowHandles().Where(window =>
+        {
+            GetWindowThreadProcessId(window, out uint owner);
+            return owner == processId;
+        }).ToArray();
+
+    internal static nint[] TopLevelWindowHandles()
     {
         var windows = new List<nint>();
         // EnumWindows includes owned top-level windows regardless of their UIA parent.
         if (!EnumWindows((window, _) =>
         {
-            GetWindowThreadProcessId(window, out uint owner);
-            if (owner == processId) windows.Add(window);
+            windows.Add(window);
             return true;
         }, 0)) throw new Win32Exception(Marshal.GetLastWin32Error());
         return windows.ToArray();

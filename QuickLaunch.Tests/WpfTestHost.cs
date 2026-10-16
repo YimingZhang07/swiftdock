@@ -41,20 +41,25 @@ internal static class WpfTestHost
             try { await action(); }
             finally
             {
-                try { ApplicationThemeManager.Apply(theme, WindowBackdropType.None, updateAccent: false); }
-                finally
+                try
                 {
-                    // Apply replaces the theme dictionary; accent updates also add local
-                    // overrides. Restore the original instances, order and values, even on failure.
+                    // Accent updates add app-level overrides. Restore those BEFORE rebuilding
+                    // the theme, otherwise derived brushes can resolve the ending test's palette.
                     // Do not Clear the application dictionary: validating all deferred
                     // style references at once can re-enter resource resolution in WPF.
                     var keys = entries.Select(entry => entry.Key).ToHashSet();
                     foreach (var key in resources.Keys.Cast<object>().Where(key => !keys.Contains(key)).ToArray()) resources.Remove(key);
-                    resources.MergedDictionaries.Clear();
-                    foreach (var dictionary in dictionaries) resources.MergedDictionaries.Add(dictionary);
                     foreach (var entry in entries)
                         if (!ReferenceEquals(resources[entry.Key], entry.Value)) resources[entry.Key] = entry.Value;
+                    resources.MergedDictionaries.Clear();
+                    foreach (var dictionary in dictionaries) resources.MergedDictionaries.Add(dictionary);
+                }
+                finally
+                {
                     Application.Current.Resources = resources;
+                    // The saved dictionaries can contain already-resolved brushes. Reload last
+                    // to restore both WPF-UI's cached theme and its palette-derived resources.
+                    ApplicationThemeManager.Apply(theme, WindowBackdropType.None, updateAccent: false);
                 }
             }
         }).Task.Unwrap().WaitAsync(TimeSpan.FromSeconds(45));

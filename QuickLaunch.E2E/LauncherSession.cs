@@ -186,26 +186,57 @@ internal sealed partial class LauncherSession
         return Process.Start(info) ?? throw new XunitException("Could not start QuickLaunch.exe.");
     }
 
-    private AutomationElement[] AppRoots() => Desktop.ProcessWindowHandles(_process!.Id)
-        .Select(hwnd => _automation.FromHandle(hwnd)).Where(element => element is not null).ToArray();
+    private sealed record WindowScope(nint Handle, AutomationElement Element);
 
-    private AutomationElement[] AppWindows(AutomationElement[]? roots = null)
+    // Discovery may skip transient providers only while a retry condition is running.
+    // A failed scan cannot prove absence (e.g. !HasMenuItem after Escape).
+    [ThreadStatic] private static int _discoveryRetryDepth;
+    [ThreadStatic] private static long _discoveryFailureVersion;
+    [ThreadStatic] private static Exception? _lastDiscoveryFailure;
+
+    private static bool TransientUiaFailure(Exception error) => error is TimeoutException or COMException or ElementNotAvailableException;
+
+    private T QueryVisibleWindow<T>(nint hwnd, Func<T> query, T absent, string operation)
     {
-        var scopes = (roots ?? AppRoots()).ToList();
-        // Native enumeration includes owned top-level windows without asking UIA to
-        // traverse unrelated desktop providers. FromHandle still uses the real UIA provider.
-        var windows = new List<AutomationElement>();
-        foreach (var root in scopes.Distinct())
+        if (!Desktop.IsDiscoverableWindow(hwnd)) return absent;
+        string windowClass = Desktop.WindowClass(hwnd); // Cache before a dying provider can destroy its HWND.
+        try { return query(); }
+        catch (Exception error) when (TransientUiaFailure(error))
         {
-            try
-            {
-                if (root.ControlType == ControlType.Window) windows.Add(root);
-                windows.AddRange(root.FindAllDescendants(cf => cf.ByControlType(ControlType.Window)));
-            }
-            catch (Exception ex) when (ex is ElementNotAvailableException or COMException)
-            { Diagnostic($"Window subtree became unavailable during discovery: {ex.Message}"); }
+            Diagnostic($"UIA discovery {(_discoveryRetryDepth > 0 ? "retry" : "failed")}: {operation}; HWND=0x{hwnd:X}; "
+                + $"class={JsonSerializer.Serialize(windowClass)}; {error.GetType().Name} 0x{error.HResult:X8}: {error.Message.ReplaceLineEndings(" ")}");
+            if (_discoveryRetryDepth == 0) throw;
+            _lastDiscoveryFailure = error; _discoveryFailureVersion++;
+            return absent;
         }
-        return windows.Distinct().ToArray();
+    }
+
+    private AutomationElement RequireVisibleWindowElement(nint hwnd, string operation) =>
+        QueryVisibleWindow<AutomationElement?>(hwnd, () => _automation.FromHandle(hwnd), null, operation)
+        ?? throw new XunitException($"{operation}: expected visible, uncloaked HWND=0x{hwnd:X}, class={Desktop.WindowClass(hwnd)}.");
+
+    private WindowScope[] AppRoots()
+    {
+        var roots = new List<WindowScope>();
+        foreach (nint hwnd in Desktop.ProcessWindowHandles(_process!.Id))
+        {
+            var element = QueryVisibleWindow<AutomationElement?>(hwnd, () => _automation.FromHandle(hwnd), null, "AppRoots/FromHandle");
+            if (element is not null) roots.Add(new(hwnd, element));
+        }
+        return roots.ToArray();
+    }
+
+    private WindowScope[] AppWindows()
+    {
+        // EnumWindows already includes owned dialogs. Avoid walking descendant Window
+        // providers, which can include hidden or tearing-down owned HWNDs again.
+        var windows = new List<WindowScope>();
+        foreach (var root in AppRoots())
+        {
+            if (QueryVisibleWindow(root.Handle, () => root.Element.ControlType == ControlType.Window, false, "AppWindows/type"))
+                windows.Add(root);
+        }
+        return windows.ToArray();
     }
 
     public AutomationElement ById(string id, AutomationElement? root = null)
@@ -220,12 +251,17 @@ internal sealed partial class LauncherSession
         AutomationElement? result = null;
         Eventually(() =>
         {
-            var roots = root is null ? AppRoots() : [root];
-            // Retain non-Window roots too: WPF context menus may be separate desktop popups.
-            var scopes = root is null ? roots.Concat(AppWindows(roots)).Distinct() : roots;
-            result = scopes.SelectMany(r => r.FindAllDescendants(cf => cf.ByName(name).And(cf.ByControlType(type))).Prepend(r))
+            AutomationElement? Find(AutomationElement scope) => scope.FindAllDescendants(cf => cf.ByName(name).And(cf.ByControlType(type))).Prepend(scope)
                 .FirstOrDefault(e => IsVisible(e) && e.ControlType == type && e.Name == name);
-            return result is not null;
+            if (root is not null) return (result = Find(root)) is not null;
+            var roots = AppRoots();
+            // Retain non-Window roots too: WPF context menus may be separate desktop popups.
+            foreach (var scope in roots)
+            {
+                result = QueryVisibleWindow(scope.Handle, () => Find(scope.Element), null, $"Named/{name}");
+                if (result is not null) return true;
+            }
+            return false;
         }, $"visible {type} '{name}'");
         return result!;
     }
@@ -253,24 +289,19 @@ internal sealed partial class LauncherSession
     private static bool IsVisible(AutomationElement? element)
     {
         try { return element is not null && !element.IsOffscreen && !element.BoundingRectangle.IsEmpty; }
-        catch (Exception ex) when (VisibilityUnavailable(ex)) { return false; }
+        catch (PropertyNotSupportedException) { return false; }
     }
 
     private Window? FindVisibleWindow(string title)
     {
         // Re-enumerate on every poll: hiding/showing can invalidate the previous UIA element.
-        try
+        foreach (var scope in AppWindows())
         {
-            foreach (var element in AppWindows())
-            {
-                try
-                {
-                    if (IsVisible(element) && element.Name == title) return element.AsWindow();
-                }
-                catch (Exception ex) when (VisibilityUnavailable(ex)) { }
-            }
+            var window = QueryVisibleWindow<Window?>(scope.Handle,
+                () => IsVisible(scope.Element) && scope.Element.Name == title ? scope.Element.AsWindow() : null,
+                null, $"FindVisibleWindow/{title}");
+            if (window is not null) return window;
         }
-        catch (Exception ex) when (VisibilityUnavailable(ex)) { }
         return null;
     }
 
@@ -280,8 +311,8 @@ internal sealed partial class LauncherSession
         if (title == "QuickLaunch" && window is not null) Panel = window;
         return window is not null;
     }
-    public bool HasNamed(string name, ControlType type) => AppRoots().Any(root =>
-        root.FindAllDescendants(cf => cf.ByName(name).And(cf.ByControlType(type))).Any(IsVisible));
+    public bool HasNamed(string name, ControlType type) => AppRoots().Any(root => QueryVisibleWindow(root.Handle,
+        () => root.Element.FindAllDescendants(cf => cf.ByName(name).And(cf.ByControlType(type))).Any(IsVisible), false, $"HasNamed/{name}"));
 
     public void Chord(VirtualKeyShort modifier, VirtualKeyShort key)
     {
@@ -290,7 +321,7 @@ internal sealed partial class LauncherSession
         finally { ReleaseKey(key); ReleaseKey(modifier); }
     }
 
-    public bool HasMenuItem(string name) => AppRoots().Any(r => r.FindAllDescendants(cf => cf.ByControlType(ControlType.MenuItem).And(cf.ByName(name))).Any(IsVisible));
+    public bool HasMenuItem(string name) => HasNamed(name, ControlType.MenuItem);
     public bool HasTab(string name) => Panel.FindAllDescendants(cf => cf.ByControlType(ControlType.Button).And(cf.ByName(name))).Any(IsVisible);
     public AutomationElement[] Tiles() => Panel.FindAllDescendants(cf => cf.ByControlType(ControlType.ListItem)).Where(IsVisible).ToArray();
     public string[] TileNames() => Tiles().Select(e => e.Name).ToArray();
@@ -341,8 +372,8 @@ internal sealed partial class LauncherSession
             if (Desktop.GetForegroundWindow() == handle) return true;
             if (retry.ElapsedMilliseconds < nextAttempt) return false;
             nextAttempt = retry.ElapsedMilliseconds + 200;
-            target = _automation.FromHandle(handle).AsWindow();
-            if (!IsVisible(target)) return false;
+            target = QueryVisibleWindow<Window?>(handle, () => _automation.FromHandle(handle).AsWindow(), null, "Foreground/FromHandle");
+            if (target is null || !IsVisible(target)) return false;
             _targetWindow = target;
             if (window is null) Panel = target;
             if (attempts++ == 0) Desktop.SetForegroundWindow(handle);
@@ -371,14 +402,14 @@ internal sealed partial class LauncherSession
     public void DeactivateAndAssertVisible()
     {
         using var guard = new HotkeyInputWindow();
-        Foreground(_automation.FromHandle(guard.Handle).AsWindow());
+        Foreground(RequireVisibleWindowElement(guard.Handle, "deactivation fixture/FromHandle").AsWindow());
         AssertVisible(true);
     }
 
     public void Hotkey(bool panelHidden = false)
     {
         using var guard = panelHidden ? new HotkeyInputWindow() : null;
-        var target = guard is null ? Panel : _automation.FromHandle(guard.Handle).AsWindow();
+        var target = guard is null ? Panel : RequireVisibleWindowElement(guard.Handle, "hotkey fixture/FromHandle").AsWindow();
         if (guard is not null)
         {
             Desktop.GetWindowThreadProcessId(guard.Handle, out uint process);
@@ -567,7 +598,8 @@ internal sealed partial class LauncherSession
             Desktop.GetWindowThreadProcessId(foreground, out uint process);
             if (_process is not null && !_process.HasExited && process == _process.Id)
             {
-                var image = CaptureWindow(_automation.FromHandle(foreground));
+                var image = CaptureWindow(QueryVisibleWindow<AutomationElement?>(foreground,
+                    () => _automation.FromHandle(foreground), null, "failure capture/FromHandle"));
                 if (image is not null) return image;
             }
         }
@@ -592,10 +624,13 @@ internal sealed partial class LauncherSession
             writer.WriteLine($"{DateTime.UtcNow:O}: waiting for dialog {JsonSerializer.Serialize(title)}; process {_process?.Id}; foreground HWND 0x{Desktop.GetForegroundWindow():X}");
             try
             {
-                var windows = AppWindows(); // Include offscreen windows in the diagnostic inventory.
+                foreach (nint hwnd in Desktop.ProcessWindowHandles(_process!.Id))
+                    writer.WriteLine($"Native: HWND=0x{hwnd:X}; class={Desktop.WindowClass(hwnd)}; visible={Desktop.IsWindowVisible(hwnd)}; cloaked={Desktop.WindowCloaking(hwnd)}");
+                var windows = AppWindows(); // Never query hidden providers, even for failure diagnostics.
                 writer.WriteLine($"UIA Window elements: {windows.Length}");
-                foreach (var window in windows)
+                foreach (var scope in windows)
                 {
+                    var window = scope.Element;
                     writer.WriteLine("Window: " + DescribeElement(window));
                     try
                     {
@@ -662,8 +697,16 @@ internal sealed partial class LauncherSession
         Exception? last = null;
         do
         {
-            try { if (condition()) return; }
+            long failureVersion = _discoveryFailureVersion;
+            _discoveryRetryDepth++;
+            try
+            {
+                bool matched = condition();
+                if (matched && failureVersion == _discoveryFailureVersion) return;
+                if (failureVersion != _discoveryFailureVersion) last = _lastDiscoveryFailure;
+            }
             catch (Exception ex) when (VisibilityUnavailable(ex) || ex is COMException) { last = ex; }
+            finally { _discoveryRetryDepth--; }
             Thread.Sleep(40);
         } while (watch.ElapsedMilliseconds < timeoutMs);
         throw new XunitException($"Timed out after {timeoutMs} ms waiting for {expected}. {last?.Message}");

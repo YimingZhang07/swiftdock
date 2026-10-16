@@ -23,11 +23,50 @@ namespace QuickLaunch.Tests;
 public sealed class ThemeTests(ITestOutputHelper output)
 {
     [Fact]
+    public Task WpfHostRestoresThemeAndAccentEvenWhenATestFails() => WpfTestHost.RunAsync(async () =>
+    {
+        static void Apply(string theme, string accent)
+        {
+            var state = new SettingsViewModelTests.SettingsState();
+            state.SetTheme(theme); state.SetAccent(accent);
+            using var appearance = new ThemeService(Dispatcher.CurrentDispatcher, state, new WpfThemeApplication(), () => (false, false, true));
+        }
+        // Exercise a baseline with no local accent overrides as well as merged brushes.
+        var application = new WpfThemeApplication();
+        application.ApplyTheme(ApplicationTheme.HighContrast);
+        application.ApplyTheme(ApplicationTheme.Light);
+        async Task<Color[]> Colors()
+        {
+            var toggle = new Wpf.Ui.Controls.ToggleSwitch { IsChecked = true };
+            var window = new Window { Content = toggle };
+            try
+            {
+                toggle.Measure(new Size(100, 40)); toggle.Arrange(new Rect(0, 0, 100, 40));
+                await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                toggle.UpdateLayout();
+                return [ApplicationAccentColorManager.SystemAccent, ApplicationAccentColorManager.PrimaryAccent,
+                    ((SolidColorBrush)toggle.Background).Color];
+            }
+            finally { window.Close(); }
+        }
+        var before = await Colors();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => WpfTestHost.RunAsync(async () =>
+        {
+            Apply("dark", "purple");
+            Assert.NotEqual(before[0], (await Colors())[0]);
+            throw new InvalidOperationException("Exercise failed-test cleanup.");
+        }));
+        Assert.Equal(ApplicationTheme.Light, ApplicationThemeManager.GetAppTheme());
+        Assert.Equal(before, await Colors());
+    });
+
+    [Fact]
     public Task CommonAppliesReloadOnceWithoutGrowingDictionaries() => WpfTestHost.RunAsync(async () =>
     {
-        new WpfThemeApplication().ApplyTheme(ApplicationTheme.Dark);
         var state = new SettingsViewModelTests.SettingsState();
-        state.SetTheme("dark");
+        state.SetTheme("dark"); state.SetAccent("blue");
+        using (var setup = new ThemeService(Dispatcher.CurrentDispatcher, state, new WpfThemeApplication(), () => (true, false, true))) { }
+        state.SetAccent("system"); // The measured startup below intentionally exercises system accent.
         var toggle = new Wpf.Ui.Controls.ToggleSwitch { IsChecked = true };
         var content = new StackPanel { Children = { toggle, new Slider { Value = 5 } } };
         var window = new Window { Content = content };
@@ -118,6 +157,10 @@ public sealed class ThemeTests(ITestOutputHelper output)
 
     private static Task CheckLibraryResourcesAsync()
     {
+        var state = new SettingsViewModelTests.SettingsState();
+        state.SetAccent("blue");
+        var preferences = (Dark: false, HighContrast: false, Transparency: true);
+        using var appearance = new ThemeService(Dispatcher.CurrentDispatcher, state, new WpfThemeApplication(), () => preferences);
         var resources = Application.Current.Resources;
         Assert.Contains(resources.MergedDictionaries, dictionary => dictionary.Source?.OriginalString
             .Contains("/Wpf.Ui;component/Resources/Theme/", StringComparison.OrdinalIgnoreCase) == true);
@@ -141,7 +184,8 @@ public sealed class ThemeTests(ITestOutputHelper output)
         Assert.True(keys.Length >= 20);
         foreach (var theme in new[] { ApplicationTheme.Light, ApplicationTheme.Dark, ApplicationTheme.HighContrast })
         {
-            new WpfThemeApplication().ApplyTheme(theme);
+            preferences = (theme == ApplicationTheme.Dark, theme == ApplicationTheme.HighContrast, true);
+            state.SetTheme(theme == ApplicationTheme.Dark ? "dark" : "light");
             foreach (string key in keys)
             {
                 if (localKeys.Contains(key)) continue;

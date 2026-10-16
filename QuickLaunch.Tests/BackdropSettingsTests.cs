@@ -171,7 +171,10 @@ public sealed class BackdropSettingsTests
     [Fact]
     public Task SettingsForegroundFollowsThemeAndContrastGuardRejectsBlackText() => WpfTestHost.RunAsync(async () =>
     {
-        using var model = CreateModel(new());
+        var state = new SettingsViewModelTests.SettingsState();
+        state.SetTheme("dark"); state.SetAccent("blue");
+        using var appearance = new ThemeService(Dispatcher.CurrentDispatcher, state, new WpfThemeApplication(), () => (true, false, true));
+        using var model = CreateModel(state, appearance);
         var pages = new SettingsPage[] { new SettingsGeneralPage(), new SettingsAppearancePage(), new SettingsPanelPage(), new SettingsAboutPage() };
         foreach (var page in pages) page.DataContext = model;
         // App resource changes invalidate Window trees, not detached visual roots.
@@ -181,7 +184,8 @@ public sealed class BackdropSettingsTests
         {
             foreach (var theme in new[] { ApplicationTheme.Dark, ApplicationTheme.Light, ApplicationTheme.Dark })
             {
-                new WpfThemeApplication().ApplyTheme(theme);
+                // Exercise the product's theme + fixed-preset palette path on every switch.
+                state.SetTheme(theme == ApplicationTheme.Dark ? "dark" : "light");
                 foreach (var page in pages)
                 {
                     page.Measure(new Size(590, 430)); page.Arrange(new Rect(0, 0, 590, 430));
@@ -237,6 +241,8 @@ public sealed class BackdropSettingsTests
         content.DataContext = model;
         content.Measure(new Size(760, 540)); content.Arrange(new Rect(0, 0, 760, 540));
         var navigation = (Wpf.Ui.Controls.NavigationView)window.FindName("SettingsNavigation");
+        Assert.Equal(Wpf.Ui.Animations.Transition.None, navigation.Transition);
+        Assert.Equal(0, navigation.TransitionDuration);
         foreach (string page in new[] { "general", "appearance", "panel", "about", "general" })
         {
             window.NavigateTo(page);

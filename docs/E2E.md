@@ -36,7 +36,16 @@ Appearance notifications use the explicit Unicode `SendMessageTimeoutW` entry po
 
 The hidden → visible half of the global-hotkey scenario necessarily needs a foreground target other than the hidden panel. The harness creates a temporary inert Win32 window inside the test process, verifies its PID and foreground HWND, and sends only Ctrl+Alt+Shift+F11 there. It closes that window immediately afterward. The visible → hidden half uses the panel. Scenario keys target only the verified panel, its dialogs, or this test-owned window. The standalone Alt activation fallback above is the only input permitted before the target is verified foreground.
 
-Failures save `artifacts/e2e/<test>-<guid>.png`, preferring the app's foreground window and falling back to the target window or panel. The per-test directory also retains `panel.png` and `failure.txt`. If the app has already exited, the cached panel capture is used. A dialog lookup timeout additionally writes `<test>-<guid>.windows.txt` beside the screenshot, listing process UIA windows (including owned/offscreen windows), their names, classes, automation IDs, native handles, and parent chains. Discovery includes native process window handles as well as UIA process roots and descendant windows. If startup or diagnostics fail, the test output records that without replacing the original failure. TRX output includes the retained temp profile/diagnostics path; successful profiles are removed.
+Failures save `artifacts/e2e/<test>-<guid>.png`, preferring the app's foreground window and falling back to the target window or panel. The per-test directory also retains `panel.png` and `failure.txt`. If the app has already exited, the cached panel capture is used. A dialog lookup timeout additionally writes `<test>-<guid>.windows.txt` beside the screenshot: a native inventory includes hidden/cloaked HWNDs and their classes, while UIA details (names, automation IDs and parent chains) are queried only for visible, uncloaked windows. Native enumeration includes owned dialogs; discovery does not traverse descendant Window providers that may already be tearing down. If startup or diagnostics fail, the test output records that without replacing the original failure. TRX output includes the retained temp profile/diagnostics path; successful profiles are removed.
+
+Every HWND-to-UIA lookup checks `IsWindowVisible` and `DWMWA_CLOAKED` first. Per-HWND
+TimeoutException, COMException and ElementNotAvailableException failures write one
+`UIA discovery retry/failed` diagnostic with the operation, HWND and cached native class.
+Inside `Eventually`, discovery skips that handle and marks the poll incomplete: even a
+negative check such as `!HasMenuItem` must retry instead of treating a failed scan as
+proof of absence. Outside a retry, required lookups log and rethrow. Tray overflow
+discovery uses the same per-HWND policy, while its cover/identity checks remain fail-closed.
+The UIA connection and transaction timeouts remain two seconds.
 
 Desktop review should check the real input/foreground behavior, native header/edge drag bounds at the reviewer's DPI, context-menu/confirmation UIA names, and that tray icons disappear after the run. These cannot be validated by compiling or by the sandbox's skipped test run.
 
@@ -64,9 +73,47 @@ Snapshot rendering is independent of this suite: `Snapshots.ps1` uses non-activa
 
 Settings tests navigate through `SettingsGeneralNav`, `SettingsAppearanceNav`,
 `SettingsPanelNav`, and `SettingsAboutNav` using control AutomationIds.
+The NavigationView uses `Transition=None` and `TransitionDuration=0`, including its
+first page. The existing navigation unit test checks both properties before navigating.
 The opacity test drags the real slider, observes a change before mouse-up, and checks both
 settings in JSON after `--exit` while Settings is still open. Solid/fallback disables
 both indented backdrop controls.
+
+The keyboard/hotkey scenario ends with an optional real tray-input phase. It searches
+the notification area for the unique fixture tooltip `QuickLaunch · Control+Alt+Shift+F11`.
+If needed, it snapshots native shell windows, clicks the chevron with real mouse input,
+then searches the desktop UIA root's top-level children. It descends only into visible,
+uncloaked HWNDs owned by explorer, ShellHost or ShellExperienceHost which appeared or
+became visible after that click. Overflow host class names are not assumed. It verifies
+click-to-show with tile focus, a later click-to-hide, and double-click-to-hide only once.
+Double-click starts with the pinned panel visible so hiding does not dismiss the overflow
+between its two real mouse presses. Shell HWND/process checks precede input; no synthetic
+tray callbacks or UIA Invoke are used. The system double-click interval supplies the waits.
+Before every overflow-icon click gesture, including after reopening the flyout, its
+rectangle must be non-empty and identical for three consecutive samples about 100 ms
+apart, with IsOffscreen false and the expected WindowFromPoint root throughout. The
+settle deadline is two seconds; expiry skips with the full target diagnostic. Final
+verification and the moved-before-mouse-down guard still run after settling. The two
+presses within a double-click retain their ordinary timing, with no settle delay between them.
+Each rejected target logs one `Tray verification FAILED` line identifying the taskbar
+icon, chevron or overflow-icon step, root HWND/class/PID/process, element PID/name/rect/
+IsOffscreen, and WindowFromPoint plus GA_ROOT HWND/class/PID/process. The hit-test root
+must be the discovered HWND and its PID must equal the element PID. Unusable taskbar
+copies are diagnosed before trying overflow; ambiguous matches never receive input.
+Discovery failures or ambiguous icons log `SKIP tray input (remaining steps), step=...`
+in the worker TRX; this is a partial skip, not proof of tray behavior. Once a tray click
+is sent, visibility/focus failures are test failures. A finally block sends real Escape to
+the identified flyout (or a newly visible shell host already owning foreground), falls
+back to a verified real chevron click, and requires all newly visible shell windows from
+that opening to be gone or cloaked. Cleanup failure fails the case. Worker deadlines are unchanged.
+
+Other application animations remain unchanged: the status line's 150 ms fade, duplicate
+tile opacity flash (100 ms, auto-reverse twice), WPF-UI ToggleSwitch thumb/fill transitions,
+CheckBox checkmark drawing, the editor's Advanced CardExpander reveal/chevron rotation,
+context-menu slide-in, and scrollbar hover expansion/fades. WPF-UI also contains pane and
+submenu animations, but the fixed-open flat Settings navigation does not exercise them.
+The drag preview has a fixed 1.1 scale rather than a timed transition. Native window-open
+and DWM material animations continue to follow Windows preferences.
 
 The acrylic and mica inactive-material cases start silently and wait for offscreen prewarm.
 On a supported DWM material they sample the empty panel background over a test-owned white

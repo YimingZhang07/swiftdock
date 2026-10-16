@@ -138,6 +138,7 @@ public sealed class LauncherTests(ITestOutputHelper output)
         app.AssertSelection(-1);
         app.Key(VirtualKeyShort.DOWN);
         app.AssertSelection(0);
+        app.AssertTrayToggleIfReachable();
     }, silentStart: true);
 
     [DesktopFact]

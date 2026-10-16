@@ -13,7 +13,7 @@
         <ui:Button DockPanel.Dock="Bottom" Content="关闭" HorizontalAlignment="Right" Margin="0,8,20,12" Click="CloseClick" IsCancel="True" />
         <ui:NavigationView x:Name="SettingsNavigation" PaneDisplayMode="Left" OpenPaneLength="152" IsPaneOpen="True"
                            IsPaneToggleVisible="False" IsBackButtonVisible="Collapsed" IsPaneVisible="True" IsFooterSeparatorVisible="False"
-                           FrameMargin="0">
+                           FrameMargin="0" Transition="None" TransitionDuration="0">
             <ui:NavigationView.MenuItems>
                 <ui:NavigationViewItem Content="常规" TargetPageType="{x:Type views:SettingsGeneralPage}" TargetPageTag="general" AutomationProperties.AutomationId="SettingsGeneralNav" />
                 <ui:NavigationViewItem Content="外观" TargetPageType="{x:Type views:SettingsAppearancePage}" TargetPageTag="appearance" AutomationProperties.AutomationId="SettingsAppearanceNav" />
