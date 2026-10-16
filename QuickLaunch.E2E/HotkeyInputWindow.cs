@@ -10,8 +10,19 @@ internal sealed class HotkeyInputWindow : IDisposable
 {
     private readonly Thread _thread;
     private readonly WindowProc _windowProc;
+    private int _mouseDownCount;
     public nint Handle { get; }
     public nint EditHandle { get; private set; }
+    public int MouseDownCount => Volatile.Read(ref _mouseDownCount);
+
+    public Point ClientCenter()
+    {
+        if (!GetClientRect(Handle, out var bounds) || bounds.Width <= 0 || bounds.Height <= 0)
+            throw new InvalidOperationException("The test-owned input window has no clickable client area.");
+        var point = new Point(bounds.Width / 2, bounds.Height / 2);
+        if (!ClientToScreen(Handle, ref point)) throw new Win32Exception(Marshal.GetLastWin32Error());
+        return point;
+    }
 
     public HotkeyInputWindow(Rectangle? backdropBounds = null)
     {
@@ -21,6 +32,7 @@ internal sealed class HotkeyInputWindow : IDisposable
             // Focus belongs to its own thread; no AttachThreadInput/remote SetFocus.
             if (message == 0x0006 && (wParam.ToInt64() & 0xffff) != 0 && EditHandle != 0) SetFocus(EditHandle);
             if (message == 0x0007 && EditHandle != 0) SetFocus(EditHandle);
+            if (message == 0x0201) Interlocked.Increment(ref _mouseDownCount); // Real client WM_LBUTTONDOWN.
             if (message == 0x0002) { PostQuitMessage(0); return 0; }
             return DefWindowProc(hwnd, message, wParam, lParam);
         };
@@ -112,6 +124,8 @@ internal sealed class HotkeyInputWindow : IDisposable
     [DllImport("user32.dll", EntryPoint = "DefWindowProcW")]
     private static extern nint DefWindowProc(nint hwnd, uint message, nint wParam, nint lParam);
     [DllImport("user32.dll")] private static extern nint SetFocus(nint hwnd);
+    [DllImport("user32.dll")] private static extern bool GetClientRect(nint hwnd, out Desktop.NativeRect bounds);
+    [DllImport("user32.dll", SetLastError = true)] private static extern bool ClientToScreen(nint hwnd, ref Point point);
     [DllImport("user32.dll")] private static extern void PostQuitMessage(int code);
     [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW", CharSet = CharSet.Unicode, ExactSpelling = true)]
     private static extern nint SendTextMessageTimeout(nint window, uint message, nint wParam, string text,

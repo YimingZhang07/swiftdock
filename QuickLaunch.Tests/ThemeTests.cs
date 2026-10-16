@@ -25,6 +25,10 @@ public sealed class ThemeTests(ITestOutputHelper output)
     [Fact]
     public Task WpfHostRestoresThemeAndAccentEvenWhenATestFails() => WpfTestHost.RunAsync(async () =>
     {
+        var current = Assert.IsType<Application>(Application.Current); // Product App must never own the test dispatcher.
+        Assert.Equal(ShutdownMode.OnExplicitShutdown, current.ShutdownMode);
+        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        Assert.Same(current, Application.Current);
         static void Apply(string theme, string accent)
         {
             var state = new SettingsViewModelTests.SettingsState();
@@ -58,6 +62,8 @@ public sealed class ThemeTests(ITestOutputHelper output)
         }));
         Assert.Equal(ApplicationTheme.Light, ApplicationThemeManager.GetAppTheme());
         Assert.Equal(before, await Colors());
+        Assert.Same(current, Application.Current);
+        Assert.False(current.Dispatcher.HasShutdownStarted);
     });
 
     [Fact]

@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Windows;
+using System.Windows.Markup;
 using System.Windows.Threading;
+using System.Xml.Linq;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
 using Xunit;
@@ -18,9 +20,27 @@ internal static class WpfTestHost
         {
             try
             {
-                var application = new App();
-                application.InitializeComponent();
-                ready.SetResult(application.Dispatcher);
+                // Application's constructor queues OnStartup even without Application.Run().
+                // A real App enters product startup and can Shutdown/clear Application.Current.
+                // Use the snapshot renderer's resource-only approach; App's BAML loader also
+                // rejects a test-assembly subclass, so load the embedded App.xaml definitions.
+                var application = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+                _ = System.Reflection.Assembly.Load("Wpf.Ui"); // XML namespace mappings for loose XAML.
+                var assembly = typeof(WpfTestHost).Assembly;
+                using (var stream = assembly.GetManifestResourceStream(assembly.GetManifestResourceNames()
+                    .Single(name => name.EndsWith(".App.xaml", StringComparison.Ordinal)))!)
+                {
+                    var root = XDocument.Load(stream).Root!;
+                    XNamespace wpf = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+                    var dictionary = root.Element(wpf + "Application.Resources")!.Elements().Single();
+                    foreach (var ns in root.Attributes().Where(attribute => attribute.IsNamespaceDeclaration))
+                        dictionary.SetAttributeValue(ns.Name, ns.Value);
+                    application.Resources = (ResourceDictionary)XamlReader.Parse(dictionary.ToString(), new ParserContext
+                        { BaseUri = new Uri("pack://application:,,,/QuickLaunch;component/App.xaml") });
+                }
+                // Publish readiness only after the base Application's queued startup has run.
+                application.Dispatcher.BeginInvoke(DispatcherPriority.Normal,
+                    () => ready.SetResult(application.Dispatcher));
                 Dispatcher.Run();
             }
             catch (Exception ex) { ready.TrySetException(ex); }

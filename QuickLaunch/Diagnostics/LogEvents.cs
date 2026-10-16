@@ -17,6 +17,13 @@ internal static partial class LoggingLogEvents
 
 internal static partial class AppLogEvents
 {
+    [LoggerMessage(33, LogLevel.Information, "Tray menu: {input}; cursor physical {cursor}; H.NotifyIcon callback {callback} ({version}); anchor physical {anchor}; overflow {overflow}, cursor root {cursorRoot}; menu physical {bounds}; DPI {dpi}; WPF keyboard focus within {keyboardFocusWithin}", EventName = "tray.menu")]
+    internal static partial void TrayMenuOpened(this ILogger logger, string input, string cursor, string callback,
+        string version, string anchor, string overflow, string cursorRoot, string bounds, uint dpi, bool keyboardFocusWithin);
+
+    [LoggerMessage(34, LogLevel.Information, "Tray menu closed after {milliseconds} ms; menu HWND {menuHwnd}; foreground HWND {foregroundHwnd}, class {foregroundClass}", EventName = "tray.menu.closed")]
+    internal static partial void TrayMenuClosed(this ILogger logger, double milliseconds, long menuHwnd, long foregroundHwnd, string foregroundClass);
+
     [LoggerMessage(2, LogLevel.Information, "Hotkey {hotkey}: {Registered}, {Error}", EventName = "hotkey.registered")]
     internal static partial void HotkeyRegistered(this ILogger logger, bool registered, int error, string hotkey);
 

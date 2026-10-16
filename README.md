@@ -100,11 +100,11 @@ SDK 10.0.401 和 NuGet 缓存位于忽略的 `.tools/`，不会替换系统安�
 .\scripts\Benchmark.ps1 -Interactive          # 点击面板确认后进行 4×50 项测试
 .\scripts\Benchmark.ps1 -SingleGroup -Prewarm  # 200 项、预热对照
 .\scripts\Benchmark.ps1 -Prewarm -IdleSeconds 300
-.\scripts\Benchmark.ps1 -Executable 'artifacts\staging\2.0.0\QuickLaunch.exe' -Interactive
+.\scripts\Benchmark.ps1 -Executable 'artifacts\staging\<版本>\QuickLaunch.exe' -Interactive
 .\scripts\MeasureStartup.ps1 -Executable '<发布目录>\QuickLaunch.exe'
 ```
 
-版本唯一来源是 `QuickLaunch/QuickLaunch.csproj` 的 `<Version>`，当前为 `2.0.0`；关于页、exe 版本、安装器和文件名均从它生成。发布新版本只需修改此字段，再运行 `Release.ps1`。每次构建先发布到 `artifacts/staging/<版本>/QuickLaunch.exe`，然后重建 `artifacts/release/<版本>/`，覆盖同版本的 `QuickLaunch-<版本>-Setup.exe`、`QuickLaunch-<版本>-Portable.zip` 和 `SHA256SUMS.txt`，不添加时间戳。`-E2E` 即使与 `-SkipTests` 同用也会运行 E2E。
+版本唯一来源是 `QuickLaunch/QuickLaunch.csproj` 的 `<Version>`；关于页、exe 版本、安装器和文件名均从它生成。发布新版本只需修改此字段，再运行 `Release.ps1`。每次构建先发布到 `artifacts/staging/<版本>/QuickLaunch.exe`，然后重建 `artifacts/release/<版本>/`，覆盖同版本的 `QuickLaunch-<版本>-Setup.exe`、`QuickLaunch-<版本>-Portable.zip` 和 `SHA256SUMS.txt`，不添加时间戳。`-E2E` 即使与 `-SkipTests` 同用也会运行 E2E。
 
 发布使用自包含 win-x64 单文件，不含 PDB，不在 bundle 内压缩；安装器和 ZIP 各自压缩。`Setup.ps1` 将固定版本的 Inno Setup 7.1.0 安装到 `.tools/innosetup/`，下载时校验 SHA-256 和 Authenticode 有效签名。
 

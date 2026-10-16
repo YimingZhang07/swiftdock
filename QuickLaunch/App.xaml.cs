@@ -28,6 +28,7 @@ public partial class App : Application
     private IDialogService? _dialogs;
     private HotkeyService? _hotkey;
     private TaskbarIcon? _tray;
+    private TrayContextMenu? _trayMenu;
     private System.Drawing.Icon? _trayIcon;
     private SingleInstanceService? _instance;
     private ConfigService? _store;
@@ -216,9 +217,10 @@ public partial class App : Application
         menu.Items.Add(startupItem);
         menu.Items.Add(new Separator());
         menu.Items.Add(new MenuItem { Header = "退出", Command = new RelayCommand(() => _ = ExitAsync()) });
-        _tray = new TaskbarIcon { ContextMenu = menu, NoLeftClickDelay = true,
+        _tray = new TaskbarIcon { NoLeftClickDelay = true,
             LeftClickCommand = new RelayCommand(() => { if (!_exiting) _window?.ToggleFromTray(); }),
             DoubleClickCommand = null };
+        _trayMenu = new TrayContextMenu(_tray, menu, _log);
         _tray.TrayLeftMouseDown += TrayMouseDown;
         UpdateTrayIcon();
         _tray.TrayIcon.MessageWindow.DpiChanged += TrayDisplayChanged;
@@ -249,6 +251,8 @@ public partial class App : Application
     private void DisposeTray()
     {
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= TrayDisplayChanged;
+        _trayMenu?.Dispose();
+        _trayMenu = null;
         if (_tray is not null)
         {
             _tray.TrayLeftMouseDown -= TrayMouseDown;

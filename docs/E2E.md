@@ -89,6 +89,22 @@ click-to-show with tile focus, a later click-to-hide, and double-click-to-hide o
 Double-click starts with the pinned panel visible so hiding does not dismiss the overflow
 between its two real mouse presses. Shell HWND/process checks precede input; no synthetic
 tray callbacks or UIA Invoke are used. The system double-click interval supplies the waits.
+The same phase then right-clicks the verified icon with the panel visible and pinned,
+and again with the panel hidden. It finds the test process's menu through the
+`显示 QuickLaunch` MenuItem. Its UIA screen rectangle must have a corner within 24 physical
+pixels of the click, or contain that point when clamped at a screen edge. In both cases
+the same popup HWND must remain visible, foreground and at the same native rectangle
+for at least 1.5 seconds with no input or focus repair. Disappearance fails immediately;
+reopening cannot restart the interval. A real click on `设置` must then open Settings,
+which is closed with real input. A third opening must survive the same stability check;
+real Down presses must move WPF keyboard focus between menu items, then real Escape
+closes it, with no foreground repair. A fourth stable opening is dismissed with one
+real click in the client area of the existing test-owned probe fixture. HWND/PID hit
+testing must confirm that exact probe before input; its WM_LBUTTONDOWN counter must
+advance and it must gain foreground. The harness never clicks the desktop or another
+application to dismiss a menu. Once the
+right-click is sent, missing, misplaced, self-closing or noninteractive menus fail the case.
+A finally block closes any menu/Settings window before flyout cleanup.
 Before every overflow-icon click gesture, including after reopening the flyout, its
 rectangle must be non-empty and identical for three consecutive samples about 100 ms
 apart, with IsOffscreen false and the expected WindowFromPoint root throughout. The
@@ -106,6 +122,36 @@ is sent, visibility/focus failures are test failures. A finally block sends real
 the identified flyout (or a newly visible shell host already owning foreground), falls
 back to a verified real chevron click, and requires all newly visible shell windows from
 that opening to be gone or cloaked. Cleanup failure fails the case. Worker deadlines are unchanged.
+
+Each product menu opening logs one `tray.menu` event: input source, physical `GetCursorPos`,
+the raw H.NotifyIcon callback point and protocol version, the selected physical anchor,
+overflow classification (unknown for unrecognized ShellHost classes), cursor root class,
+final native menu rectangle and menu DPI. H.NotifyIcon 2.4.1's
+[mouse path](https://raw.githubusercontent.com/HavenDV/H.NotifyIcon/v2.4.1/src/libs/H.NotifyIcon.Shared/TaskbarIcon.MouseEvents.cs)
+scales the callback point and its
+[menu path](https://raw.githubusercontent.com/HavenDV/H.NotifyIcon/v2.4.1/src/libs/H.NotifyIcon.Shared/TaskbarIcon.ContextMenu.Wpf.cs)
+overwrites AbsolutePoint offsets; it does not use Shell_NotifyIconGetRect there. Its cached
+DPI factor comes from a temporary HwndSource, falls back to 1, and refreshes only on the
+message window's DpiChanged event. A stale 1 at 192 DPI makes WPF double the coordinates
+and clamp the menu to the screen corner. QuickLaunch
+now opens the same menu at the captured mouse position, using WPF's physical absolute
+placement rectangle and built-in edge clamping. Keyboard invocation uses the Shell icon
+rectangle instead of the cursor. Desktop review should compare callback/cursor/menu
+coordinates and check Shift+F10/Menu-key placement,
+outside-click dismissal, menu commands and the autostart checkmark. No old/new desktop
+comparison is implied by the unit tests or build.
+Opening runs from H.NotifyIcon's `PreviewTrayContextMenuOpen` hook with its original
+ordering: set placement, finish setting IsOpen, foreground the popup HWND (message
+window only as the library's missing-HWND fallback), then raise TrayContextMenuOpen.
+It then calls ContextMenu.Focus() so WPF keyboard focus follows native foreground;
+Escape and arrow keys use the built-in menu handling. The open diagnostic also records
+IsKeyboardFocusWithin, separately from native foreground/focus/capture.
+Neither the hidden message window nor the panel is activated before opening, and the
+Opened handler only records diagnostics. Raw callbacks only supply diagnostic points.
+The mouse gesture suppresses paired WM_CONTEXTMENU callbacks during button-down and
+for the system double-click interval after button-up, even if the popup has closed.
+`tray.menu.closed` records the close timestamp, elapsed open milliseconds, popup HWND,
+and foreground HWND/class, so a spontaneous close is visible in the product log.
 
 Other application animations remain unchanged: the status line's 150 ms fade, duplicate
 tile opacity flash (100 ms, auto-reverse twice), WPF-UI ToggleSwitch thumb/fill transitions,

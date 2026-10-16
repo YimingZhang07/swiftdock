@@ -50,6 +50,22 @@ internal static partial class NativeMethods
     [StructLayout(LayoutKind.Sequential)]
     internal struct Rect { public int Left, Top, Right, Bottom; }
     [StructLayout(LayoutKind.Sequential)]
+    internal struct NotifyIconIdentifier
+    {
+        public uint Size;
+        public nint Window;
+        public uint Id;
+        public Guid Guid;
+    }
+    [LibraryImport("shell32.dll")]
+    internal static partial int Shell_NotifyIconGetRect(in NotifyIconIdentifier identifier, out Rect rect);
+    [LibraryImport("user32.dll")]
+    internal static partial nint WindowFromPoint(Point point);
+    [LibraryImport("user32.dll")]
+    internal static partial nint GetAncestor(nint hwnd, uint flags);
+    [LibraryImport("user32.dll", EntryPoint = "GetClassNameW", StringMarshalling = StringMarshalling.Utf16)]
+    internal static partial int GetClassName(nint hwnd, [Out] char[] name, int count);
+    [StructLayout(LayoutKind.Sequential)]
     internal struct MonitorInfo
     {
         public int Size;

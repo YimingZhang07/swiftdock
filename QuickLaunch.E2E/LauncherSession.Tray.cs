@@ -57,6 +57,7 @@ internal sealed partial class LauncherSession
         int interval = checked((int)Desktop.GetDoubleClickTime());
         nint panel = PanelHandle;
         string step = "taskbar icon";
+        bool menuAttempted = false, menuInputSent = false;
 
         TrayWindow[] NewVisibleShellWindows(bool cleanup = false) => beforeChevron is null ? [] : ShellWindowSnapshot().Values.Where(window =>
             window.Visible && (window.Cloaked == 0 || cleanup && window.Cloaked is null)
@@ -217,10 +218,193 @@ internal sealed partial class LauncherSession
                 return settled.ElapsedMilliseconds >= interval + 150;
             }, "one toggle for a real tray double-click", interval + 1200);
             Diagnostic("Tray input PASSED: single click showed, later click hid, real double-click toggled once.");
+
+            WindowScope OpenStableMenu(string phase)
+            {
+                menuInputSent = false; // A newly covered icon may skip before this gesture sends input.
+                var target = ReachIcon();
+                menuAttempted = true;
+                Point click = ClickTrayTarget(target, button: MouseButton.Right);
+                menuInputSent = true; // After input, a missing/flashing menu fails instead of skipping.
+                return AssertStableTrayMenu(click, phase + "/" + target.Step);
+            }
+
+            foreach (bool visible in new[] { true, false })
+            {
+                CloseOverflow();
+                if (Desktop.IsWindowVisible(panel) != visible) Hotkey(panelHidden: visible);
+                AssertVisible(visible);
+                Assert.NotEqual(0, Desktop.GetWindowLong(panel, -20) & 0x00000008); // WS_EX_TOPMOST
+                string phase = visible ? "visible-pinned" : "hidden";
+                var menu = OpenStableMenu(phase);
+                var item = Named("设置", ControlType.MenuItem, menu.Element);
+                Point point = Center(item.BoundingRectangle);
+                SaveCursor(); MoveMouse(point, "real tray Settings menu click");
+                AssertAppAt(point);
+                Assert.Equal(menu.Handle, Desktop.GetAncestor(Desktop.WindowFromPoint(point), 2));
+                try { PressMouse(MouseButton.Left); } finally { ReleaseMouse(MouseButton.Left); }
+                var settings = Dialog("设置");
+                Click(Named("关闭", ControlType.Button, settings), settings);
+                Eventually(() => !HasWindow("设置"), "tray Settings command window to close");
+                Diagnostic($"Tray menu interactive PASSED: {phase}; real Settings item click opened Settings.");
+            }
+
+            CloseOverflow();
+            var escapeMenu = OpenStableMenu("escape");
+            // No foreground repair: Escape must reach the menu that just survived 1.5 s.
+            Assert.Equal(escapeMenu.Handle, Desktop.GetForegroundWindow());
+            Assert.True(Desktop.IsDiscoverableWindow(escapeMenu.Handle));
+            string? FocusedItem() => QueryVisibleWindow(escapeMenu.Handle, () => escapeMenu.Element
+                .FindAllDescendants(cf => cf.ByControlType(ControlType.MenuItem))
+                .FirstOrDefault(item => IsVisible(item) && item.Properties.HasKeyboardFocus.Value)?.Name,
+                null, "tray menu/keyboard focus");
+            string? firstFocused = null;
+            try { PressKey(VirtualKeyShort.DOWN, "navigate tray menu"); }
+            finally { ReleaseKey(VirtualKeyShort.DOWN, "navigate tray menu finally"); }
+            Eventually(() => (firstFocused = FocusedItem()) is not null, "Down to focus a tray menu item");
+            Assert.Equal(escapeMenu.Handle, Desktop.GetForegroundWindow());
+            try { PressKey(VirtualKeyShort.DOWN, "next tray menu item"); }
+            finally { ReleaseKey(VirtualKeyShort.DOWN, "next tray menu item finally"); }
+            Eventually(() => FocusedItem() is { } next && next != firstFocused, "Down to move WPF focus to the next tray menu item");
+            try { PressKey(VirtualKeyShort.ESCAPE, "dismiss proven-open tray menu"); }
+            finally { ReleaseKey(VirtualKeyShort.ESCAPE, "dismiss proven-open tray menu finally"); }
+            Eventually(() => !Desktop.IsWindowVisible(escapeMenu.Handle) && FindTrayMenu() is null,
+                "proven-open tray menu to close after Escape");
+            Diagnostic("Tray menu keyboard PASSED: real Down moved item focus; Escape closed the stable menu.");
+
+            CloseOverflow();
+            using (var probe = new HotkeyInputWindow())
+            {
+                // Prepare the inert test-owned window before opening the menu. There
+                // is no foreground repair between opening and the outside click.
+                Foreground(RequireVisibleWindowElement(probe.Handle, "tray outside-click fixture").AsWindow());
+                var outsideMenu = OpenStableMenu("outside-click");
+                Point outside = probe.ClientCenter();
+                Assert.True(Desktop.GetWindowRect(outsideMenu.Handle, out var menuBounds));
+                Assert.False(menuBounds.Rectangle.Contains(outside));
+                SaveCursor(); MoveMouse(outside, "dismiss tray menu by real probe click");
+                nint hit = Desktop.WindowFromPoint(outside);
+                Desktop.GetWindowThreadProcessId(hit, out uint pid);
+                Assert.Equal((uint)Environment.ProcessId, pid);
+                Assert.Equal(probe.Handle, hit); // Client area of our HWND, never desktop/another app.
+                Assert.Equal(outsideMenu.Handle, Desktop.GetForegroundWindow());
+                Assert.True(Desktop.IsDiscoverableWindow(outsideMenu.Handle));
+                int clicks = probe.MouseDownCount;
+                try { PressMouse(MouseButton.Left); } finally { ReleaseMouse(MouseButton.Left); }
+                Eventually(() => !Desktop.IsWindowVisible(outsideMenu.Handle) && FindTrayMenu() is null,
+                    "tray context menu to close on a real outside click");
+                Eventually(() => probe.MouseDownCount == clicks + 1 && Desktop.GetForegroundWindow() == probe.Handle,
+                    "the test-owned probe to receive the outside click and foreground");
+                Diagnostic($"Tray menu outside-click PASSED: probe HWND=0x{probe.Handle:X}, received WM_LBUTTONDOWN={probe.MouseDownCount}.");
+                CloseOverflow();
+            }
         }
-        catch (Exception error) when (error is TrayUnavailableException or COMException or TimeoutException or InvalidOperationException)
+        catch (Exception error) when (!menuInputSent && (error is TrayUnavailableException or COMException or TimeoutException or InvalidOperationException))
         { Diagnostic($"SKIP tray input (remaining steps), step={step}: {error.Message.ReplaceLineEndings(" ")}"); }
-        finally { CloseOverflow(); }
+        finally
+        {
+            try
+            {
+                if (menuAttempted)
+                {
+                    CloseTrayMenu();
+                    // Also clean up if a later assertion failed after the Settings command.
+                    Eventually(() =>
+                    {
+                        var settings = FindVisibleWindow("设置");
+                        if (settings is null) return true;
+                        Click(Named("关闭", ControlType.Button, settings), settings);
+                        return false;
+                    }, "tray Settings cleanup");
+                }
+            }
+            finally { CloseOverflow(); }
+        }
+    }
+
+    private WindowScope AssertStableTrayMenu(Point click, string phase)
+    {
+        WindowScope? menu = null;
+        Eventually(() => (menu = FindTrayMenu()) is not null, phase + ": tray context menu after real right-click");
+        nint hwnd = menu!.Handle;
+        Rectangle bounds = Rectangle.Empty;
+        Eventually(() =>
+        {
+            Assert.True(Desktop.IsDiscoverableWindow(hwnd), phase + ": menu closed before placement settled");
+            bounds = QueryVisibleWindow(hwnd, () => menu.Element.BoundingRectangle, Rectangle.Empty, "tray menu/anchor");
+            return MenuTouchesClick(bounds, click);
+        }, phase + $": menu corner within 24 physical px of {click} (or containing it at screen edge)", 2000);
+        Assert.True(Desktop.GetWindowRect(hwnd, out var original));
+        var watch = Stopwatch.StartNew();
+        try
+        {
+            // Native popup bounds exclude WPF's slide animation. Do not reset this
+            // interval on disappearance/replacement, and do not inject input or repair focus.
+            do
+            {
+                CheckAbort();
+                Assert.True(Desktop.IsDiscoverableWindow(hwnd), phase + ": tray menu closed itself");
+                Assert.True(Desktop.GetWindowRect(hwnd, out var current));
+                Assert.Equal(original.Rectangle, current.Rectangle);
+                Assert.Equal(hwnd, Desktop.GetForegroundWindow());
+                Thread.Sleep(40);
+            } while (watch.ElapsedMilliseconds < 1500);
+            Assert.Equal(hwnd, FindTrayMenu()?.Handle);
+            Assert.True(Desktop.IsDiscoverableWindow(hwnd));
+            Assert.True(Desktop.GetWindowRect(hwnd, out var final));
+            Assert.Equal(original.Rectangle, final.Rectangle);
+        }
+        finally
+        {
+            Diagnostic($"Tray menu stability: {phase}; HWND=0x{hwnd:X}, click={click}, bounds={bounds}, "
+                + $"native={original}, observed={watch.ElapsedMilliseconds} ms; {Desktop.FocusDescription(hwnd)}");
+        }
+        return menu;
+    }
+
+    private WindowScope? FindTrayMenu()
+    {
+        foreach (var root in AppRoots())
+        {
+            var menu = QueryVisibleWindow<AutomationElement?>(root.Handle, () =>
+            {
+                var item = root.Element.FindFirstDescendant(cf => cf.ByName("显示 QuickLaunch").And(cf.ByControlType(ControlType.MenuItem)));
+                if (!IsVisible(item)) return null;
+                for (var parent = item!.Parent; parent is not null; parent = parent.Parent)
+                {
+                    if (parent.ControlType == ControlType.Menu) return parent;
+                    if (parent.Equals(root.Element)) break;
+                }
+                return null;
+            }, null, "tray menu/discovery");
+            if (menu is not null) return new(root.Handle, menu);
+        }
+        return null;
+    }
+
+    private static bool MenuTouchesClick(Rectangle bounds, Point click)
+    {
+        if (bounds.Width <= 0 || bounds.Height <= 0) return false;
+        if (click.X >= bounds.Left && click.X <= bounds.Right && click.Y >= bounds.Top && click.Y <= bounds.Bottom) return true;
+        return new[] { new Point(bounds.Left, bounds.Top), new Point(bounds.Right, bounds.Top),
+            new Point(bounds.Left, bounds.Bottom), new Point(bounds.Right, bounds.Bottom) }
+            .Any(corner => Math.Pow((double)corner.X - click.X, 2) + Math.Pow((double)corner.Y - click.Y, 2) <= 24 * 24);
+    }
+
+    private void CloseTrayMenu()
+    {
+        Eventually(() =>
+        {
+            var menu = FindTrayMenu();
+            if (menu is null) return true;
+            // Discovery is restricted to the test process. Never direct Escape to
+            // an unrelated foreground application if activation is refused.
+            Desktop.SetForegroundWindow(menu.Handle);
+            if (Desktop.GetForegroundWindow() != menu.Handle) return false;
+            try { PressKey(VirtualKeyShort.ESCAPE, "close tray context menu"); }
+            finally { ReleaseKey(VirtualKeyShort.ESCAPE, "close tray context menu finally"); }
+            return false;
+        }, "tray context menu closed after Escape", 3000);
     }
 
     private bool VerifyTrayPoint(TrayTarget target, out Point point, string? refusal = null)
@@ -258,7 +442,7 @@ internal sealed partial class LauncherSession
         return false;
     }
 
-    private void ClickTrayTarget(TrayTarget target, bool doubleClick = false)
+    private Point ClickTrayTarget(TrayTarget target, bool doubleClick = false, MouseButton button = MouseButton.Left)
     {
         // Every opening/reopening goes through this gate. Settle once per gesture,
         // never between the two presses of a real double-click.
@@ -276,9 +460,10 @@ internal sealed partial class LauncherSession
                 VerifyTrayPoint(target, out _, $"element center moved from {point} to {current} before mouse-down");
                 throw new TrayUnavailableException(target.Step + ": target moved before mouse-down.");
             }
-            try { PressMouse(MouseButton.Left); } finally { ReleaseMouse(MouseButton.Left); }
+            try { PressMouse(button); } finally { ReleaseMouse(button); }
             if (doubleClick && click == 0) Thread.Sleep((int)Math.Min(50, Desktop.GetDoubleClickTime() / 4));
         }
+        return point;
     }
 
     private void SettleOverflowIcon(TrayTarget target)
