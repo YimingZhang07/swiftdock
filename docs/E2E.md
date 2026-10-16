@@ -6,13 +6,13 @@ Run from an unlocked Windows desktop with the repository SDK installed:
 .\scripts\E2E.ps1
 ```
 
-The script restores the existing lock file, builds Release with `-warnaserror`, then runs only `QuickLaunch.E2E`. Results go to `artifacts/e2e/e2e.trx`. `Validate.ps1` restores/builds only the app + unit project and runs the 453 fast unit cases (target ≤40 s end to end). `Snapshots.ps1` independently builds a small rendering tool and emits 33 review PNGs plus `artifacts/validation/snapshots.json`; it has no behavior assertions. No new packages are needed. The embedded smoke suite and its switches have been removed; see the [exhaustive coverage mapping](validation/test-consolidation.md).
+The script restores the existing lock file, builds Release with `-warnaserror`, then runs only `QuickLaunch.E2E`. Results go to `artifacts/e2e/e2e.trx`. `Validate.ps1` restores/builds only the app + unit project and runs the fast unit cases. `Snapshots.ps1` independently builds a small rendering tool and emits 39 review PNGs plus `artifacts/validation/snapshots.json`, with a text-contrast guard for dark settings pages.
 
-The suite sends real keyboard and mouse input. Leave the desktop unlocked and do not use the keyboard or mouse during the run. Tests run in one nonparallel collection, with a fresh app/profile per scenario; the reviewer measured 11/11 passing in 125 seconds and accepted the additional real coverage moved from smokes. The earlier 75-second target is retired; no scenarios were cut. Background services, a locked/disconnected desktop, and runs without explicit opt-in report **Skipped**, not Passed. For direct `scripts/dotnet.ps1 test QuickLaunch.E2E -c Release`, set `QUICKLAUNCH_E2E=1`; `E2E.ps1` sets and restores that environment variable automatically. Do not opt in from a sandbox.
+The suite sends real keyboard and mouse input. Leave the desktop unlocked and do not use the keyboard or mouse during the run. Tests run in one nonparallel collection, with a fresh app/profile per scenario. Background services, a locked/disconnected desktop, and runs without explicit opt-in report **Skipped**, not Passed. For direct `scripts/dotnet.ps1 test QuickLaunch.E2E -c Release`, set `QUICKLAUNCH_E2E=1`; `E2E.ps1` sets and restores that environment variable automatically. Do not opt in from a sandbox.
 
-The harness resolves `QuickLaunch/bin/Release/net10.0-windows10.0.19041.0/win-x64/QuickLaunch.exe` relative to `QuickLaunch.slnx`, and reports a missing Release build clearly. It launches the apphost, preserving the app's manifest. The consolidated keyboard case starts with `--silent`, waits for the ordinary `warmup.completed` log event, verifies the panel is hidden, then starts a real secondary process and checks forwarding/exit before real input begins. It also activates a test-owned native window while the panel is visible to check deactivation behavior. Other cases start visibly. Each profile has two groups, five local folders with glyph icons, remembered panel geometry, and Ctrl+Alt+Shift+F11. F11 avoids [Windows' reservation of F12 for debuggers](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-registerhotkey). Favicons are off, except in the settings scenario, which starts enabled so it can test switching them off; that profile contains no URLs. The add-URL test stays offline. A primary work area below 1000 × 840 DIPs is skipped so the settings dialog and drag destinations fit.
+The harness resolves `QuickLaunch/bin/Release/net10.0-windows10.0.19041.0/win-x64/QuickLaunch.exe` relative to `QuickLaunch.slnx`, and reports a missing Release build clearly. It launches the apphost, preserving the app's manifest. The keyboard case starts with `--silent`, waits for the ordinary `warmup.completed` log event, verifies the panel is hidden, then starts a real secondary process and checks forwarding/exit before real input begins. It also activates a test-owned native window while the panel is visible to check deactivation behavior. Other cases start visibly. Each profile has two groups, five local folders with glyph icons, remembered panel geometry, and Ctrl+Alt+Shift+F11. F11 avoids [Windows' reservation of F12 for debuggers](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-registerhotkey). Favicons are off, except in the settings scenario, which starts enabled so it can test switching them off; that profile contains no URLs. The add-URL test stays offline. A primary work area below 1000 × 840 DIPs is skipped so the settings dialog and drag destinations fit.
 
-`--e2e-launch-log <file>` is a test-only alternative to actual tile/Enter/context-menu launches. Unlike `--smoke-test`, it runs the ordinary interactive app. It requires an explicit isolated `--config-dir` and appends one JSON object per accepted launch, for example:
+`--e2e-launch-log <file>` is a test-only alternative to actual tile/Enter/context-menu launches in the ordinary interactive app. It requires an explicit isolated `--config-dir` and appends one JSON object per accepted launch, for example:
 
 ```json
 {"id":"00000000000000000000000000000012","name":"Bravo","elevated":false}
@@ -40,11 +40,11 @@ Failures save `artifacts/e2e/<test>-<guid>.png`, preferring the app's foreground
 
 Desktop review should check the real input/foreground behavior, native header/edge drag bounds at the reviewer's DPI, context-menu/confirmation UIA names, and that tray icons disappear after the run. These cannot be validated by compiling or by the sandbox's skipped test run.
 
-## Consolidated scenarios
+## Scenarios
 
 | Cases | Scenario | Behaviors |
 | --- | --- | --- |
-| 2 | `Accent_preset_survives_startup_and_appearance_changes` | Purple/dark/mica and green/light/acrylic, all five original color phases, config defaults, native backdrop. |
+| 2 | `Accent_preset_survives_startup_and_appearance_changes` | Purple/dark/mica and green/light/acrylic, all five color phases, config defaults, native backdrop. |
 | 1 | `Keyboard_pointer_menu_escape_and_hotkey` | Alt/arrows, empty-area click, menu Escape, two-stage panel Escape, hotkey hide/show, Ctrl+Tab and mouse tab focus. |
 | 1 | `Tab_click_switches_both_ways_and_drag_reorders` | Real clicks on the other tab and back verify tile names, cleared selection and list focus; dragging the inactive tab verifies visible/persisted tab order without selecting it. |
 | 1 | `Click_and_held_enter_each_launch_once` | Click then held Enter, one record for each, no delayed duplicate. |
@@ -56,14 +56,14 @@ Desktop review should check the real input/foreground behavior, native header/ed
 | 1 | `Add_url_with_icon_then_edit_and_undo_delete` | URL host naming, picker arrows/Enter/Escape, context edit, F2 rename, Delete, Ctrl+Z, persisted glyph. |
 | 1 | `Delete_group_confirmation_can_cancel_then_delete` | Cancel then accept, persisted surviving group. |
 
-The 16 original cases are retained in these flows; only redundant process/profile startup and shutdown were removed. The preset pair still counts as two cases. Unit tests own decision tables and persistence edge cases; E2E owns input/binding/native integration. The 39-image snapshot matrix is visual evidence for review, not another pass/fail regression suite. Existing historical smoke reports remain historical and their old commands are obsolete.
+Unit tests cover decision tables and persistence edge cases; E2E covers input/binding/native integration. The 39-image snapshot matrix provides visual evidence for review.
 
-The snapshot follow-up is independent of this suite: `Snapshots.ps1` uses non-activating offscreen surfaces, six-second per-image worker deadlines and a 90-second overall renderer deadline. It continuously writes rendered/failed/current progress to `snapshots.json`, including partial failure. It never runs modal dialogs or requests human input.
+Snapshot rendering is independent of this suite: `Snapshots.ps1` uses non-activating offscreen surfaces, six-second per-image worker deadlines and a 90-second overall renderer deadline. It continuously writes rendered/failed/current progress to `snapshots.json`, including partial failure. It never runs modal dialogs or requests human input.
 
-Task 21 adds real settings navigation through `SettingsGeneralNav`, `SettingsAppearanceNav`,
-`SettingsPanelNav`, and `SettingsAboutNav`; existing control AutomationIds are retained.
+Settings tests navigate through `SettingsGeneralNav`, `SettingsAppearanceNav`,
+`SettingsPanelNav`, and `SettingsAboutNav` using control AutomationIds.
 The opacity test drags the real slider, observes a change before mouse-up, and checks both
-new settings in JSON after `--exit` while Settings is still open. Solid/fallback disables
+settings in JSON after `--exit` while Settings is still open. Solid/fallback disables
 both indented backdrop controls.
 
 The acrylic and mica inactive-material cases start silently and wait for offscreen prewarm.
@@ -77,20 +77,17 @@ hotkey from that inactive state and verifies panel focus, hide/show and panel Es
 
 DWM attribute support alone does not prove that `WM_NCACTIVATE` preserves
 `DWMSBT_TRANSIENTWINDOW`. These pixel cases are the desktop acceptance check. If acrylic
-still becomes solid on the target OS, do not treat the feature as verified; the next option
-to evaluate is a panel-only compositor-hosted acrylic brush with explicit activation state
-(and a separate implementation decision for mica). The hook does not change `WM_ACTIVATE`,
+becomes solid on the target OS, the feature has failed validation. The hook does not change `WM_ACTIVATE`,
 keyboard focus or WPF `IsActive`; see the
 [WM_NCACTIVATE contract](https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-ncactivate).
 
-Snapshots replace `settings.png`/`settings-light.png` with `settings-general`,
+Settings snapshots include `settings-general`,
 `settings-appearance`, `settings-panel`, and `settings-about`, each with `.png` and
-`-light.png` variants. Existing accent/material images remain, bringing the matrix to 39.
-The six-second worker and 90-second batch limits and offscreen rendering policy are unchanged.
+`-light.png` variants, alongside accent/material images in the 39-image matrix.
 
-## Task 21 desktop follow-up: deadlines and focus control
+## Deadlines and focus control
 
-Each scenario now runs the existing E2E assembly in an isolated `dotnet vstest`
+Each scenario runs the E2E assembly in an isolated `dotnet vstest`
 process. The outer xUnit host never initializes UIA and imposes a 60-second
 execution deadline. A timeout captures a native HWND/foreground/focus dump and
 screen PNGs with an independent two-second diagnostic budget, sends `--exit`
@@ -147,7 +144,7 @@ Snapshot manifests retry three atomic writes with 25/50 ms delays, then try a
 direct write. A failure of both paths is collected without interrupting the
 image loop or cleanup. Manifest errors are reported only after rendering, with
 the full final inventory on stderr if the final file is still locked. Rendering
-still has the original 90-second overall deadline.
+has a 90-second overall deadline.
 
 Independent cleanup accepts `--exit` code 2 (no instance) when the tracked process
 has already exited, including when the worker already shut it down successfully.

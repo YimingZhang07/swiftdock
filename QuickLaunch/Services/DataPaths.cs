@@ -9,9 +9,13 @@ public sealed record DataPaths(string ConfigDirectory, string LogDirectory, bool
         Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(ConfigDirectory.ToUpperInvariant())))[..24]);
     public static string DefaultConfigDirectory => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "QuickLaunch");
     public static DataPaths Resolve(string? explicitConfig, string? explicitLogs)
+        => Resolve(explicitConfig, explicitLogs, AppContext.BaseDirectory);
+
+    internal static DataPaths Resolve(string? explicitConfig, string? explicitLogs, string baseDirectory)
     {
-        bool portable = explicitConfig is null && File.Exists(Path.Combine(AppContext.BaseDirectory, "portable.flag"));
-        string directory = Path.GetFullPath(explicitConfig ?? (portable ? AppContext.BaseDirectory : DefaultConfigDirectory));
+        string dataDirectory = Path.Combine(baseDirectory, "Data");
+        bool portable = explicitConfig is null && Directory.Exists(dataDirectory);
+        string directory = Path.GetFullPath(explicitConfig ?? (portable ? dataDirectory : DefaultConfigDirectory));
         string logs = Path.GetFullPath(explicitLogs ?? (portable ? Path.Combine(directory, "logs")
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "QuickLaunch", "logs")));
         return new(directory, logs, portable);

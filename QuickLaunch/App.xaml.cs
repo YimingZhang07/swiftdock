@@ -62,7 +62,7 @@ public partial class App : Application
                 if (_performanceRun) readOnly = true;
                 else
                 {
-                    var answer = MessageBox.Show("所选配置目录不可写。\n是：使用默认目录\n否：只读运行\n取消：退出", "QuickLaunch", MessageBoxButton.YesNoCancel);
+                    var answer = MessageBox.Show((paths.Portable ? "便携 Data 目录不可写。" : "所选配置目录不可写。") + "\n是：使用默认目录\n否：只读运行\n取消：退出", "QuickLaunch", MessageBoxButton.YesNoCancel);
                     if (answer == MessageBoxResult.Cancel) { Shutdown(); return; }
                     if (answer == MessageBoxResult.Yes) paths = DataPaths.Resolve(DataPaths.DefaultConfigDirectory, Argument(e.Args, "--diagnostics-dir"));
                     else readOnly = true;

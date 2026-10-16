@@ -1,8 +1,17 @@
-# QuickLaunch v0.1.3
+# QuickLaunch 使用说明
 
-Windows x64 启动器。standalone 包无需另装 .NET；解压整个目录后双击 `QuickLaunch.exe`，不要只移动 exe。
+Windows 10/11 x64 启动器，安装版和便携版均自带 .NET，无需另装运行时。
 
-诊断日志默认位于 `%LOCALAPPDATA%\QuickLaunch\logs`（便携模式为程序旁的 `logs`），可用 `--diagnostics-dir <目录>` 覆盖。格式为 CLEF：按 `EventId.Name` 筛选事件，字段直接位于顶层。多个进程可共享同一目录的滚动文件；Serilog 按日期/约 4 MiB 滚动、保留 20 个匹配文件。读取最新滚动文件及分段后，按 `Pid` 和 GUID `Session` 筛选会话。详见 [日志与启动测量](LOGGING.md)。E2E 启动记录仍使用独立 JSONL；旧程序内 smoke 已移除。
+## 安装、便携与卸载
+
+- **安装**：运行 `QuickLaunch-<版本>-Setup.exe`，在向导中选择安装路径。默认安装到 `%LOCALAPPDATA%\Programs\QuickLaunch`，仅供当前用户使用，无需管理员权限。自动创建开始菜单入口；桌面快捷方式默认不勾选，完成后的“启动 QuickLaunch”默认勾选。
+- **SmartScreen**：安装包未签名；若出现“Windows 已保护你的电脑”，确认下载来源后点击“更多信息”→“仍要运行”。
+- **便携**：将 `QuickLaunch-<版本>-Portable.zip` 解压到任意可写位置，双击 `QuickLaunch\QuickLaunch.exe`。程序旁的 `Data\` 文件夹必须保留：配置、`icons\` 缓存和 `logs\` 都放在 `Data\` 中，不写入 AppData。移动便携文件夹前先关闭登录自启，移动后再开启；移除前关闭自启并退出程序，再删除整个文件夹。
+- **升级**：再次运行安装包，沿用之前选择的安装目录，用户数据不变。
+- **卸载**：从 Windows“已安装的应用”卸载。卸载只移除该安装目录对应的登录自启项，然后询问是否也删除 `%APPDATA%\QuickLaunch` 的配置和 `%LOCALAPPDATA%\QuickLaunch` 的缓存/日志，默认“否”。静默卸载不删除数据；其他目录中的便携副本及其自启项保留。
+- 安装、升级及卸载会请求 QuickLaunch 正常退出，保存配置并移除托盘图标。如果程序没有退出，请从托盘菜单退出后重试。
+
+诊断日志默认位于 `%LOCALAPPDATA%\QuickLaunch\logs`（便携模式为 `Data\logs\`），可用 `--diagnostics-dir <目录>` 覆盖。格式为 CLEF：按 `EventId.Name` 筛选事件，字段直接位于顶层。多个进程可共享同一目录的滚动文件；Serilog 按日期/约 4 MiB 滚动、保留 20 个匹配文件。读取最新滚动文件及分段后，按 `Pid` 和 GUID `Session` 筛选会话。详见 [日志与启动测量](LOGGING.md)。
 
 ## 日常操作
 
@@ -25,7 +34,7 @@ Windows x64 启动器。standalone 包无需另装 .NET；解压整个目录后�
 
 - 配置默认位于 `%APPDATA%\QuickLaunch`，可从托盘打开目录；备份为 `config.json.bak`。
 - 添加、排序和设置自动保存；顶栏只显示只读或尚未保存的错误。退出时保存失败可重试或返回，强杀可能丢失最后尚未保存的修改。
-- 在 exe 同目录建立 `portable.flag` 可使用便携模式，目录不可写会提示。移动目录前先关闭自启，移动后重新设置。
+- exe 同目录的 `Data\` 启用便携模式；不可写时可选择使用默认目录、只读运行或退出。`--config-dir <绝对目录>` 优先于便携模式，改用指定配置及默认缓存/日志目录。
 - 主题和强调色默认跟随系统，也可在设置中选择。Windows 高对比度始终优先，关闭后恢复自己的选择。未自定义的网址先显示地球，再异步显示网站图标；小图标居中放在浅色圆角底板上。自定义图标始终优先。
 - 网站图标直接访问网址、跟随其 HTTP/HTTPS 重定向，并读取最终页面引用的图标（包括 CDN），不使用第三方图标查询服务。在设置 → 外观关闭“自动获取网站图标”开关即可停用，关闭后不发请求，也不使用缓存的网站图标。成功缓存 30 天，失败缓存 1 天；右键“刷新图标”可跳过缓存重新获取该站点。只读配置不能修改这个设置。
 - × 仅隐藏面板并继续常驻；设置底部“退出 QuickLaunch”或托盘菜单“退出”才结束程序，退出前会保存最后修改。设置中的“关闭”只关闭设置窗口。
@@ -35,14 +44,10 @@ Windows x64 启动器。standalone 包无需另装 .NET；解压整个目录后�
 
 标准按钮、输入框、开关、下拉框、菜单、提示和滚动条由 WPF-UI 4.3.0（MIT）提供，面板自定义样式使用同一套主题资源。主题与强调色通过 WPF-UI API 应用，深浅色变体由库生成。透明效果关闭、高对比度或系统不支持所选材质时，面板回退纯色，背景材质行显示原因。设置、项目编辑、名称和确认对话框使用无图标标题栏与 Mica；选择纯色时对话框也使用纯色，系统回退规则同样适用；删除分组的确认框以红色“删除”和“取消”区分操作。构建与验证命令见 [README](../README.md#开发)。
 
-## 本版验证边界
-
-功能已实现并通过自动检查。真实浏览器拖拽、混合 DPI、UAC、系统注销/关机及 Explorer 重启等人工场景尚未全部验证。性能报告中，后台前台权限失败不会计为成功；未承诺 50ms 端到端呼出或 60MB 常驻内存已全面达成。
+开发者在仓库根目录运行 `scripts/Setup.ps1` 安装本地 SDK 和便携 Inno Setup，再运行 `scripts/Release.ps1` 验证并发布。`-SkipTests` 跳过单测验证；`-E2E` 额外运行真实桌面检查（即使同时指定 `-SkipTests`）。产物在 `artifacts/release/<版本>/`：安装器、便携 ZIP 和 `SHA256SUMS.txt`；同版本每次重建覆盖。单文件 exe 位于 `artifacts/staging/<版本>/`，可传给 `Benchmark.ps1 -Executable` 和 `MeasureStartup.ps1 -Executable`。修改 `QuickLaunch/QuickLaunch.csproj` 的 `<Version>` 即可升级版本，关于页、exe、安装器及文件名都会随之更新；当前版本为 `1.1.0`。
 
 ## 开发验证
 
-- 每次修改：`scripts/Validate.ps1`，锁定还原 + Release `-warnaserror` + 453 项快速单测，目标 ≤40 秒；默认不运行桌面检查。
-- UI 改动后：解锁桌面运行 `scripts/E2E.ps1`，11 个真实键鼠用例，评审实测 11/11 通过（125 秒，已接受）。运行期间不要操作键鼠，详见 [E2E](E2E.md)。
-- 视觉评审：解锁桌面按需运行 `scripts/Snapshots.ps1`，在 `artifacts/validation/` 生成 33 张 PNG 和 `snapshots.json`，只检查是否渲染成功。窗口在屏幕外渲染且不抢焦点，不需要点击对话框；单张图超时后继续，脚本默认 90 秒总时限，部分失败也写入 `snapshots.json`。
-
-`--smoke-test`、`Run.ps1 -Smoke`、`Validate.ps1 -DesktopSmoke` 已删除。覆盖迁移、实测结果和沙箱限制见 [测试整合记录](validation/test-consolidation.md)。
+- 每次修改：`scripts/Validate.ps1`，锁定还原 + Release `-warnaserror` + 快速单测；默认不运行桌面检查。
+- UI 改动后：解锁桌面运行 `scripts/E2E.ps1` 的真实键鼠用例。运行期间不要操作键鼠，详见 [E2E](E2E.md)。
+- 视觉评审：解锁桌面按需运行 `scripts/Snapshots.ps1`，在 `artifacts/validation/` 生成 39 张 PNG 和 `snapshots.json`，检查渲染及深色设置文字对比度。窗口在屏幕外渲染且不抢焦点，不需要点击对话框；单张图超时后继续，脚本默认 90 秒总时限，部分失败也写入 `snapshots.json`。

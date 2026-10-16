@@ -40,11 +40,10 @@ internal static partial class NativeMethods
     internal const int WmDpiChanged = 0x02E0;
     internal const int WmChangeUiState = 0x0127, WmUpdateUiState = 0x0128;
     internal const int WmEnterSizeMove = 0x0231, WmExitSizeMove = 0x0232, WmSizing = 0x0214;
-    internal const int WmNcHitTest = 0x0084;
     internal const int WmNcActivate = 0x0086;
     [LibraryImport("user32.dll", EntryPoint = "DefWindowProcW")]
     internal static partial nint DefWindowProc(nint hwnd, int message, nint wParam, nint lParam);
-    internal const uint ModAlt = 0x0001, ModNoRepeat = 0x4000;
+    internal const uint ModNoRepeat = 0x4000;
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct Point { public int X, Y; }
@@ -71,9 +70,6 @@ internal static partial class NativeMethods
     internal static partial bool SetForegroundWindow(nint hwnd);
     [LibraryImport("user32.dll")]
     internal static partial nint GetForegroundWindow();
-    [LibraryImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    internal static partial bool IsWindowVisible(nint hwnd);
     [LibraryImport("user32.dll")]
     internal static partial int GetSystemMetrics(int index);
     // A user-invoked secondary process may grant foreground permission to the primary.
@@ -111,13 +107,9 @@ internal static partial class NativeMethods
     internal static partial int GetSystemMetricsForDpi(int index, uint dpi);
     [LibraryImport("user32.dll", EntryPoint = "FindWindowW", StringMarshalling = StringMarshalling.Utf16)]
     internal static partial nint FindWindow(string className, string? windowName);
-    [LibraryImport("user32.dll", EntryPoint = "SendMessageW")]
-    internal static partial nint SendMessage(nint hwnd, int message, nint wParam, nint lParam);
     [LibraryImport("shcore.dll")]
     internal static partial int GetDpiForMonitor(nint monitor, int type, out uint dpiX, out uint dpiY);
     // DWM attributes do not allocate resources; failure simply keeps square corners.
     [LibraryImport("dwmapi.dll")]
     internal static partial int DwmSetWindowAttribute(nint hwnd, uint attribute, in int value, uint size);
-    [LibraryImport("dwmapi.dll")]
-    internal static partial int DwmGetWindowAttribute(nint hwnd, uint attribute, out int value, uint size);
 }

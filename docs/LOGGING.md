@@ -6,19 +6,19 @@ The config store/writer, view model, theme, startup service, icon STA thread, ic
 
 ## Location and format
 
-The default log directory remains `%LOCALAPPDATA%\QuickLaunch\logs`. Portable mode uses `logs` beside the executable; `--diagnostics-dir <directory>` overrides either location. Diagnostic files use Serilog compact JSON (CLEF), one JSON object per UTF-8 line:
+The default log directory is `%LOCALAPPDATA%\QuickLaunch\logs`. Portable mode uses `Data\logs` beside the executable; `--diagnostics-dir <directory>` overrides either location. Diagnostic files use Serilog compact JSON (CLEF), one JSON object per UTF-8 line:
 
 ```json
 {"@t":"2026-10-15T00:00:00Z","@mt":"Hotkey changed: {hotkey}","hotkey":"Alt+Space","EventId":{"Id":6,"Name":"hotkey.changed"},"SourceContext":"QuickLaunch.Views.LauncherWindow","Session":"a18b4d02e97a4c1ca81b83f3846496d9","Pid":1234}
 ```
 
-`@t` is a UTC timestamp, `@mt` is a message template, and `@l` is the level (omitted for Information). The stable event name is `EventId.Name`. The previous `data` object's fields are now top-level properties, retaining their spelling and types, including `Kind`, `Accepted`, `Cancelled`, `Message`, `processToReadyMs`, `origin`, and `saved`. Filter on `EventId.Name`, not `@mt` or CLEF's reserved `@i`. `SourceContext` contains the `ILogger<T>` category. Every event, including the in-memory fallback, carries numeric `Pid` and a GUID `Session`. The session GUID remains constant for the process session and distinguishes sessions even when Windows reuses a PID.
+`@t` is a UTC timestamp, `@mt` is a message template, and `@l` is the level (omitted for Information). The stable event name is `EventId.Name`. Structured fields are top-level properties, including `Kind`, `Accepted`, `Cancelled`, `Message`, `processToReadyMs`, `origin`, and `saved`. Filter on `EventId.Name`, not `@mt` or CLEF's reserved `@i`. `SourceContext` contains the `ILogger<T>` category. Every event, including the in-memory fallback, carries numeric `Pid` and a GUID `Session`. The session GUID remains constant for the process session and distinguishes sessions even when Windows reuses a PID.
 
-The approved configuration is `quicklaunch-.jsonl` with `RollingInterval.Day`, `rollOnFileSizeLimit: true`, `fileSizeLimitBytes: 4 * 1024 * 1024`, `retainedFileCountLimit: 20`, and `shared: true`. Each diagnostics directory has one shared daily rolling file, named `quicklaunch-yyyyMMdd.jsonl`, with size-roll suffixes such as `_001`. Several processes, including independent `--config-dir` instances, can write the same file. Serilog manages rolling and retention; there is no custom session filename or retention routine. Legacy timestamp/PID files do not match the rolling pattern and are left untouched.
+The sink configuration is `quicklaunch-.jsonl` with `RollingInterval.Day`, `rollOnFileSizeLimit: true`, `fileSizeLimitBytes: 4 * 1024 * 1024`, `retainedFileCountLimit: 20`, and `shared: true`. Each diagnostics directory has one shared daily rolling file, named `quicklaunch-yyyyMMdd.jsonl`, with size-roll suffixes such as `_001`. Several processes, including independent `--config-dir` instances, can write the same file. Serilog manages rolling and retention; there is no custom session filename or retention routine. Legacy timestamp/PID files do not match the rolling pattern and are left untouched.
 
 Serilog 4.3's built-in batching queues at most 512 events, in batches of up to 64 with a 250 ms buffering interval. A small `IBatchedLogEventSink` adapter creates the standard file sink on that worker. Opening files, formatting CLEF, writing, flushing and retention never run in a UI logging call. Queue saturation may drop events. If file creation or writing fails, file logging is disabled for the session and the first `log.fallback` event remains in the DI singleton `LoggingDiagnostics.Failure`; there is no second directory fallback or recursive file logging.
 
-Source-generated `LoggerMessage` methods preserve the existing event names. Favicon diagnostics include origins only; Shell/error messages strip web URL paths and queries. File contents are never diagnostic payloads. `benchmark.json` is unchanged; the retired smoke report is no longer generated. The E2E launch recorder's `id`, `name`, `elevated` JSONL is a separate test fixture and remains unchanged.
+Source-generated `LoggerMessage` methods define the event names. Favicon diagnostics include origins only; Shell/error messages strip web URL paths and queries. File contents are never diagnostic payloads. `benchmark.json` contains performance measurements. The E2E launch recorder's `id`, `name`, `elevated` JSONL is a separate test fixture.
 
 ## Reading and measuring
 
@@ -37,6 +37,6 @@ Both measurement scripts use `ReadDiagnostics.ps1` to discover retained rolling 
 
 `scripts/MeasureStartup.ps1 -Executable <exe> -Count 3` reads the selected session's CLEF startup event and rejects missing measurements. For restricted desktops only, `-AllowUnavailableTray` adds the performance-only `--allow-unavailable-tray` flag to the startup probe so tray creation failure is recorded and measurement can continue. Use the same flags on both sides of a comparison. These are process launches with filesystem caching, not cold-boot measurements. `startup.host` reports empty-builder, registration, and build/start durations separately; it is emitted after the readiness measurement.
 
-`scripts/Benchmark.ps1` reads CLEF for startup time and the UI-proxy event count, then prints the unchanged benchmark report. Neither script treats a missing event as a zero-duration result.
+`scripts/Benchmark.ps1` reads CLEF for startup time and the UI-proxy event count, then prints the benchmark report. Neither script treats a missing event as a zero-duration result.
 
-The embedded smoke events/report were retired in Task 19. Snapshot rendering writes `artifacts/validation/snapshots.json`; benchmark and startup events remain. `MeasureStartup.ps1 -AllowUnavailableTray` now uses the performance-only `--allow-unavailable-tray` switch.
+Snapshot rendering writes `artifacts/validation/snapshots.json`.

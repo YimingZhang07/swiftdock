@@ -86,7 +86,6 @@ internal static class BenchmarkRunner
             runtime = Environment.Version.ToString(), os = Environment.OSVersion.VersionString,
             logicalCpu = Environment.ProcessorCount, dpi = VisualTreeHelper.GetDpi(window).PixelsPerInchX,
             animations = System.Windows.SystemParameters.ClientAreaAnimation,
-            nativeR2R = File.Exists(Path.Combine(AppContext.BaseDirectory, "r2r.flag")),
             physicalPresentationMeasured = false, realHotkeyMeasured = false,
             note = "100 warm samples; first/idle are single observations; single-group switch data is a control, not a cross-group claim. No explicit GC or working-set trimming."
         };

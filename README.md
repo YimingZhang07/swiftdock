@@ -1,10 +1,14 @@
 # QuickLaunch
 
-Windows x64 常驻启动器，C# / .NET 10 / WPF。v0.1.3 已实现计划中的图标缓存、导入、拖拽、编辑、撤销、自启和主题跟随；面板只有单行分组页签和图标区，顶栏空白处可拖动窗口，启动项目或失去焦点后面板保持显示。性能目标与人工验收状态单独记录，不把“功能已实现”等同于“全部指标达标”。
+Windows 10/11 x64 常驻启动器，C# / .NET 10 / WPF。支持图标缓存、导入、拖拽、编辑、撤销、自启和主题跟随；面板只有单行分组页签和图标区，顶栏空白处可拖动窗口，启动项目或失去焦点后面板保持显示。
 
 ## 使用
 
-推荐使用 `artifacts/releases/` 中的 **standalone** 发布包，解压后运行 `QuickLaunch.exe`，无需另装 .NET。详细操作见 [使用说明](docs/QUICKSTART.zh-CN.md)。
+发布提供安装版和便携版，均自带 .NET，无需另装运行时。详细操作见 [使用说明](docs/QUICKSTART.zh-CN.md)。
+
+- **安装版**：运行 `QuickLaunch-<版本>-Setup.exe`，按向导选择安装路径。仅为当前用户安装，无需管理员权限；默认路径为 `%LOCALAPPDATA%\Programs\QuickLaunch`。开始菜单快捷方式自动创建，桌面快捷方式可选；完成时默认启动程序。安装包未签名，SmartScreen 若提示“Windows 已保护你的电脑”，确认来源后点击“更多信息”→“仍要运行”。
+- **便携版**：将 `QuickLaunch-<版本>-Portable.zip` 解压到任意可写位置，打开其中的 `QuickLaunch\QuickLaunch.exe`。同目录的空 `Data\` 文件夹启用便携模式；配置、图标缓存、日志都保存在其中。移动时保留整个文件夹。
+- **升级与卸载**：安装新版会沿用原路径并保留数据。可从 Windows“已安装的应用”卸载；卸载会移除该安装目录的登录自启项，并询问是否删除配置与缓存/日志，默认“否”。静默卸载始终保留数据。安装、升级和卸载会请求正在运行的程序正常退出；若无法退出，请从托盘退出后重试。便携版移除前先关闭自启并退出，再删除整个文件夹。
 
 - 默认 `Alt+Space` 呼出/隐藏，热键可在“设置”修改，冲突时保留旧组合。
 - 拖动顶栏移动面板，拖动边缘或四角调整大小；位置和大小会自动记住，下次呼出恢复。设置 → 外观 → 呼出位置可切换“上次位置”或“跟随鼠标”。
@@ -23,7 +27,7 @@ Windows x64 常驻启动器，C# / .NET 10 / WPF。v0.1.3 已实现计划中的�
 
 ## 配置
 
-默认数据为 `%APPDATA%\QuickLaunch\config.json`；图标和日志在 `%LOCALAPPDATA%\QuickLaunch`。exe 同目录放置 `portable.flag` 可使用便携数据目录。`--config-dir <绝对目录>` 可选择独立配置。
+默认数据为 `%APPDATA%\QuickLaunch\config.json`；图标和日志在 `%LOCALAPPDATA%\QuickLaunch`。exe 同目录存在 `Data\` 时使用便携模式：配置为 `Data\config.json`，缓存为 `Data\icons\`，日志为 `Data\logs\`，不向用户的 AppData 目录写入数据。`--config-dir <绝对目录>` 优先于便携模式，使用指定配置目录及默认缓存/日志目录；`--diagnostics-dir` 可单独覆盖日志路径。便携目录不可写时会提示选择默认目录、只读运行或退出。
 
 外观为可选字段，默认值省略，旧配置无需迁移。只读配置禁用所有外观控件；Windows 高对比度始终覆盖所选主题、强调色和透明材质，关闭后恢复所选值。
 
@@ -58,7 +62,7 @@ $process.ExitCode
 Windows 11 x64，仓库根目录 PowerShell：
 
 ```powershell
-.\scripts\Setup.ps1                    # 安装仓库专用 SDK，验证 SHA-512
+.\scripts\Setup.ps1                    # 安装仓库专用 SDK 和便携 Inno Setup，验证下载
 .\scripts\GenerateIcon.ps1             # 离线 WPF 生成应用 ICO 和 artifacts/icon/preview.png
 .\scripts\Validate.ps1                # 锁定依赖、Release -warnaserror、快速单元测试
 .\scripts\E2E.ps1                     # UI 改动后：解锁桌面，真实键鼠回归
@@ -72,34 +76,37 @@ SDK 10.0.401 和 NuGet 缓存位于忽略的 `.tools/`，不会替换系统安�
 
 主题、系统强调色和标准控件使用 [WPF-UI 4.3.0](https://github.com/lepoco/wpfui/tree/4.3.0)（MIT），依赖版本与锁文件固定。`App.xaml` 合并其主题/控件字典，面板自定义样式直接引用库的主题资源；系统消息变化后重新应用已选主题、强调色与材质策略。`ApplicationThemeManager` / `ApplicationAccentColorManager` 生成深浅色强调色变体。面板保留现有 WindowChrome；设置、项目编辑、名称和确认对话框使用 FluentWindow、无图标标题栏和 Mica；选择纯色或触发系统回退时对话框也使用纯色。设置按快捷键、外观、启动分为卡片行；网站图标和登录自启使用开关，除快捷键需点“应用”外均立即生效。编辑高级选项使用 CardExpander，删除分组使用 WPF-UI 确认框。WPF-UI 滚动条占 14 DIP，布局为它保留空间。
 
-验证分为三个独立层级，删除了程序内 smoke 和 `-DesktopSmoke` / `-Smoke` 开关：
+验证分为三个独立层级：
 
 | 命令 | 何时运行 | 产物 / 范围 |
 | --- | --- | --- |
-| `scripts/Validate.ps1` | 每次修改，包括沙箱 | 锁定依赖还原、应用与单测 Release 构建（`-warnaserror`）、453 项快速单测；`artifacts/tests/launcher.trx`。目标 ≤40 秒。 |
-| `scripts/E2E.ps1` | UI 改动后，在解锁桌面 | 11 个真实输入用例；`artifacts/e2e/e2e.trx`。评审实测 11/11 通过，125 秒，已接受；保留全部用例。 |
-| `scripts/Snapshots.ps1` | 视觉评审时，在解锁桌面 | 独立 `QuickLaunch.Snapshots` 工具生成 33 张 PNG 和 `artifacts/validation/snapshots.json`；只要求成功渲染，不做行为或像素断言。 |
+| `scripts/Validate.ps1` | 每次修改，包括沙箱 | 锁定依赖还原、应用与单测 Release 构建（`-warnaserror`）、快速单测；`artifacts/tests/launcher.trx`。 |
+| `scripts/E2E.ps1` | UI 改动后，在解锁桌面 | 真实输入用例；`artifacts/e2e/e2e.trx`。 |
+| `scripts/Snapshots.ps1` | 视觉评审时，在解锁桌面 | 独立 `QuickLaunch.Snapshots` 工具生成 39 张 PNG 和 `artifacts/validation/snapshots.json`，并检查深色设置文字对比度。 |
 
-单测保留配置、VM、解析、图标、几何、资源和 DI 生命周期；E2E 检查原生输入与窗口连接；视觉布局由快照评审。默认验证不构建或运行桌面工具。测试与快照使用隔离配置，不修改日常配置或登录启动项。详细覆盖去向与实测限制见 [测试整合记录](docs/validation/test-consolidation.md)，真实桌面要求见 [E2E 说明](docs/E2E.md)。
+单测覆盖配置、VM、解析、图标、几何、资源和 DI 生命周期；E2E 检查原生输入与窗口连接；视觉布局由快照评审。默认验证不构建或运行桌面工具。测试与快照使用隔离配置，不修改日常配置或登录启动项。真实桌面要求见 [E2E 说明](docs/E2E.md)。
 
-`--e2e-launch-log <file>` 必须配合独立 `--config-dir`，将条目启动委托替换为 JSONL 记录器，每行包含 `id`、`name`、`elevated`，不调用 Shell；未提供此开关时正常启动条目。`--exit`、日志、基准和启动测量继续保留。
+`--e2e-launch-log <file>` 必须配合独立 `--config-dir`，将条目启动委托替换为 JSONL 记录器，每行包含 `id`、`name`、`elevated`，不调用 Shell；未提供此开关时正常启动条目。
 
 ## 发布与性能检查
 
 ```powershell
-.\scripts\Publish.ps1                         # 独立版 + ZIP + SHA-256
-.\scripts\Publish.ps1 -FrameworkDependent     # 依赖系统 Desktop Runtime
-.\scripts\Publish.ps1 -ReadyToRun             # R2R 对照版本
+.\scripts\Release.ps1                         # 验证、单文件发布、安装包、便携 ZIP、SHA-256
+.\scripts\Release.ps1 -SkipTests              # 跳过单测验证
+.\scripts\Release.ps1 -E2E                    # 额外运行桌面 E2E（需解锁桌面）
 .\scripts\Benchmark.ps1 -Interactive          # 点击面板确认后进行 4×50 项测试
 .\scripts\Benchmark.ps1 -SingleGroup -Prewarm  # 200 项、预热对照
 .\scripts\Benchmark.ps1 -Prewarm -IdleSeconds 300
+.\scripts\Benchmark.ps1 -Executable 'artifacts\staging\1.1.0\QuickLaunch.exe' -Interactive
 .\scripts\MeasureStartup.ps1 -Executable '<发布目录>\QuickLaunch.exe'
 ```
 
+版本唯一来源是 `QuickLaunch/QuickLaunch.csproj` 的 `<Version>`，当前为 `1.1.0`；关于页、exe 版本、安装器和文件名均从它生成。发布新版本只需修改此字段，再运行 `Release.ps1`。每次构建先发布到 `artifacts/staging/<版本>/QuickLaunch.exe`，然后重建 `artifacts/release/<版本>/`，覆盖同版本的 `QuickLaunch-<版本>-Setup.exe`、`QuickLaunch-<版本>-Portable.zip` 和 `SHA256SUMS.txt`，不添加时间戳。`-E2E` 即使与 `-SkipTests` 同用也会运行 E2E。
+
+发布使用自包含 win-x64 单文件，不含 PDB，不在 bundle 内压缩；安装器和 ZIP 各自压缩。`Setup.ps1` 将固定版本的 Inno Setup 7.1.0 安装到 `.tools/innosetup/`，下载时校验 SHA-256 和 Authenticode 有效签名。
+
 基准会重复显示/隐藏窗口，使用专用生成数据，不启动条目。后台运行可能没有前台权限；这种情况下焦点确认失败单列，渲染耗时不能冒充完整呼出耗时。首次、预热后、闲置恢复及首次/已访问分组分开记录；不强制 GC 或修剪工作集。
 
-`Snapshots.ps1` 输出 launcher、settings、add-dialog、edit-dialog、name-dialog、icon-picker、item-menu、delete-confirm 的深/浅色 PNG，以及 `appearance-{dark|light}-{blue|purple}-{acrylic|mica|solid}.png`（12 张）、`appearance-settings-{dark|light}-{blue|purple}.png`（4 张）和 `panel-polish.png`。基础深色文件无后缀，浅色使用 `-light`。窗口不激活并固定在整个虚拟桌面外，确认框不进入模态循环，菜单/选择器不打开原生弹出窗口。每张图使用独立进程，6 秒超时后记录失败并继续；脚本默认 90 秒总运行时限（可用 `-TimeoutSeconds` 调整），超时终止渲染器及其工作进程。`snapshots.json` 在开始和每步结束时更新，始终记录 `rendered` / `failed`，以及运行中的 `current`；旧 PNG 不代表本次成功。PNG 为 WPF 合成图，不包含原生 DWM 材质、边框或阴影；原生材质由 E2E 验证。
+`Snapshots.ps1` 输出 launcher、settings-general、settings-appearance、settings-panel、settings-about、add-dialog、edit-dialog、name-dialog、icon-picker、item-menu、delete-confirm 的深/浅色 PNG，以及 `appearance-{dark|light}-{blue|purple}-{acrylic|mica|solid}.png`（12 张）、`appearance-settings-{dark|light}-{blue|purple}.png`（4 张）和 `panel-polish.png`。基础深色文件无后缀，浅色使用 `-light`。窗口不激活并固定在整个虚拟桌面外，确认框不进入模态循环，菜单/选择器不打开原生弹出窗口。每张图使用独立进程，6 秒超时后记录失败并继续；脚本默认 90 秒总运行时限（可用 `-TimeoutSeconds` 调整），超时终止渲染器及其工作进程。`snapshots.json` 在开始和每步结束时更新，始终记录 `rendered` / `failed`，以及运行中的 `current`；旧 PNG 不代表本次成功。PNG 为 WPF 合成图，不包含原生 DWM 材质、边框或阴影；原生材质由 E2E 验证。
 
-性能日志保留在 `artifacts/benchmarks/`、`artifacts/startup/`，发布包在 `artifacts/releases/`。启动测量在无托盘的环境可显式使用 `MeasureStartup.ps1 -AllowUnavailableTray`（对应 `--allow-unavailable-tray`，仅性能模式有效）。基准禁用网站请求，避免网络时间影响测量。
-
-最新验证结果与历史覆盖迁移见 [测试整合记录](docs/validation/test-consolidation.md)。`docs/validation/` 中其他报告是当时的历史记录，不能用作当前 smoke 运行指南。
+性能日志保留在 `artifacts/benchmarks/`、`artifacts/startup/`，发布包在 `artifacts/release/<版本>/`。启动测量在无托盘的环境可显式使用 `MeasureStartup.ps1 -AllowUnavailableTray`（对应 `--allow-unavailable-tray`，仅性能模式有效）。基准禁用网站请求，避免网络时间影响测量。

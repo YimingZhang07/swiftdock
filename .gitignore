@@ -8,9 +8,5 @@ TestResults/
 *.suo
 *.log
 *.tmp
-portable.flag
-config.json
-config.json.bak
-config.lock
-icons/
+Data/
 

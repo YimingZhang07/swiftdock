@@ -36,11 +36,6 @@ public static class WindowPlacement
         return Math.Min(Math.Max(2, Math.Ceiling(Math.Max(1, itemCount) / (double)columns)) * cellSize + VerticalChrome, workHeight * .7);
     }
 
-    public static void AtCursor(Window window, int columns = 6, double cellSize = 84, int itemCount = 1, Size? savedSize = null)
-    {
-        PlacePanel(window, ReadDesktop(new WindowInteropHelper(window).EnsureHandle()), "cursor", null, columns, cellSize, itemCount, savedSize);
-    }
-
     public static Rect ResolvePlacement(string? mode, Point? savedPosition, Size desiredSize, IReadOnlyList<Monitor> monitors, Point cursor)
     {
         var (monitor, position) = SelectMonitor(mode, savedPosition, desiredSize, monitors, cursor);

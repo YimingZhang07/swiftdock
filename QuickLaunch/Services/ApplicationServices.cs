@@ -25,7 +25,7 @@ internal static class ApplicationServices
         services.AddSingleton(sp => ConfigService.Open(paths.ConfigDirectory, readOnly, sp.GetRequiredService<IConfigWriter>()));
         services.AddSingleton(sp => new MainViewModel(sp.GetRequiredService<ConfigService>()));
         services.AddSingleton(sp => new ThemeService(dispatcher, sp.GetRequiredService<MainViewModel>()));
-        services.AddSingleton(_ => new StartupService(Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "QuickLaunch.exe"), paths.ConfigDirectory));
+        services.AddSingleton(_ => new StartupService(Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "QuickLaunch.exe"), paths.ConfigDirectory, portable: paths.Portable));
         services.AddIconServices(performanceRun || launchLog is not null ? Path.Combine(paths.LogDirectory, "icons") : paths.IconDirectory);
         services.AddSingleton<ISettingsState>(sp => sp.GetRequiredService<MainViewModel>());
         services.AddSingleton<ISettingsActions>(sp => new SettingsActions(sp.GetRequiredService<LauncherWindow>().ResetWindowSize,
