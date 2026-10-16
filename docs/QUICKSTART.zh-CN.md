@@ -50,7 +50,7 @@ Windows 10/11 x64 启动器，安装版和便携版均自带 .NET，无需另装
 
 标准按钮、输入框、开关、下拉框、菜单、提示和滚动条由 WPF-UI 4.3.0（MIT）提供，面板自定义样式使用同一套主题资源。主题与强调色通过 WPF-UI API 应用，深浅色变体由库生成。透明效果关闭、高对比度或系统不支持所选材质时，面板回退纯色，背景材质行显示原因。设置、项目编辑、名称和确认对话框使用无图标标题栏与 Mica；选择纯色时对话框也使用纯色，系统回退规则同样适用；删除分组的确认框以红色“删除”和“取消”区分操作。构建与验证命令见 [README](../README.md#开发)。
 
-开发者在仓库根目录运行 `scripts/Setup.ps1` 安装本地 SDK 和便携 Inno Setup，再运行 `scripts/Release.ps1` 验证并发布。`-SkipTests` 跳过单测验证；`-E2E` 额外运行真实桌面检查（即使同时指定 `-SkipTests`）。产物在 `artifacts/release/<版本>/`：安装器、便携 ZIP 和 `SHA256SUMS.txt`；同版本每次重建覆盖。单文件 exe 位于 `artifacts/staging/<版本>/`，可传给 `Benchmark.ps1 -Executable` 和 `MeasureStartup.ps1 -Executable`。修改 `QuickLaunch/QuickLaunch.csproj` 的 `<Version>` 即可升级版本，关于页、exe、安装器及文件名都会随之更新；当前版本为 `1.1.0`。
+开发者在仓库根目录运行 `scripts/Setup.ps1` 安装本地 SDK 和便携 Inno Setup，再运行 `scripts/Release.ps1` 验证并发布。`-SkipTests` 跳过单测验证；`-E2E` 额外运行真实桌面检查（即使同时指定 `-SkipTests`）。产物在 `artifacts/release/<版本>/`：安装器、便携 ZIP 和 `SHA256SUMS.txt`；同版本每次重建覆盖。单文件 exe 位于 `artifacts/staging/<版本>/`，可传给 `Benchmark.ps1 -Executable` 和 `MeasureStartup.ps1 -Executable`。修改 `QuickLaunch/QuickLaunch.csproj` 的 `<Version>` 即可升级版本，关于页、exe、安装器及文件名都会随之更新；当前版本为 `2.0.0`。
 
 ## 开发验证
 
