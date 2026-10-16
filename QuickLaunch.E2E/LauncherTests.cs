@@ -11,6 +11,51 @@ namespace QuickLaunch.E2E;
 [Collection(DesktopCollection.Name)]
 public sealed class LauncherTests(ITestOutputHelper output)
 {
+    [DesktopFact]
+    public void Settings_navigation_and_opacity_drag_persist_after_exit() => Run(output, app =>
+    {
+        bool supported = app.SupportsMaterial("acrylic");
+        app.Click(app.ById("SettingsButton"));
+        var settings = app.Dialog("设置");
+        foreach (var (page, control) in new[] { ("General", "MainKey"), ("Appearance", "BackdropOpacitySlider"),
+            ("Panel", "ResetSizeButton"), ("About", "DirectoryLabel") })
+        {
+            app.NavigateSettings(settings, page); app.ById(control, settings);
+        }
+        app.ById("OpenLogsButton", settings); // Never opens Explorer during automation.
+        app.NavigateSettings(settings, "Appearance");
+        var slider = app.ById("BackdropOpacitySlider", settings);
+        var toggle = app.ById("KeepBackdropWhenInactiveBox", settings);
+        Assert.Equal(ToggleState.On, toggle.Patterns.Toggle.Pattern.ToggleState.Value);
+        app.Click(app.ById("SolidBackdrop", settings), settings);
+        Eventually(() => !slider.IsEnabled && !toggle.IsEnabled, "solid disables both backdrop subrows");
+        app.Click(app.ById("AcrylicBackdrop", settings), settings);
+        if (!supported)
+        {
+            Assert.False(slider.IsEnabled); Assert.False(toggle.IsEnabled);
+            return;
+        }
+        app.DragBackdropOpacity(settings, 65);
+        int value = (int)slider.Patterns.RangeValue.Pattern.Value.Value;
+        Assert.InRange(value, 50, 80);
+        app.Click(toggle, settings);
+        // Leave settings open: --exit must flush the latest debounced value too.
+        using var config = app.ExitAndReadConfig();
+        Assert.Equal(value, config.RootElement.GetProperty("backdropOpacity").GetInt32());
+        Assert.False(config.RootElement.GetProperty("keepBackdropWhenInactive").GetBoolean());
+    }, theme: "dark", backdrop: "acrylic");
+
+    [DesktopTheory]
+    [InlineData("acrylic")]
+    [InlineData("mica")]
+    public void Inactive_material_pixels_and_real_focus_survive_prewarm(string backdrop) => Run(output, app =>
+    {
+        app.AssertInactiveBackdrop(backdrop);
+        using var config = app.ExitAndReadConfig();
+        Assert.False(config.RootElement.TryGetProperty("keepBackdropWhenInactive", out _));
+        Assert.False(config.RootElement.TryGetProperty("backdropOpacity", out _));
+    }, theme: "dark", backdrop: backdrop, silentStart: true, test: $"Inactive_material_{backdrop}");
+
     [DesktopTheory]
     [InlineData("dark", "mica", "purple", 0x87, 0x64, 0xB8)]
     [InlineData("light", "acrylic", "green", 0x10, 0x7C, 0x10)]
@@ -219,6 +264,7 @@ public sealed class LauncherTests(ITestOutputHelper output)
     {
         app.Click(app.ById("SettingsButton"));
         var dialog = app.Dialog("设置");
+        app.NavigateSettings(dialog, "Panel");
         var toggle = app.ById("WebsiteIconsBox", dialog);
         Assert.Equal(ToggleState.On, toggle.Patterns.Toggle.Pattern.ToggleState.Value);
         app.Click(toggle, dialog);

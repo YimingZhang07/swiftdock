@@ -79,6 +79,8 @@ internal static partial class IconLogEvents
 
 internal static partial class WindowLogEvents
 {
+    [LoggerMessage(31, LogLevel.Information, "Panel activation: {isActive}, foreground {foregroundHwnd}, keep {keepBackdrop}, warming {warming}, message {message}", EventName = "window.activation")]
+    internal static partial void PanelActivation(this ILogger logger, bool isActive, long foregroundHwnd, bool keepBackdrop, bool warming, int message);
     [LoggerMessage(21, LogLevel.Information, "Window initialized: {cornerHresult}, {backdrop}, {dpi}", EventName = "window.initialized")]
     internal static partial void WindowInitialized(this ILogger logger, int cornerHresult, string backdrop, uint dpi);
 

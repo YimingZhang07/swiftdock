@@ -56,6 +56,108 @@ Desktop review should check the real input/foreground behavior, native header/ed
 | 1 | `Add_url_with_icon_then_edit_and_undo_delete` | URL host naming, picker arrows/Enter/Escape, context edit, F2 rename, Delete, Ctrl+Z, persisted glyph. |
 | 1 | `Delete_group_confirmation_can_cancel_then_delete` | Cancel then accept, persisted surviving group. |
 
-The 16 original cases are retained in these flows; only redundant process/profile startup and shutdown were removed. The preset pair still counts as two cases. Unit tests own decision tables and persistence edge cases; E2E owns input/binding/native integration. The 33-image snapshot matrix is visual evidence for review, not another pass/fail regression suite. Existing historical smoke reports remain historical and their old commands are obsolete.
+The 16 original cases are retained in these flows; only redundant process/profile startup and shutdown were removed. The preset pair still counts as two cases. Unit tests own decision tables and persistence edge cases; E2E owns input/binding/native integration. The 39-image snapshot matrix is visual evidence for review, not another pass/fail regression suite. Existing historical smoke reports remain historical and their old commands are obsolete.
 
 The snapshot follow-up is independent of this suite: `Snapshots.ps1` uses non-activating offscreen surfaces, six-second per-image worker deadlines and a 90-second overall renderer deadline. It continuously writes rendered/failed/current progress to `snapshots.json`, including partial failure. It never runs modal dialogs or requests human input.
+
+Task 21 adds real settings navigation through `SettingsGeneralNav`, `SettingsAppearanceNav`,
+`SettingsPanelNav`, and `SettingsAboutNav`; existing control AutomationIds are retained.
+The opacity test drags the real slider, observes a change before mouse-up, and checks both
+new settings in JSON after `--exit` while Settings is still open. Solid/fallback disables
+both indented backdrop controls.
+
+The acrylic and mica inactive-material cases start silently and wait for offscreen prewarm.
+On a supported DWM material they sample the empty panel background over a test-owned white
+window. OFF must visibly change from active (maximum RGB-channel distance greater than
+three); its DWM fallback need not equal the theme's solid colour. ON must remain within three RGB levels of the active sample and differ from the
+fallback by more than three. Samples must settle for 800 ms. An indistinguishable active
+sample fails explicitly instead of accepting a no-op. No Windows preferences are changed.
+The same case types into a test-owned EDIT control, presses Esc there, then uses the global
+hotkey from that inactive state and verifies panel focus, hide/show and panel Esc.
+
+DWM attribute support alone does not prove that `WM_NCACTIVATE` preserves
+`DWMSBT_TRANSIENTWINDOW`. These pixel cases are the desktop acceptance check. If acrylic
+still becomes solid on the target OS, do not treat the feature as verified; the next option
+to evaluate is a panel-only compositor-hosted acrylic brush with explicit activation state
+(and a separate implementation decision for mica). The hook does not change `WM_ACTIVATE`,
+keyboard focus or WPF `IsActive`; see the
+[WM_NCACTIVATE contract](https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-ncactivate).
+
+Snapshots replace `settings.png`/`settings-light.png` with `settings-general`,
+`settings-appearance`, `settings-panel`, and `settings-about`, each with `.png` and
+`-light.png` variants. Existing accent/material images remain, bringing the matrix to 39.
+The six-second worker and 90-second batch limits and offscreen rendering policy are unchanged.
+
+## Task 21 desktop follow-up: deadlines and focus control
+
+Each scenario now runs the existing E2E assembly in an isolated `dotnet vstest`
+process. The outer xUnit host never initializes UIA and imposes a 60-second
+execution deadline. A timeout captures a native HWND/foreground/focus dump and
+screen PNGs with an independent two-second diagnostic budget, sends `--exit`
+without calling UIA first, then terminates any remaining product/worker as a
+reported last resort. Shutdown waits are bounded (four seconds for the exit
+client and four for the product; two seconds after a kill). The input ownership
+journal lets the supervisor release only its worker's keys/buttons. A timed-out
+worker is terminated before another scenario runs; abandoned UIA threads cannot
+resume input in the next case. Worker stdout/stderr, TRX, focus phases and timeout
+artifacts live in `artifacts/e2e/<scenario>-<guid>/`.
+
+`E2E.ps1 -TimeoutSeconds 300` adds an independent overall execution deadline. Its
+finally block stops this run's test hosts, then enumerates QuickLaunch command
+lines and sends `--exit` only for config directories canonically below
+`%TEMP%/QuickLaunch.E2E/`. PID start times guard against PID reuse. The script also
+uses recorded host identities if process-tree enumeration fails, releases this
+run's recorded input, and reports any last-resort kill in `cleanup.log`. Restore
+and build precede the timed desktop execution. Direct `dotnet test` still has the
+per-scenario deadline; the script supplies the overall deadline and orphan sweep.
+
+Blocking-call audit:
+
+| Operation | Bound |
+| --- | --- |
+| UIA discovery, properties, patterns, disposal and failure diagnostics | UIA3 connection/transaction timeouts remain 2 seconds; every provider call is contained by the independent 60-second process deadline, including providers that ignore their timeout. Discovery now starts from native process HWNDs, not desktop-wide UIA traversal. |
+| Foreground | Native SetForegroundWindow plus the existing standalone-Alt fallback, with a 3-second poll; removed UIA SetFocus/SetForeground helpers. No AttachThreadInput. |
+| Input drain | Removed FlaUI Wait.UntilInputIsProcessed; input-idle is 1 second and quiet-state polling is 3 seconds. |
+| Other WaitForExit calls | Secondary show 8 seconds; ordinary --exit client 6 seconds, product 8 seconds; post-kill waits 2 seconds. All remain inside scenario isolation. |
+| SendMessage | Only SendMessageTimeoutW: appearance notifications 2 seconds; test EDIT WM_GETTEXT/WM_SETTEXT 500 ms. |
+| Fixture thread | Startup 3 seconds, posted WM_CLOSE and join 2 seconds; the message loop belongs to the disposable worker process. |
+| Supervisor diagnostics/output | Native diagnostic capture 2 seconds, each output drain 1 second. No UIA in teardown. |
+| Overall process discovery | CIM operation timeout 3 seconds; recorded PID/start-time fallback. |
+
+The focus fixture is now a registered top-level Win32 window with an EDIT child,
+not the predefined STATIC class used as a top-level window. In the same material
+case, OFF is the control and ON repeats exactly the same foreground, real mouse
+click, native focus verification and Unicode SendInput typing. The fixture detaches
+IME contexts from its top-level HWND and existing EDIT child on their owning thread,
+before input, and verifies that both contexts are null. Unicode input alone does not
+prevent WeType composition. This uses [ImmAssociateContextEx](https://learn.microsoft.com/en-us/windows/win32/api/imm/nf-imm-immassociatecontextex)
+only on the disposable test fixture; the user's IME settings are unchanged. Before typing
+in each phase, the fixture clears its EDIT with bounded WM_SETTEXT and asserts an empty
+readback, without relying on Ctrl+A support. Every focus/typing failure includes expected
+and actual EDIT text (or an explicit read failure). Both phases
+verify text with bounded WM_GETTEXT and log GetForegroundWindow/owner PID,
+GetGUIThreadInfo active/focus HWNDs for the fixture and panel threads, and a fresh
+`window.activation` product log containing the actual WPF `IsActive` value.
+The product log runs after message processing; it does not infer IsActive from
+the foreground HWND or change activation handling. Both phases run even if the
+OFF control fails. OFF-pass/ON-fail is reported as a product regression; both-fail
+identifies an unproven harness/foreground path. The inactive pixel checks remain.
+
+Snapshot manifests retry three atomic writes with 25/50 ms delays, then try a
+direct write. A failure of both paths is collected without interrupting the
+image loop or cleanup. Manifest errors are reported only after rendering, with
+the full final inventory on stderr if the final file is still locked. Rendering
+still has the original 90-second overall deadline.
+
+Independent cleanup accepts `--exit` code 2 (no instance) when the tracked process
+has already exited, including when the worker already shut it down successfully.
+Both the scenario supervisor and script orphan sweep judge shutdown by the tracked
+process lifetime. Exit-client timeouts and any required last-resort kill still fail.
+
+Dark settings renders also run a small text-contrast guard after writing the PNG.
+It walks the active page's visible TextBlocks and fails the worker below 3:1,
+which records the image/error in `snapshots.json` and makes the batch exit nonzero.
+Plain page text uses NavigationView's page background composited over the theme
+background; template labels/checkmarks use their painted control background so
+intentional black-on-accent text is not mistaken for black-on-dark-page text.
+Errors include the text, foreground/background colours and computed ratio.

@@ -9,6 +9,8 @@
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../QuickLaunch.Snapshots/ManifestWriter.cs" Link="ManifestWriter.cs" />
+    <Compile Include="../QuickLaunch.Snapshots/SettingsTextContrast.cs" Link="SettingsTextContrast.cs" />
     <None Include="../QuickLaunch/Assets/QuickLaunch.ico" Link="Assets/QuickLaunch.ico" CopyToOutputDirectory="PreserveNewest" />
     <EmbeddedResource Include="../QuickLaunch/**/*.xaml" Exclude="../QuickLaunch/bin/**;../QuickLaunch/obj/**" />
     <EmbeddedResource Include="../QuickLaunch/**/*.cs" Exclude="../QuickLaunch/bin/**;../QuickLaunch/obj/**" />

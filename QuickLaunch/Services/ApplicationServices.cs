@@ -29,7 +29,11 @@ internal static class ApplicationServices
         services.AddIconServices(performanceRun || launchLog is not null ? Path.Combine(paths.LogDirectory, "icons") : paths.IconDirectory);
         services.AddSingleton<ISettingsState>(sp => sp.GetRequiredService<MainViewModel>());
         services.AddSingleton<ISettingsActions>(sp => new SettingsActions(sp.GetRequiredService<LauncherWindow>().ResetWindowSize,
-            hotkeyChanged ?? (() => { }), exit ?? (() => Task.CompletedTask)));
+            hotkeyChanged ?? (() => { }), exit ?? (() => Task.CompletedTask), () =>
+            {
+                Directory.CreateDirectory(paths.LogDirectory);
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(paths.LogDirectory) { UseShellExecute = true });
+            }));
         services.AddDialogs();
         services.AddSingleton<Func<LaunchItem, bool, Task<LaunchResult>>>(_ => launchLog is null
             ? LaunchService.StartAsync : new E2eLaunchRecorder(launchLog).RecordAsync);

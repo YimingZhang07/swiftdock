@@ -111,7 +111,15 @@ internal static class ImageRenderer
             switch (image.Kind)
             {
                 case "launcher": target = launcherWindow; break;
-                case "settings": target = Open(scope.ServiceProvider.GetRequiredService<SettingsWindow>()); break;
+                case "settings-general":
+                case "settings-appearance":
+                case "settings-panel":
+                case "settings-about":
+                    var settings = (SettingsWindow)Open(scope.ServiceProvider.GetRequiredService<SettingsWindow>());
+                    await Dispatcher.Yield(DispatcherPriority.Loaded);
+                    settings.NavigateTo(image.Kind["settings-".Length..]);
+                    target = settings;
+                    break;
                 case "name-dialog":
                     scope.ServiceProvider.GetRequiredService<NameDialogViewModel>().Initialize("新建分组", "新分组");
                     target = Open(scope.ServiceProvider.GetRequiredService<NameDialog>());
@@ -167,6 +175,15 @@ internal static class ImageRenderer
             await Task.Delay(220);
             Console.Error.WriteLine("Phase: capture");
             Capture(target, Path.Combine(output, image.File), overflow);
+            if (image.Theme == "dark" && target is SettingsWindow)
+            {
+                var page = LauncherWindow.Descendants<SettingsPage>(target).Single();
+                var errors = SettingsTextContrast.FindFailures(page);
+                if (errors.Count > 0)
+                    // The coordinator records the worker error against this PNG in
+                    // snapshots.json and exits nonzero after the rest of the matrix.
+                    throw new InvalidOperationException("Dark settings text contrast failed: " + string.Join("; ", errors));
+            }
         }
         finally
         {

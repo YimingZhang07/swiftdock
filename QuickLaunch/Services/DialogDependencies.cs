@@ -13,6 +13,8 @@ public interface ISettingsState : INotifyPropertyChanged
     string Placement { get; }
     string Theme { get; }
     string Backdrop { get; }
+    int BackdropOpacity { get; }
+    bool KeepBackdropWhenInactive { get; }
     string Accent { get; }
     bool AutoFetchWebsiteIcons { get; }
     void ApplySettings(HotkeyConfig hotkey);
@@ -20,6 +22,8 @@ public interface ISettingsState : INotifyPropertyChanged
     void SetPlacement(string placement);
     void SetTheme(string theme);
     void SetBackdrop(string backdrop);
+    void SetBackdropOpacity(int opacity);
+    void SetKeepBackdropWhenInactive(bool enabled);
     void SetAccent(string accent);
     void SetAutoFetchWebsiteIcons(bool enabled);
 }
@@ -37,13 +41,15 @@ public interface ISettingsActions
     void ResetWindowSize();
     void HotkeyChanged();
     Task ExitAsync();
+    void OpenLogs();
 }
 
-internal sealed class SettingsActions(Action reset, Action hotkeyChanged, Func<Task> exit) : ISettingsActions
+internal sealed class SettingsActions(Action reset, Action hotkeyChanged, Func<Task> exit, Action? openLogs = null) : ISettingsActions
 {
     public void ResetWindowSize() => reset();
     public void HotkeyChanged() => hotkeyChanged();
     public Task ExitAsync() => exit();
+    public void OpenLogs() => openLogs?.Invoke();
 }
 
 public interface IFilePicker

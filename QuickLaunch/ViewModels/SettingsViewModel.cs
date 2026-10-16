@@ -23,15 +23,20 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     [ObservableProperty] private int _iconSize;
     [ObservableProperty] private string _placement;
     [ObservableProperty] private string _theme, _backdrop, _accent;
+    [ObservableProperty] private int _backdropOpacity;
+    [ObservableProperty] private bool _keepBackdropWhenInactive;
     [ObservableProperty] private bool _autoFetchWebsiteIcons, _startupEnabled;
     [ObservableProperty] private bool _startupAvailable = true;
     [ObservableProperty] private string _status = "";
     [ObservableProperty] private bool _statusError;
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ApplyCommand), nameof(ResetSizeCommand))]
+    [NotifyPropertyChangedFor(nameof(CanEditBackdrop))]
     private bool _canEdit;
 
-    public string DirectoryLabel => $"配置目录：{_state.DirectoryPath}";
+    public string DirectoryLabel => _state.DirectoryPath;
+    public string AppVersion => $"QuickLaunch {typeof(SettingsViewModel).Assembly.GetName().Version?.ToString(3)}";
+    public bool CanEditBackdrop => CanEdit && Backdrop != "solid" && (_appearance?.HasBackdrop ?? true);
     public IReadOnlyList<string> Keys => ConfigValidation.Keys;
     public string BackdropDescription => _appearance?.BackdropDescription ?? "应用于面板；对话框使用云母背景";
     public string ThemeDescription => _appearance?.HighContrast == true ? "当前使用 Windows 高对比度主题" : "立即应用于面板和对话框";
@@ -43,6 +48,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         _state = state; _startup = startup; _hotkey = hotkey; _actions = actions; _log = log;
         _appearance = appearance;
         _theme = state.Theme; _backdrop = state.Backdrop; _accent = state.Accent;
+        _backdropOpacity = state.BackdropOpacity; _keepBackdropWhenInactive = state.KeepBackdropWhenInactive;
         if (_appearance is not null) _appearance.BackdropChanged += AppearanceChanged;
         _canEdit = state.CanEdit;
         _alt = state.Hotkey.Modifiers.Contains("Alt"); _control = state.Hotkey.Modifiers.Contains("Control");
@@ -64,6 +70,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
             CanEdit = _state.CanEdit;
             IconSize = _state.IconSize; Placement = _state.Placement;
             Theme = _state.Theme; Backdrop = _state.Backdrop; Accent = _state.Accent;
+            BackdropOpacity = _state.BackdropOpacity; KeepBackdropWhenInactive = _state.KeepBackdropWhenInactive;
             AutoFetchWebsiteIcons = _state.AutoFetchWebsiteIcons;
         }
         finally { _syncing = false; }
@@ -72,11 +79,18 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     partial void OnIconSizeChanged(int value) { if (!_syncing && CanEdit) _state.SetIconSize(value); }
     partial void OnPlacementChanged(string value) { if (!_syncing && CanEdit) _state.SetPlacement(value); }
     partial void OnThemeChanged(string value) { if (!_syncing && CanEdit) _state.SetTheme(value); }
-    partial void OnBackdropChanged(string value) { if (!_syncing && CanEdit) _state.SetBackdrop(value); }
+    partial void OnBackdropChanged(string value)
+    {
+        if (!_syncing && CanEdit) _state.SetBackdrop(value);
+        OnPropertyChanged(nameof(CanEditBackdrop));
+    }
+    partial void OnBackdropOpacityChanged(int value) { if (!_syncing && CanEditBackdrop) _state.SetBackdropOpacity(value); }
+    partial void OnKeepBackdropWhenInactiveChanged(bool value) { if (!_syncing && CanEditBackdrop) _state.SetKeepBackdropWhenInactive(value); }
     partial void OnAccentChanged(string value) { if (!_syncing && CanEdit) _state.SetAccent(value); }
     private void AppearanceChanged()
     {
         OnPropertyChanged(nameof(BackdropDescription)); OnPropertyChanged(nameof(ThemeDescription)); OnPropertyChanged(nameof(AccentDescription));
+        OnPropertyChanged(nameof(CanEditBackdrop));
     }
     partial void OnAutoFetchWebsiteIconsChanged(bool value) { if (!_syncing && CanEdit) _state.SetAutoFetchWebsiteIcons(value); }
     partial void OnStartupEnabledChanged(bool value)
@@ -121,6 +135,11 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand] private Task ExitAsync() => _actions.ExitAsync();
+    [RelayCommand] private void OpenLogs()
+    {
+        try { _actions.OpenLogs(); }
+        catch (Exception ex) { ReportError(ex); }
+    }
     private void SetStatus(string message, bool error = false) { Status = message; StatusError = error; }
     private void ReportError(Exception ex)
     {

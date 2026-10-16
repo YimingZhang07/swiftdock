@@ -66,10 +66,10 @@ try {
     $process.Refresh()
     if ($process.ExitCode -ne 0) { throw "Snapshot renderer exited with code $($process.ExitCode); see snapshots.json and snapshots.stderr.log." }
     $report = Get-Content -LiteralPath $manifest -Raw -Encoding utf8 | ConvertFrom-Json
-    if (-not $report.completed -or @($report.rendered).Count -ne 33 -or @($report.failed).Count -ne 0) {
-        throw 'Snapshot renderer did not finish the 33-image matrix; see snapshots.json.'
+    if (-not $report.completed -or @($report.rendered).Count -ne 39 -or @($report.failed).Count -ne 0) {
+        throw 'Snapshot renderer did not finish the 39-image matrix; see snapshots.json.'
     }
-    Write-Output "Rendered 33 snapshots: $output"
+    Write-Output "Rendered 39 snapshots: $output"
 }
 catch {
     $reason = $_.Exception.Message

@@ -37,6 +37,7 @@ public partial class LauncherWindow : Window, IDisposable
     private TaskCompletionSource<double?>? _showCompletion;
     private TaskCompletionSource<double?>? _renderCompletion;
     private bool _warming;
+    private bool _activationLogQueued;
     private CancellationTokenSource? _warmupStop;
     public Task<double?> PendingShow => _showCompletion?.Task ?? Task.FromResult<double?>(null);
     public Task<double?> PendingRender => _renderCompletion?.Task ?? Task.FromResult<double?>(null);
@@ -80,6 +81,7 @@ public partial class LauncherWindow : Window, IDisposable
         if (Launcher.ToastVisible) UpdateToast();
         UpdateMinimumSize();
         ViewModel.PropertyChanged += ViewModelChanged;
+        IsVisibleChanged += (_, _) => UpdateNonClientBackdrop();
         Closed += (_, _) =>
         {
             ViewModel.PropertyChanged -= ViewModelChanged;
@@ -101,6 +103,8 @@ public partial class LauncherWindow : Window, IDisposable
 
     private void ViewModelChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(MainViewModel.BackdropOpacity)) UpdateBackdropTint();
+        if (e.PropertyName == nameof(MainViewModel.KeepBackdropWhenInactive)) UpdateNonClientBackdrop();
         if (e.PropertyName == nameof(MainViewModel.AutoFetchWebsiteIcons))
         {
             Icons.AutoFetchWebsiteIcons = ViewModel.AutoFetchWebsiteIcons;
@@ -176,7 +180,7 @@ public partial class LauncherWindow : Window, IDisposable
         bool material = type != Wpf.Ui.Controls.WindowBackdropType.None && applied;
         if (material)
         {
-            Background = Brushes.Transparent; Root.Background = Brushes.Transparent;
+            Background = Brushes.Transparent;
         }
         else
         {
@@ -186,11 +190,52 @@ public partial class LauncherWindow : Window, IDisposable
         if (HwndSource.FromHwnd(hwnd)?.CompositionTarget is { } target)
             target.BackgroundColor = material ? Colors.Transparent : ((SolidColorBrush)FindResource("ApplicationBackgroundBrush")).Color;
         BackdropMode = material ? requested : "solid";
+        if (material) UpdateBackdropTint();
+        UpdateNonClientBackdrop();
         if (!_warming) _theme?.ReportBackdrop(requested != "solid" && !material);
+    }
+
+    private void UpdateBackdropTint()
+    {
+        if (BackdropMode is not ("acrylic" or "mica")) return;
+        var color = ((SolidColorBrush)FindResource("ApplicationBackgroundBrush")).Color;
+        var tint = new SolidColorBrush(AppearanceOptions.OverlayColor(color, ViewModel.BackdropOpacity));
+        tint.Freeze(); Root.Background = tint;
+    }
+
+    private void UpdateNonClientBackdrop()
+    {
+        // Apply a changed choice even while Settings owns foreground. This paints the
+        // non-client state only; never activate the panel or change its WPF IsActive.
+        if (!IsVisible || _warming) return;
+        nint hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == 0) return;
+        bool active = IsActive || AppearanceOptions.KeepNonClientActive(NativeMethods.WmNcActivate,
+            ViewModel.KeepBackdropWhenInactive, BackdropMode, IsVisible, _warming);
+        NativeMethods.DefWindowProc(hwnd, NativeMethods.WmNcActivate, active ? 1 : 0, 0);
     }
 
     internal nint WindowMessage(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)
     {
+        if (message is 0x0006 or NativeMethods.WmNcActivate && !_activationLogQueued)
+        {
+            _activationLogQueued = true;
+            // Observe WPF's actual state after WindowChrome/native activation processing;
+            // no focus changes or test-only query messages are involved.
+            Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
+            {
+                _activationLogQueued = false;
+                Log.PanelActivation(IsActive, NativeMethods.GetForegroundWindow().ToInt64(),
+                    ViewModel.KeepBackdropWhenInactive, _warming, message);
+            });
+        }
+        if (AppearanceOptions.KeepNonClientActive(message, ViewModel.KeepBackdropWhenInactive, BackdropMode, IsVisible, _warming))
+        {
+            handled = true;
+            nint result = NativeMethods.DefWindowProc(hwnd, message, 1, lParam);
+            // A FALSE request must return TRUE to allow real deactivation to finish.
+            return wParam == 0 ? 1 : result;
+        }
         // Equivalent to SystemThemeWatcher, including transparency/high-contrast setting changes.
         // Keep the hook active even before a silent launcher's first Loaded event.
         if (message is 0x001A or 0x0015 or 0x031A or 0x0320) _theme?.QueueUpdate();

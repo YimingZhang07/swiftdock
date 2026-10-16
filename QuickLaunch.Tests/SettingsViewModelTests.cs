@@ -18,7 +18,7 @@ public sealed class SettingsViewModelTests
         var startup = Startup(_ => null, (_, command) => writes.Add(command));
         using var model = Create(state, startup, hotkey, actions);
         Assert.Equal("当前已注册：Alt+Space", model.Status);
-        Assert.Equal("配置目录：C:\\profile", model.DirectoryLabel);
+        Assert.Equal("C:\\profile", model.DirectoryLabel);
         Assert.Empty(state.Calls); Assert.Empty(writes);
         model.IconSize = 48; model.Placement = "cursor"; model.AutoFetchWebsiteIcons = false;
         Assert.Equal(["size:48", "placement:cursor", "favicons:False"], state.Calls);
@@ -101,16 +101,18 @@ public sealed class SettingsViewModelTests
     private static StartupService Startup(Func<string, string?>? read = null, Action<string, string?>? write = null) =>
         new(@"C:\QuickLaunch\QuickLaunch.exe", @"C:\profile", @"Software\QuickLaunch\Tests", read ?? (_ => null), write ?? ((_, _) => { }));
 
-    private sealed class SettingsState : ISettingsState
+    internal sealed class SettingsState : ISettingsState
     {
         public event PropertyChangedEventHandler? PropertyChanged;
         public bool CanEdit { get; private set; } = true;
-        public string DirectoryPath => @"C:\profile";
+        public string DirectoryPath { get; init; } = @"C:\profile";
         public HotkeyConfig Hotkey { get; private set; } = new();
         public int IconSize { get; private set; } = 40;
         public string Placement { get; private set; } = "lastPosition";
         public string Theme { get; private set; } = "system";
         public string Backdrop { get; private set; } = "acrylic";
+        public int BackdropOpacity { get; private set; }
+        public bool KeepBackdropWhenInactive { get; private set; } = true;
         public string Accent { get; private set; } = "system";
         public bool AutoFetchWebsiteIcons { get; private set; } = true;
         internal List<string> Calls { get; } = [];
@@ -121,10 +123,12 @@ public sealed class SettingsViewModelTests
         public void SetPlacement(string placement) { Placement = placement; Calls.Add($"placement:{placement}"); Changed(nameof(Placement)); }
         public void SetTheme(string theme) { Theme = theme; Calls.Add($"theme:{theme}"); Changed(nameof(Theme)); }
         public void SetBackdrop(string backdrop) { Backdrop = backdrop; Calls.Add($"backdrop:{backdrop}"); Changed(nameof(Backdrop)); }
+        public void SetBackdropOpacity(int value) { BackdropOpacity = value; Calls.Add($"opacity:{value}"); Changed(nameof(BackdropOpacity)); }
+        public void SetKeepBackdropWhenInactive(bool value) { KeepBackdropWhenInactive = value; Calls.Add($"keep:{value}"); Changed(nameof(KeepBackdropWhenInactive)); }
         public void SetAccent(string accent) { Accent = accent; Calls.Add($"accent:{accent}"); Changed(nameof(Accent)); }
         public void SetAutoFetchWebsiteIcons(bool enabled) { AutoFetchWebsiteIcons = enabled; Calls.Add($"favicons:{enabled}"); Changed(nameof(AutoFetchWebsiteIcons)); }
     }
-    private sealed class Hotkey : IHotkeyService
+    internal sealed class Hotkey : IHotkeyService
     {
         public bool Registered { get; set; } = true;
         public int Error => 1409;
@@ -133,11 +137,13 @@ public sealed class SettingsViewModelTests
         internal int Attempts { get; private set; }
         public bool TryChange(HotkeyConfig candidate) { Attempts++; if (Succeeds) Current = candidate; return Succeeds; }
     }
-    private sealed class Actions : ISettingsActions
+    internal sealed class Actions : ISettingsActions
     {
         internal int Resets { get; private set; }
         internal int Exits { get; private set; }
         internal int HotkeyChanges { get; private set; }
+        internal int LogOpens { get; private set; }
+        public void OpenLogs() => LogOpens++;
         public void ResetWindowSize() => Resets++;
         public void HotkeyChanged() => HotkeyChanges++;
         public Task ExitAsync() { Exits++; return Task.CompletedTask; }

@@ -35,10 +35,23 @@ internal sealed partial class LauncherSession
 
     private void PressKey(VirtualKeyShort key, string reason = "scenario")
     {
+        CheckAbort();
         // Record ownership before SendInput: a partially failed call still needs cleanup.
         lock (InputLock) { UsedKeys.Add(key); HeldKeys.Add(key); }
+        SaveInputOwnership();
         RecordInput($"SendInput key down {key} (0x{(int)key:X2}); {reason}");
         Keyboard.Press(key);
+    }
+
+    private void TypeOwnedText(string text)
+    {
+        CheckAbort();
+        var packet = (VirtualKeyShort)0xE7; // VK_PACKET is used by Unicode SendInput.
+        lock (InputLock) { UsedKeys.Add(packet); HeldKeys.Add(packet); }
+        SaveInputOwnership();
+        RecordInput("Unicode SendInput to the verified test-owned EDIT");
+        try { Keyboard.Type(text); }
+        finally { ReleaseKey(packet); }
     }
 
     private void ReleaseKey(VirtualKeyShort key, string reason = "scenario finally")
@@ -46,11 +59,14 @@ internal sealed partial class LauncherSession
         RecordInput($"SendInput key up {key} (0x{(int)key:X2}); {reason}");
         Keyboard.Release(key);
         lock (InputLock) HeldKeys.Remove(key);
+        SaveInputOwnership();
     }
 
     private void PressMouse(MouseButton button)
     {
+        CheckAbort();
         lock (InputLock) { UsedButtons.Add(button); HeldButtons.Add(button); }
+        SaveInputOwnership();
         RecordInput($"SendInput mouse down {button} at {Mouse.Position}");
         Mouse.Down(button);
     }
@@ -60,10 +76,12 @@ internal sealed partial class LauncherSession
         RecordInput($"SendInput mouse up {button} at {Mouse.Position}; {reason}");
         Mouse.Up(button);
         lock (InputLock) HeldButtons.Remove(button);
+        SaveInputOwnership();
     }
 
     private void MoveMouse(Point point, string reason = "scenario")
     {
+        CheckAbort();
         RecordInput($"Mouse.Position {point}; {reason}");
         Mouse.Position = point;
     }
@@ -99,7 +117,8 @@ internal sealed partial class LauncherSession
 
         // SendInput returning is not a delivery acknowledgement. Let the hardware input
         // queue advance, wait for the old app before --exit, then require stable key-up state.
-        Wait.UntilInputIsProcessed();
+        // FlaUI Wait.UntilInputIsProcessed can wait on other desktop input queues.
+        // Use bounded input-idle and quiet-state checks instead.
         if (_process is { HasExited: false })
             Assert.True(_process.WaitForInputIdle(1000), $"QuickLaunch did not become input-idle at {phase}.");
         var quiet = Stopwatch.StartNew();

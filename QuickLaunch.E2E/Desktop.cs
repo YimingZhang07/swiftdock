@@ -74,7 +74,53 @@ internal static class Desktop
     [DllImport("user32.dll")] private static extern nint GetShellWindow();
     [DllImport("user32.dll")] private static extern uint GetDpiForSystem();
     [StructLayout(LayoutKind.Sequential)]
-    private struct NativeRect { public int Left, Top, Right, Bottom; }
+    internal struct NativeRect
+    {
+        public int Left, Top, Right, Bottom;
+        public int Width => Right - Left;
+        public int Height => Bottom - Top;
+        public Rectangle Rectangle => Rectangle.FromLTRB(Left, Top, Right, Bottom);
+        public override string ToString() => Rectangle.ToString();
+    }
+    [DllImport("user32.dll")] internal static extern bool GetWindowRect(nint window, out NativeRect rectangle);
+    [DllImport("user32.dll")] internal static extern bool IsWindowVisible(nint window);
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct GuiThreadInfo
+    {
+        public uint Size, Flags;
+        public nint Active, Focus, Capture, MenuOwner, MoveSize, Caret;
+        public NativeRect CaretRect;
+    }
+    [DllImport("user32.dll", SetLastError = true)] private static extern bool GetGUIThreadInfo(uint thread, ref GuiThreadInfo info);
+    internal static GuiThreadInfo GuiInfo(uint thread = 0)
+    {
+        var info = new GuiThreadInfo { Size = (uint)Marshal.SizeOf<GuiThreadInfo>() };
+        if (!GetGUIThreadInfo(thread, ref info)) throw new Win32Exception(Marshal.GetLastWin32Error());
+        return info;
+    }
+    internal static string FocusDescription(nint window = 0)
+    {
+        nint foreground = GetForegroundWindow();
+        uint thread = GetWindowThreadProcessId(window == 0 ? foreground : window, out uint process);
+        GetWindowThreadProcessId(foreground, out uint foregroundPid);
+        try
+        {
+            var info = GuiInfo(thread);
+            return $"foreground=0x{foreground:X} foregroundPID={foregroundPid}; thread={thread} PID={process} "
+                + $"GetGUIThreadInfo.active=0x{info.Active:X} focus=0x{info.Focus:X} capture=0x{info.Capture:X}";
+        }
+        catch (Win32Exception error) { return $"foreground=0x{foreground:X} PID={foregroundPid}; GetGUIThreadInfo: {error.Message}"; }
+    }
+    [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern nint SendTextMessageTimeout(nint window, uint message, nint length, StringBuilder text,
+        uint flags, uint timeout, out nuint result);
+    internal static string ReadEditText(nint window)
+    {
+        var text = new StringBuilder(256);
+        if (SendTextMessageTimeout(window, 0x000D, text.Capacity, text, 0x0002, 500, out _) == 0)
+            throw new TimeoutException("Test-owned EDIT WM_GETTEXT failed or exceeded 500 ms.");
+        return text.ToString();
+    }
     [DllImport("user32.dll")] private static extern bool SystemParametersInfo(uint action, uint parameter, out NativeRect value, uint flags);
     [DllImport("user32.dll")] internal static extern uint GetDpiForWindow(nint window);
     [DllImport("dwmapi.dll")]

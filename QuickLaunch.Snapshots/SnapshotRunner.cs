@@ -9,6 +9,7 @@ internal static class SnapshotRunner
     internal const int ImageTimeoutSeconds = 6;
     internal const string CaptureDescription = "96-DPI WPF rendering, composited on ApplicationBackgroundBrush; no DWM material, native border or shadow.";
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true };
+    private static readonly ManifestWriter Manifest = new();
 
     [STAThread]
     private static int Main(string[] args)
@@ -63,7 +64,13 @@ internal static class SnapshotRunner
             SaveReport(output, report);
         }
         Console.WriteLine($"Rendered {report.Rendered.Count}; failed {report.Failed.Count}. See snapshots.json.");
-        return report.Failed.Count == 0 ? 0 : 1;
+        if (report.ManifestErrors.Count > 0)
+        {
+            // Report only after every image/cleanup has been attempted. Preserve the
+            // final inventory on stderr even if snapshots.json is still locked.
+            Console.Error.WriteLine("Manifest write errors (rendering continued): " + JsonSerializer.Serialize(report, Json));
+        }
+        return report.Failed.Count == 0 && report.ManifestErrors.Count == 0 ? 0 : 1;
     }
 
     private static void RenderInWorker(string output, string file)
@@ -98,22 +105,22 @@ internal static class SnapshotRunner
     {
         report.UpdatedAt = DateTimeOffset.Now;
         string path = Path.Combine(output, "snapshots.json");
-        File.WriteAllText(path + ".tmp", JsonSerializer.Serialize(report, Json));
-        File.Move(path + ".tmp", path, overwrite: true);
+        string? error = Manifest.TryWrite(path, JsonSerializer.Serialize(report, Json));
+        if (error is not null) report.ManifestErrors.Add($"{report.UpdatedAt:O}, image={report.Current ?? "final"}: {error}");
     }
 
     internal static List<SnapshotImage> CreatePlan()
     {
         List<SnapshotImage> images = [];
         foreach (string theme in new[] { "dark", "light" })
-        foreach (string kind in new[] { "launcher", "settings", "name-dialog", "add-dialog", "edit-dialog", "icon-picker", "item-menu", "delete-confirm" })
+        foreach (string kind in new[] { "launcher", "settings-general", "settings-appearance", "settings-panel", "settings-about", "name-dialog", "add-dialog", "edit-dialog", "icon-picker", "item-menu", "delete-confirm" })
             images.Add(new(kind + (theme == "dark" ? "" : "-light") + ".png", kind, theme));
         foreach (string theme in new[] { "dark", "light" })
         foreach (string accent in new[] { "blue", "purple" })
         foreach (string backdrop in new[] { "acrylic", "mica", "solid" })
         {
             images.Add(new($"appearance-{theme}-{accent}-{backdrop}.png", "launcher", theme, accent, backdrop, Selected: true));
-            if (backdrop == "solid") images.Add(new($"appearance-settings-{theme}-{accent}.png", "settings", theme, accent));
+            if (backdrop == "solid") images.Add(new($"appearance-settings-{theme}-{accent}.png", "settings-appearance", theme, accent));
         }
         images.Add(new("panel-polish.png", "launcher", "dark", Selected: true));
         return images;
@@ -124,6 +131,7 @@ internal static class SnapshotRunner
         public string[] Expected { get; init; } = [];
         public List<string> Rendered { get; } = [];
         public List<SnapshotFailure> Failed { get; } = [];
+        public List<string> ManifestErrors { get; } = [];
         public string? Current { get; set; }
         public bool Completed { get; set; }
         public bool TimedOut { get; set; }

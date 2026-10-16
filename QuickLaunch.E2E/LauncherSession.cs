@@ -22,7 +22,8 @@ internal sealed partial class LauncherSession
     public const string BravoId = "00000000000000000000000000000012";
     private readonly ITestOutputHelper _output;
     private readonly string _repo = FindRepo();
-    private readonly string _temp = Path.Combine(Path.GetTempPath(), "QuickLaunch.E2E", Guid.NewGuid().ToString("N"));
+    private readonly string _temp = Environment.GetEnvironmentVariable("QUICKLAUNCH_E2E_PROFILE")
+        ?? Path.Combine(Path.GetTempPath(), "QuickLaunch.E2E", Guid.NewGuid().ToString("N"));
     private readonly string _test;
     private readonly List<RecordedLaunch> _expectedLaunches = [];
     private UIA3Automation _automation = null!;
@@ -42,9 +43,17 @@ internal sealed partial class LauncherSession
 
     public static void Run(ITestOutputHelper output, Action<LauncherSession> scenario,
         bool websiteIcons = false, int iconSize = 32, int windowWidth = 620,
-        string? theme = null, string? backdrop = null, string? accent = null, bool silentStart = false, [CallerMemberName] string test = "")
+        string? theme = null, string? backdrop = null, string? accent = null, bool silentStart = false,
+        [CallerMemberName] string test = "", [CallerMemberName] string method = "")
     {
+        string? worker = Environment.GetEnvironmentVariable("QUICKLAUNCH_E2E_SCENARIO");
+        if (worker is not null && worker != test) return; // Other rows of the selected theory do no work.
         var session = new LauncherSession(output, test);
+        if (worker is null) { session.RunIsolated(method); return; }
+        Directory.CreateDirectory(session._temp);
+        File.WriteAllText(Path.Combine(session._temp, "worker.pid"), Environment.ProcessId.ToString());
+        using (var current = Process.GetCurrentProcess())
+            File.WriteAllText(Path.Combine(session._temp, "worker.started"), current.StartTime.ToUniversalTime().Ticks.ToString());
         var failures = new List<Exception>();
         // UIA bounds and SendInput use physical pixels, including on mixed-DPI desktops.
         nint previousDpi = Desktop.SetThreadDpiAwarenessContext(-4); // PerMonitorV2, this test thread only
@@ -67,7 +76,7 @@ internal sealed partial class LauncherSession
             session._automation?.Dispose();
             session._process?.Dispose();
             if (previousDpi != 0) Desktop.SetThreadDpiAwarenessContext(previousDpi);
-            if (failures.Count == 0 && Directory.Exists(session._temp)) Directory.Delete(session._temp, recursive: true);
+            // The supervisor owns profile removal, after its independent cleanup.
         }
         if (failures.Count > 0) throw new AggregateException(failures);
     }
@@ -83,6 +92,8 @@ internal sealed partial class LauncherSession
             "--e2e-launch-log", LaunchFile];
         if (silentStart) arguments.Add("--silent");
         _process = StartProcess(arguments.ToArray());
+        File.WriteAllText(Path.Combine(_temp, "instance.json"), JsonSerializer.Serialize(new
+            { Pid = _process.Id, Started = _process.StartTime.ToUniversalTime().Ticks }));
         if (silentStart)
         {
             Eventually(WarmupCompleted, "silent startup to finish prewarming", 8000);
@@ -166,6 +177,7 @@ internal sealed partial class LauncherSession
 
     private Process StartProcess(params string[] arguments)
     {
+        if (!arguments.Contains("--exit")) CheckAbort();
         var info = new ProcessStartInfo(Executable) { UseShellExecute = false, WorkingDirectory = _repo };
         foreach (string argument in arguments) info.ArgumentList.Add(argument);
         // Direct dotnet test also works when only the repo-local Desktop Runtime is installed.
@@ -174,23 +186,14 @@ internal sealed partial class LauncherSession
         return Process.Start(info) ?? throw new XunitException("Could not start QuickLaunch.exe.");
     }
 
-    private AutomationElement[] AppRoots() => _automation.GetDesktop().FindAllChildren(cf => cf.ByProcessId(_process!.Id));
+    private AutomationElement[] AppRoots() => Desktop.ProcessWindowHandles(_process!.Id)
+        .Select(hwnd => _automation.FromHandle(hwnd)).Where(element => element is not null).ToArray();
 
     private AutomationElement[] AppWindows(AutomationElement[]? roots = null)
     {
         var scopes = (roots ?? AppRoots()).ToList();
-        // Supplement the UIA roots with every process HWND: owned windows need not be under
-        // the launcher's UIA root. FromHandle still reads state through the real UIA provider.
-        foreach (nint handle in Desktop.ProcessWindowHandles(_process!.Id))
-        {
-            try
-            {
-                var window = _automation.FromHandle(handle);
-                if (window is not null) scopes.Add(window);
-            }
-            catch (Exception ex) when (ex is ElementNotAvailableException or COMException)
-            { Diagnostic($"Window HWND 0x{handle:X} became unavailable during discovery: {ex.Message}"); }
-        }
+        // Native enumeration includes owned top-level windows without asking UIA to
+        // traverse unrelated desktop providers. FromHandle still uses the real UIA provider.
         var windows = new List<AutomationElement>();
         foreach (var root in scopes.Distinct())
         {
@@ -321,6 +324,7 @@ internal sealed partial class LauncherSession
 
     public void Foreground(Window? window = null)
     {
+        CheckAbort();
         Window? target = null;
         Eventually(() => IsVisible(target = window ?? FindVisibleWindow("QuickLaunch")), "a visible window before sending input");
         if (window is null) Panel = target!;
@@ -333,6 +337,7 @@ internal sealed partial class LauncherSession
         bool pulsedAlt = false;
         Eventually(() =>
         {
+            CheckAbort();
             if (Desktop.GetForegroundWindow() == handle) return true;
             if (retry.ElapsedMilliseconds < nextAttempt) return false;
             nextAttempt = retry.ElapsedMilliseconds + 200;
@@ -340,7 +345,7 @@ internal sealed partial class LauncherSession
             if (!IsVisible(target)) return false;
             _targetWindow = target;
             if (window is null) Panel = target;
-            if (attempts++ == 0) target.SetForeground();
+            if (attempts++ == 0) Desktop.SetForegroundWindow(handle);
             else
             {
                 // Windows can deny startup activation. A standalone Alt press releases
@@ -353,7 +358,9 @@ internal sealed partial class LauncherSession
                     pulsedAlt = true;
                     Desktop.SetForegroundWindow(handle);
                 }
-                if (Desktop.GetForegroundWindow() != handle) target.Focus();
+                // No UIA SetFocus/AttachThreadInput fallback: a blocked provider or
+                // attached input queue must not take the harness with it.
+                if (Desktop.GetForegroundWindow() != handle) Desktop.SetForegroundWindow(handle);
             }
             return Desktop.GetForegroundWindow() == handle;
         }, $"foreground HWND {handle} ({name}); refusing to type into another application", 3000);

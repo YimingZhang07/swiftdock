@@ -36,6 +36,10 @@ public sealed record AppConfig
     public string? Theme { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Backdrop { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int BackdropOpacity { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? KeepBackdropWhenInactive { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Accent { get; init; }
     // Null is the default (on); only an explicit opt-out is written.

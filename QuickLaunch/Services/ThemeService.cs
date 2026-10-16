@@ -25,6 +25,8 @@ public sealed class ThemeService : IDisposable
     public event Action? Changed;
     public event Action? BackdropChanged;
     public string Backdrop => _state?.Backdrop ?? "acrylic";
+    public bool HasBackdrop => !_backdropFailed && AppearanceOptions.EffectiveBackdrop(Backdrop,
+        AppearanceOptions.IsSupported(AppearanceOptions.BackdropType(Backdrop)), TransparencyEnabled, HighContrast) != WindowBackdropType.None;
     public string BackdropDescription => AppearanceOptions.DescribeBackdrop(Backdrop,
         AppearanceOptions.IsSupported(AppearanceOptions.BackdropType(Backdrop)), TransparencyEnabled, HighContrast, _backdropFailed);
 

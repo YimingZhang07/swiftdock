@@ -20,6 +20,11 @@ public static class AppearanceOptions
     public static string? NormalizeTheme(string? value) => value is "light" or "dark" ? value : null;
     public static string? NormalizeBackdrop(string? value) => value is "mica" or "solid" ? value : null;
     public static string? NormalizeAccent(string? value) => Accents.Any(preset => preset.Value == value) ? value : null;
+    internal static Color OverlayColor(Color background, int opacity) => Color.FromArgb(
+        (byte)Math.Round(Math.Clamp(opacity, 0, 100) * 255.0 / 100, MidpointRounding.AwayFromZero), background.R, background.G, background.B);
+    // Only non-client painting is overridden. WM_ACTIVATE/WM_SETFOCUS still reach WPF.
+    internal static bool KeepNonClientActive(int message, bool enabled, string effectiveBackdrop, bool visible, bool warming) =>
+        message == Interop.NativeMethods.WmNcActivate && enabled && effectiveBackdrop is "acrylic" or "mica" && visible && !warming;
     internal static WindowBackdropType BackdropType(string value) => value switch
     {
         "solid" => WindowBackdropType.None, "mica" => WindowBackdropType.Mica, _ => WindowBackdropType.Acrylic

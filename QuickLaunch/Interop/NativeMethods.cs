@@ -41,6 +41,9 @@ internal static partial class NativeMethods
     internal const int WmChangeUiState = 0x0127, WmUpdateUiState = 0x0128;
     internal const int WmEnterSizeMove = 0x0231, WmExitSizeMove = 0x0232, WmSizing = 0x0214;
     internal const int WmNcHitTest = 0x0084;
+    internal const int WmNcActivate = 0x0086;
+    [LibraryImport("user32.dll", EntryPoint = "DefWindowProcW")]
+    internal static partial nint DefWindowProc(nint hwnd, int message, nint wParam, nint lParam);
     internal const uint ModAlt = 0x0001, ModNoRepeat = 0x4000;
 
     [StructLayout(LayoutKind.Sequential)]

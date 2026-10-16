@@ -75,6 +75,8 @@ public static class ConfigValidation
         return config with { HideOnDeactivate = false, AutoFetchWebsiteIcons = config.AutoFetchWebsiteIcons == false ? false : null,
             Theme = AppearanceOptions.NormalizeTheme(config.Theme), Backdrop = AppearanceOptions.NormalizeBackdrop(config.Backdrop),
             Accent = AppearanceOptions.NormalizeAccent(config.Accent),
+            BackdropOpacity = Math.Clamp(config.BackdropOpacity, 0, 100),
+            KeepBackdropWhenInactive = config.KeepBackdropWhenInactive == false ? false : null,
             WindowWidth = sized ? config.WindowWidth : null,
             WindowLeft = positioned ? config.WindowLeft : null, WindowTop = positioned ? config.WindowTop : null,
             Placement = config.Placement == "cursor" ? "cursor" : null,

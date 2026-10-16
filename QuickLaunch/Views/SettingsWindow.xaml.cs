@@ -1,5 +1,4 @@
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Input;
 using QuickLaunch.ViewModels;
 
@@ -12,16 +11,28 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
     {
         ViewModel = viewModel;
         InitializeComponent(); DataContext = viewModel;
+        SettingsNavigation.SetServiceProvider(new PageProvider(viewModel));
+        Loaded += (_, _) => { if (SettingsNavigation.SelectedItem is null) NavigateTo("general"); };
         Closed += (_, _) => viewModel.Dispose();
         PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) { Close(); e.Handled = true; } };
     }
-    private void SegmentKeyDown(object sender, KeyEventArgs e)
+    public void NavigateTo(string page) => SettingsNavigation.Navigate(page);
+
+    private sealed class PageProvider(SettingsViewModel viewModel) : IServiceProvider
     {
-        if (!ViewModel.CanEdit || e.OriginalSource is not RadioButton current || e.Key is not (Key.Left or Key.Right or Key.Up or Key.Down)) return;
-        var buttons = ((StackPanel)sender).Children.OfType<RadioButton>().ToArray();
-        int step = e.Key is Key.Left or Key.Up ? -1 : 1;
-        var next = buttons[(Array.IndexOf(buttons, current) + step + buttons.Length) % buttons.Length];
-        next.SetCurrentValue(RadioButton.IsCheckedProperty, true); next.Focus(); e.Handled = true;
+        private readonly Dictionary<Type, SettingsPage> _pages = [];
+        public object? GetService(Type type)
+        {
+            if (_pages.TryGetValue(type, out var cached)) return cached;
+            SettingsPage? page = type == typeof(SettingsGeneralPage) ? new SettingsGeneralPage()
+                : type == typeof(SettingsAppearancePage) ? new SettingsAppearancePage()
+                : type == typeof(SettingsPanelPage) ? new SettingsPanelPage()
+                : type == typeof(SettingsAboutPage) ? new SettingsAboutPage() : null;
+            if (page is null) return null;
+            page.DataContext = viewModel;
+            _pages.Add(type, page);
+            return page;
+        }
     }
     private void CloseClick(object sender, RoutedEventArgs e) => Close();
 }

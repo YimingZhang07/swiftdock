@@ -31,6 +31,8 @@ public sealed class MainViewModel : ObservableObject, ISettingsState, IDisposabl
     public int IconSize => _settings.IconSize;
     public string Theme => _settings.Theme ?? "system";
     public string Backdrop => _settings.Backdrop ?? "acrylic";
+    public int BackdropOpacity => _settings.BackdropOpacity;
+    public bool KeepBackdropWhenInactive => _settings.KeepBackdropWhenInactive ?? true;
     public string Accent => _settings.Accent ?? "system";
     public bool AutoFetchWebsiteIcons => _settings.AutoFetchWebsiteIcons ?? true;
     public double CellSize => Math.Max(84, IconSize + 52);
@@ -145,6 +147,21 @@ public sealed class MainViewModel : ObservableObject, ISettingsState, IDisposabl
         if (!CanEdit || _settings.Accent == value) return;
         _settings = _settings with { Accent = value };
         OnPropertyChanged(nameof(Accent)); Changed();
+    }
+    public void SetBackdropOpacity(int opacity)
+    {
+        _owner.VerifyAccess();
+        int value = Math.Clamp(opacity, 0, 100);
+        if (!CanEdit || BackdropOpacity == value) return;
+        _settings = _settings with { BackdropOpacity = value };
+        OnPropertyChanged(nameof(BackdropOpacity)); Changed();
+    }
+    public void SetKeepBackdropWhenInactive(bool enabled)
+    {
+        _owner.VerifyAccess();
+        if (!CanEdit || KeepBackdropWhenInactive == enabled) return;
+        _settings = _settings with { KeepBackdropWhenInactive = enabled ? null : false };
+        OnPropertyChanged(nameof(KeepBackdropWhenInactive)); Changed();
     }
     public void SetWindowSize(Size? size)
     {
