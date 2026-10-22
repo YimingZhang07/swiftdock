@@ -44,15 +44,13 @@ There is **no telemetry**. Website icons are fetched only for websites you add a
 
 Config and its backup live in `%APPDATA%\Swiftdock`; icon caches and diagnostic logs live in `%LOCALAPPDATA%\Swiftdock`. Portable mode keeps everything in `Data\`. The tray menu can open the config folder. Logs remain on your computer; see [logging](docs/LOGGING.md) before sharing them.
 
-## Upgrading from QuickLaunch
+## Upgrading
 
-The installer retains the same product identity, requests a graceful exit, installs into the new Swiftdock directory and removes the previous executable, uninstaller and QuickLaunch shortcuts. Installed apps has one entry. If the app cannot exit, close it from its tray menu and retry.
-
-On the first normal startup, if the new config is absent, Swiftdock **copies** `config.json` and its optional backup from `%APPDATA%\QuickLaunch`. The old files stay intact; an existing Swiftdock config is never replaced. Matching default-profile login startup entries are updated. Icons and logs regenerate. Explicit `--config-dir` profiles and portable copies are not migrated. For portable upgrades, exit the app and copy your existing `Data\` beside the new executable; disable login startup before moving the folder and enable it again afterwards.
+Run the new installer. It asks the running app to exit, upgrades it in place and keeps your settings. If the app cannot exit, close it from its tray menu and retry. For the portable edition, exit the app and replace `Swiftdock.exe`, keeping your `Data\` folder.
 
 ## Uninstall
 
-Use Windows **Installed apps**. Uninstall asks whether to delete Swiftdock data and any legacy QuickLaunch data; **No** is the default. Silent uninstall keeps data. Portable users should disable login startup, exit the app, then delete its folder.
+Use Windows **Installed apps**. Uninstall asks whether to delete your Swiftdock data; **No** is the default. Silent uninstall keeps data. Portable users should disable login startup, exit the app, then delete its folder.
 
 ## Build and licence
 
