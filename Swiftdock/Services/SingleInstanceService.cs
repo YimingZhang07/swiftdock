@@ -34,7 +34,7 @@ public sealed class SingleInstanceService : IAsyncDisposable
     {
         using var user = WindowsIdentity.GetCurrent();
         using var process = Process.GetCurrentProcess();
-        string sid = user.User?.Value ?? throw new InvalidOperationException("无法确定当前用户 SID。");
+        string sid = user.User?.Value ?? throw L.Exception<InvalidOperationException>(L.Text("CouldNotDetermineTheCurrentUserSid"));
         string canonical = Path.TrimEndingDirectorySeparator(Path.GetFullPath(configDirectory)).ToUpperInvariant();
         string hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)))[..24];
         return $"{sid}_{process.SessionId}_{hash}";
@@ -106,7 +106,7 @@ public sealed class SingleInstanceService : IAsyncDisposable
         var pidBytes = new byte[4];
         await pipe.ReadExactlyAsync(pidBytes, cancellation);
         int serverPid = BitConverter.ToInt32(pidBytes);
-        if (serverPid <= 0) throw new IOException("已有实例返回无效 PID。");
+        if (serverPid <= 0) throw L.Exception<IOException>(L.Text("TheExistingInstanceReturnedAnInvalidPid"));
         if (command == 1) NativeMethods.AllowSetForegroundWindow((uint)serverPid);
         await pipe.WriteAsync(new byte[] { command }, cancellation);
         var ack = new byte[1];
@@ -123,7 +123,7 @@ public sealed class SingleInstanceService : IAsyncDisposable
             try
             {
                 if (await SendRequestAsync(_pipeName, 1, deadline.Token)) return;
-                throw new IOException("已有实例未确认显示请求。");
+                throw L.Exception<IOException>(L.Text("TheExistingInstanceDidNotAcknowledgeTheShowRequest"));
             }
             catch (Exception ex) when (ex is IOException or TimeoutException)
             {

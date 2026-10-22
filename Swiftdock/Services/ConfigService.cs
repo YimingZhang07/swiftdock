@@ -35,7 +35,7 @@ public sealed class ConfigService : IAsyncDisposable
     public string FilePath => Path.Combine(DirectoryPath, "config.json");
     public AppConfig Initial { get; private set; } = AppConfig.CreateDefault();
     public bool IsReadOnly { get; private set; }
-    public string? Notice { get; private set; }
+    public UiText? Notice { get; private set; }
     public long SavedRevision => Interlocked.Read(ref _savedRevision);
 
     private ConfigService(string directory, bool readOnly, IConfigWriter writer)
@@ -51,7 +51,7 @@ public sealed class ConfigService : IAsyncDisposable
                 _lease = new(Path.Combine(DirectoryPath, "config.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            { MakeReadOnly($"配置目录被其他会话占用或不可写，当前只读：{ex.Message}"); }
+            { MakeReadOnly(L.Text("TheConfigurationFolderIsInUseOrNotWritableRunningReadOnly0", L.Error(ex))); }
         }
         Load();
         _worker = Task.Run(WriteLoopAsync);
@@ -60,7 +60,7 @@ public sealed class ConfigService : IAsyncDisposable
     public static ConfigService Open(string directory, bool readOnly = false, IConfigWriter? writer = null)
         => new(directory, readOnly, writer ?? new AtomicConfigWriter());
 
-    private void MakeReadOnly(string message)
+    private void MakeReadOnly(UiText message)
     {
         IsReadOnly = true;
         Notice = message;
@@ -71,7 +71,7 @@ public sealed class ConfigService : IAsyncDisposable
     private static AppConfig Read(string path)
     {
         using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-        if (file.Length > 4 * 1024 * 1024) throw new InvalidDataException("配置超过 4MB 限制。");
+        if (file.Length > 4 * 1024 * 1024) throw L.Exception<InvalidDataException>(L.Text("ConfigurationExceedsThe4MbLimit"));
         using var memory = new MemoryStream();
         file.CopyTo(memory);
         return ConfigValidation.Parse(memory.ToArray());
@@ -80,29 +80,29 @@ public sealed class ConfigService : IAsyncDisposable
     private void Load()
     {
         bool primaryBad = false, backupBad = false;
-        string? primaryError = null;
+        UiText? primaryError = null;
         try { Initial = Read(FilePath); return; }
-        catch (FutureConfigException ex) { MakeReadOnly(ex.Message); return; }
+        catch (FutureConfigException ex) { MakeReadOnly(L.Error(ex)); return; }
         catch (FileNotFoundException) { }
         catch (DirectoryNotFoundException) { }
         catch (Exception ex) when (ex is JsonException or InvalidDataException)
-        { primaryBad = true; primaryError = ex.Message; }
+        { primaryBad = true; primaryError = L.Error(ex); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        { MakeReadOnly($"读取配置失败，未覆盖原文件：{ex.Message}"); return; }
+        { MakeReadOnly(L.Text("CouldNotReadConfigurationTheOriginalFileWasKept0", L.Error(ex))); return; }
 
         AppConfig? recovered = null;
         try { recovered = Read(FilePath + ".bak"); }
-        catch (FutureConfigException ex) { MakeReadOnly(ex.Message); return; }
+        catch (FutureConfigException ex) { MakeReadOnly(L.Error(ex)); return; }
         catch (FileNotFoundException) { }
         catch (DirectoryNotFoundException) { }
         catch (Exception ex) when (ex is JsonException or InvalidDataException) { backupBad = true; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        { MakeReadOnly($"读取备份失败，未覆盖原文件：{ex.Message}"); return; }
+        { MakeReadOnly(L.Text("CouldNotReadTheBackupTheOriginalFileWasKept0", L.Error(ex))); return; }
 
         Initial = recovered ?? AppConfig.CreateDefault();
         if (IsReadOnly)
         {
-            Notice = $"{Notice ?? "配置只读。"} {(recovered is null ? "使用临时默认内容。" : "从备份只读加载。")}";
+            Notice = L.Text("ReadOnlyNotice", Notice ?? L.Text("ConfigurationIsReadOnly"), recovered is null ? L.Text("UsingTemporaryDefaultContent") : L.Text("LoadedTheBackupReadOnly"));
             return;
         }
         try
@@ -111,11 +111,11 @@ public sealed class ConfigService : IAsyncDisposable
             if (primaryBad) Archive(FilePath, "config");
             if (backupBad) Archive(FilePath + ".bak", "backup");
             _savedRevision = -1; // Initial snapshot must be written by the same serial worker.
-            Notice = recovered is not null ? "已从备份恢复配置，损坏文件已保留。"
-                : primaryBad || backupBad ? $"原配置损坏并已保留，当前使用默认内容。{primaryError}" : null;
+            Notice = recovered is not null ? L.Text("ConfigurationRestoredFromBackupTheDamagedFileWasKept")
+                : primaryBad || backupBad ? L.Text("TheDamagedConfigurationWasKeptUsingDefaultContent0", primaryError) : null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        { MakeReadOnly($"无法保留损坏文件，已转为只读且停止自动修复：{ex.Message}"); }
+        { MakeReadOnly(L.Text("CouldNotPreserveTheDamagedFileRunningReadOnlyAutomaticRepairStopp", L.Error(ex))); }
     }
 
     private void Archive(string path, string prefix) => File.Move(path,
@@ -124,7 +124,7 @@ public sealed class ConfigService : IAsyncDisposable
     // Caller owns snapshot creation on the UI thread; no live bound collections reach this queue.
     public Task SaveAsync(AppConfig snapshot, long revision)
     {
-        if (IsReadOnly) return Task.FromException(new InvalidOperationException("配置只读，禁止写入。"));
+        if (IsReadOnly) return Task.FromException(L.Exception<InvalidOperationException>(L.Text("ConfigurationIsReadOnlyWritingIsDisabled")));
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         if (!_queue.Writer.TryWrite(new(snapshot, revision, completion)))
             completion.TrySetException(new ObjectDisposedException(nameof(ConfigService)));
@@ -144,7 +144,7 @@ public sealed class ConfigService : IAsyncDisposable
                 {
                     var validated = ConfigValidation.Normalize(newest.Snapshot);
                     byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(validated, ConfigJsonContext.Default.AppConfig);
-                    if (bytes.Length > 4 * 1024 * 1024) throw new InvalidDataException("配置超过 4MB 上限，未覆盖已有配置。");
+                    if (bytes.Length > 4 * 1024 * 1024) throw L.Exception<InvalidDataException>(L.Text("ConfigurationExceeds4MbTheExistingFileWasKept"));
                     _writer.Write(FilePath, bytes);
                     Interlocked.Exchange(ref _savedRevision, newest.Revision);
                 }

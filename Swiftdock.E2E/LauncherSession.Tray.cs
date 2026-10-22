@@ -3,8 +3,8 @@ using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using FlaUI.Core.AutomationElements;
-using FlaUI.Core.Conditions;
 using FlaUI.Core.Definitions;
+using FlaUI.Core.Exceptions;
 using FlaUI.Core.Input;
 using FlaUI.Core.WindowsAPI;
 using Xunit;
@@ -14,7 +14,8 @@ namespace Swiftdock.E2E;
 
 internal sealed partial class LauncherSession
 {
-    private const string TestTrayTooltip = "迅启 · Control+Alt+Shift+F11";
+    private const string TestTrayHotkeySuffix = "· Control+Alt+Shift+F11";
+    private string TestTrayTooltip => (_englishUi ? "Swiftdock" : "迅启") + " " + TestTrayHotkeySuffix;
     private static readonly string[] ShellProcesses = ["explorer", "ShellHost", "ShellExperienceHost"];
     private sealed class TrayUnavailableException(string message) : Exception(message);
     private sealed record TrayWindow(nint Handle, uint Pid, string Process, long Started, string Class, bool Visible, int? Cloaked)
@@ -25,6 +26,13 @@ internal sealed partial class LauncherSession
         public override string ToString() => $"HWND=0x{Handle:X} class={JsonSerializer.Serialize(Class)} PID={Pid} process={Process} visible={Visible} cloaked={Cloaked?.ToString() ?? "unknown"}";
     }
     private sealed record TrayTarget(AutomationElement Element, TrayWindow Root, string Step);
+
+    private static bool TryReadTrayProperty<T>(Func<T> read, out T value)
+    {
+        try { value = read(); return true; }
+        catch (Exception error) when (error is PropertyNotSupportedException || TransientUiaFailure(error))
+        { value = default!; return false; }
+    }
 
     private static TrayWindow ReadTrayWindow(nint handle)
     {
@@ -49,7 +57,7 @@ internal sealed partial class LauncherSession
         }).Select(ReadTrayWindow).Where(window => window.IsShell).ToDictionary(window => window.Handle);
     }
 
-    public void AssertTrayToggleIfReachable()
+    public void AssertTrayToggleIfReachable(bool languageOnly = false)
     {
         var taskbar = ReadTrayWindow(Desktop.FindWindow("Shell_TrayWnd", null));
         Dictionary<nint, TrayWindow>? beforeChevron = null;
@@ -58,15 +66,43 @@ internal sealed partial class LauncherSession
         nint panel = PanelHandle;
         string step = "taskbar icon";
         bool menuAttempted = false, menuInputSent = false;
+        var observedNames = new Dictionary<nint, string>();
 
         TrayWindow[] NewVisibleShellWindows(bool cleanup = false) => beforeChevron is null ? [] : ShellWindowSnapshot().Values.Where(window =>
             window.Visible && (window.Cloaked == 0 || cleanup && window.Cloaked is null)
                 && (!beforeChevron.TryGetValue(window.Handle, out var before)
                 || !window.SameWindow(before) || !before.Visible || before.Cloaked is > 0)).ToArray();
 
-        TrayTarget[] IconsIn(AutomationElement root, TrayWindow native, string location) => root
-            .FindAllDescendants(cf => cf.ByName(TestTrayTooltip).And(cf.ByControlType(ControlType.Button)))
-            .Select(element => new TrayTarget(element, native, location)).ToArray();
+        TrayTarget[] IconsIn(AutomationElement root, TrayWindow native, string location)
+        {
+            // Capture every test-hotkey name before filtering. A stale Chinese name
+            // is useful evidence, but must never become a target in an English step.
+            var buttons = root.FindAllDescendants(cf => cf.ByControlType(ControlType.Button));
+            var readable = new List<(AutomationElement Element, string Name)>();
+            int unreadableNames = 0;
+            foreach (var element in buttons)
+            {
+                // Optional properties and individual stale providers must not
+                // prevent the remaining buttons from being inspected and logged.
+                if (!TryReadTrayProperty(() => element.Properties.Name.ValueOrDefault, out var name) || name is null)
+                { unreadableNames++; continue; }
+                readable.Add((element, name));
+            }
+            var names = readable.Where(button => button.Name.Contains(TestTrayHotkeySuffix, StringComparison.Ordinal))
+                .Select(button => button.Name).ToArray();
+            string snapshot = $"{location}; root=[{native}]; buttons={buttons.Length}; unreadable names={unreadableNames}; matching names={JsonSerializer.Serialize(names)}";
+            if (!observedNames.TryGetValue(native.Handle, out string? previous) || previous != snapshot)
+            {
+                observedNames[native.Handle] = snapshot;
+                Diagnostic($"Tray button names: expected={JsonSerializer.Serialize(TestTrayTooltip)}; {snapshot}");
+            }
+            return readable.Where(button => TrayIconNameMatcher.Matches(button.Name, TestTrayTooltip))
+                .Select(button => new TrayTarget(button.Element, native, location)).ToArray();
+        }
+
+        TrayTarget? FindTaskbarIcon() => Unique(QueryVisibleWindow(taskbar.Handle,
+            () => IconsIn(_automation.FromHandle(taskbar.Handle), taskbar, "taskbar icon"),
+            Array.Empty<TrayTarget>(), "tray taskbar/FromHandle"));
 
         TrayTarget? Unique(TrayTarget[] matches, bool verify = true)
         {
@@ -90,9 +126,27 @@ internal sealed partial class LauncherSession
             {
                 matches.AddRange(QueryVisibleWindow(native.Handle, () =>
                 {
-                    var root = _automation.GetDesktop().FindFirstChild(new PropertyCondition(
-                        _automation.PropertyLibrary.Element.NativeWindowHandle, unchecked((int)native.Handle))); // UIA stores HWND as VT_I4.
-                    return root is null ? [] : IconsIn(root, native, "overflow icon");
+                    AutomationElement? root = null;
+                    int skippedHandles = 0;
+                    // Desktop children can include non-HWND elements. Read each
+                    // handle separately instead of letting one unsupported property
+                    // abort the condition-based search. Descend only into our known
+                    // visible shell HWND after it has been matched exactly.
+                    foreach (var child in _automation.GetDesktop().FindAllChildren())
+                    {
+                        if (!TryReadTrayProperty(() => child.Properties.NativeWindowHandle.ValueOrDefault, out var handle) || handle == 0)
+                        { skippedHandles++; continue; }
+                        if (handle != native.Handle) continue;
+                        root = child; break;
+                    }
+                    if (root is not null) return IconsIn(root, native, "overflow icon");
+                    string snapshot = $"overflow icon; root=[{native}]; UIA desktop child unavailable; skipped unreadable/non-HWND children={skippedHandles}; button names unreadable";
+                    if (!observedNames.TryGetValue(native.Handle, out string? previous) || previous != snapshot)
+                    {
+                        observedNames[native.Handle] = snapshot;
+                        Diagnostic("Tray button names: " + snapshot);
+                    }
+                    return [];
                 }, Array.Empty<TrayTarget>(), "tray overflow/desktop child"));
             }
             // A newly opened flyout can expose its button before layout/animation
@@ -114,8 +168,7 @@ internal sealed partial class LauncherSession
         {
             step = "taskbar icon";
             if (!taskbar.Available) throw new TrayUnavailableException("taskbar icon: unavailable shell root: " + taskbar);
-            var icon = Unique(QueryVisibleWindow(taskbar.Handle, () => IconsIn(_automation.FromHandle(taskbar.Handle), taskbar, step),
-                Array.Empty<TrayTarget>(), "tray taskbar/FromHandle"));
+            var icon = FindTaskbarIcon();
             if (icon is not null) return icon;
             if (beforeChevron is not null)
             {
@@ -124,26 +177,42 @@ internal sealed partial class LauncherSession
                 if (icon is not null) return flyoutIcon = icon;
                 CloseOverflow();
             }
-            step = "chevron";
-            var chevron = FindChevron();
-            beforeChevron = ShellWindowSnapshot(); // Before real input, including a partially failed click.
-            try { ClickTrayTarget(chevron); }
-            catch (TrayUnavailableException) { beforeChevron = null; throw; } // Verification failed before any mouse press.
-            step = "overflow icon";
-            try
+            // Only language checks need to account for a shell UIA name left over
+            // from NIM_MODIFY. Two 3-second waits, with one verified close/reopen.
+            int attempts = languageOnly ? 2 : 1;
+            for (int attempt = 1; attempt <= attempts; attempt++)
             {
-                Eventually(() =>
+                icon = FindTaskbarIcon();
+                if (icon is not null) return icon;
+                step = "chevron";
+                var chevron = FindChevron();
+                beforeChevron = ShellWindowSnapshot(); // Before real input, including a partially failed click.
+                try { ClickTrayTarget(chevron); }
+                catch (TrayUnavailableException) { beforeChevron = null; throw; } // Verification failed before any mouse press.
+                step = "overflow icon";
+                try
                 {
-                    CheckAbort();
-                    return (icon = FindOverflowIcon()) is not null;
-                }, "uniquely reachable test-profile icon in the new shell flyout", 3000);
-                return flyoutIcon = icon!;
+                    Eventually(() =>
+                    {
+                        CheckAbort();
+                        icon = FindTaskbarIcon() ?? FindOverflowIcon();
+                        return icon is not null;
+                    }, $"uniquely reachable test-profile icon named {JsonSerializer.Serialize(TestTrayTooltip)} in taskbar or new shell flyout (attempt {attempt}/{attempts})", 3000);
+                    if (icon!.Step == "overflow icon") flyoutIcon = icon;
+                    return icon;
+                }
+                catch (XunitException error)
+                {
+                    string evidence = $"expected={JsonSerializer.Serialize(TestTrayTooltip)}; observed: "
+                        + string.Join("; ", observedNames.Values) + "; candidates: "
+                        + string.Join("; ", NewVisibleShellWindows().Select(window => window.ToString()));
+                    Diagnostic($"Tray name wait failed ({attempt}/{attempts}): {evidence}");
+                    if (attempt == attempts) throw new TrayUnavailableException($"overflow icon: {error.Message}; {evidence}");
+                    CloseOverflow();
+                    Diagnostic("Reopening the verified tray flyout once to refresh its UIA name; the old language remains unacceptable.");
+                }
             }
-            catch (XunitException error)
-            {
-                throw new TrayUnavailableException($"overflow icon: {error.Message}; candidates: "
-                    + string.Join("; ", NewVisibleShellWindows().Select(window => window.ToString())));
-            }
+            throw new TrayUnavailableException("Tray name attempts exhausted.");
         }
 
         bool WaitUntilClosed(int milliseconds)
@@ -200,6 +269,19 @@ internal sealed partial class LauncherSession
 
         try
         {
+            if (languageOnly)
+            {
+                var target = ReachIcon();
+                menuAttempted = true;
+                Point click = ClickTrayTarget(target, button: MouseButton.Right);
+                menuInputSent = true;
+                var menu = AssertStableTrayMenu(click, "language");
+                foreach (string text in _englishUi
+                    ? new[] { "Show Swiftdock", "Settings", "Open configuration folder", "Start at sign-in", "Exit Swiftdock" }
+                    : new[] { "显示迅启", "设置", "打开配置目录", "登录时自动启动", "退出迅启" })
+                    Named(text, ControlType.MenuItem, menu.Element);
+                CloseTrayMenu(); CloseOverflow(); return;
+            }
             ReachIcon(); CloseOverflow();
             Hotkey(); AssertVisible(false);
             ClickTrayTarget(ReachIcon());
@@ -299,7 +381,7 @@ internal sealed partial class LauncherSession
                 CloseOverflow();
             }
         }
-        catch (Exception error) when (!menuInputSent && (error is TrayUnavailableException or COMException or TimeoutException or InvalidOperationException))
+        catch (Exception error) when (!languageOnly && !menuInputSent && (error is TrayUnavailableException or COMException or TimeoutException or InvalidOperationException))
         { Diagnostic($"SKIP tray input (remaining steps), step={step}: {error.Message.ReplaceLineEndings(" ")}"); }
         finally
         {
@@ -309,7 +391,7 @@ internal sealed partial class LauncherSession
                 {
                     CloseTrayMenu();
                     // Also clean up if a later assertion failed after the Settings command.
-                    Eventually(() =>
+                    if (!languageOnly) Eventually(() =>
                     {
                         var settings = FindVisibleWindow("设置");
                         if (settings is null) return true;
@@ -368,7 +450,7 @@ internal sealed partial class LauncherSession
         {
             var menu = QueryVisibleWindow<AutomationElement?>(root.Handle, () =>
             {
-                var item = root.Element.FindFirstDescendant(cf => cf.ByName("显示迅启").And(cf.ByControlType(ControlType.MenuItem)));
+                var item = root.Element.FindFirstDescendant(cf => cf.ByAutomationId("ShowSwiftdock").And(cf.ByControlType(ControlType.MenuItem)));
                 if (!IsVisible(item)) return null;
                 for (var parent = item!.Parent; parent is not null; parent = parent.Parent)
                 {
@@ -425,7 +507,7 @@ internal sealed partial class LauncherSession
         point = hasPoint ? Center(bounds!.Value) : Point.Empty;
         var hit = ReadTrayWindow(hasPoint ? Desktop.WindowFromPoint(point) : 0);
         var hitRoot = ReadTrayWindow(hasPoint ? Desktop.GetAncestor(hit.Handle, 2) : 0);
-        bool expectedName = target.Step == "chevron" || name == TestTrayTooltip;
+        bool expectedName = target.Step == "chevron" || TrayIconNameMatcher.Matches(name, TestTrayTooltip);
         if (!expectedName) errors.Add("test-profile tooltip no longer matches");
         if (!hasPoint) errors.Add("empty or unavailable rectangle");
         if (offscreen != false) errors.Add("element offscreen state is not false");

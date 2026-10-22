@@ -17,7 +17,7 @@ public sealed record GroupConfig
     [JsonRequired]
     public string Id { get; init; } = Guid.NewGuid().ToString("N");
     [JsonRequired]
-    public string Name { get; init; } = "常用";
+    public string Name { get; init; } = L.Text("Favorites");
     [JsonRequired]
     public List<LaunchItem> Items { get; init; } = [];
 }
@@ -39,6 +39,8 @@ public sealed record AppConfig
     // Null preserves the original defaults: system theme/accent and acrylic panel.
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Theme { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Language { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Backdrop { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
@@ -70,11 +72,11 @@ public sealed record AppConfig
     {
         var common = new GroupConfig
         {
-            Items = [new("记事本", "%WINDIR%\\System32\\notepad.exe", LaunchKind.App),
-                new("用户目录", "%USERPROFILE%", LaunchKind.Folder),
+            Items = [new(L.Text("Notepad"), "%WINDIR%\\System32\\notepad.exe", LaunchKind.App),
+                new(L.Text("UserFolder"), "%USERPROFILE%", LaunchKind.Folder),
                 new("GitHub", "https://github.com", LaunchKind.Url)]
         };
-        var work = new GroupConfig { Name = "工作", Items = [] };
+        var work = new GroupConfig { Name = L.Text("Work"), Items = [] };
         return new() { Groups = [common, work], LastGroupId = common.Id };
     }
 }

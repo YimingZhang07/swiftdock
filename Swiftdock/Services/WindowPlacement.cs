@@ -57,7 +57,7 @@ public static class WindowPlacement
     private static (Monitor Monitor, Point? Position) SelectMonitor(string? mode, Point? savedPosition, Size desiredSize,
         IReadOnlyList<Monitor> monitors, Point cursor)
     {
-        if (monitors.Count == 0) throw new ArgumentException("至少需要一个显示器。", nameof(monitors));
+        if (monitors.Count == 0) throw L.Exception<ArgumentException>(L.Text("AtLeastOneMonitorIsRequired"));
         if (mode != "cursor" && savedPosition is { } position)
         {
             var origin = monitors.MinBy(m => DistanceSquared(position, m.Bounds));

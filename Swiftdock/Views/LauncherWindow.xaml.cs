@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -421,7 +421,7 @@ public partial class LauncherWindow : Window, IDisposable
         {
             if (generation != _showGeneration) return;
             Log.ShowTimeout(source, NativeMethods.GetForegroundWindow() == hwnd, IsKeyboardFocusWithin);
-            SetStatus("激活未确认，可点击面板继续；详情已写入诊断日志。");
+            SetStatus(L.Text("ActivationWasNotConfirmedClickThePanelToContinueDetailsWereLogged"));
             CancelMeasurement();
         };
         _measureTimeout.Start();
@@ -581,7 +581,7 @@ public partial class LauncherWindow : Window, IDisposable
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => { if (list == SelectedList) list.RevealSelection(); });
     }
 
-    public void SetStatus(string text, bool toast = true) => Launcher.SetStatus(text, toast);
+    public void SetStatus(UiText text, bool toast = true) => Launcher.SetStatus(text, toast);
     private void UpdateToast()
     {
         ShowToast(Launcher.ToastVisible);

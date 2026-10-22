@@ -29,25 +29,25 @@ public static class ItemEditorValidation
     {
         if (kind == LaunchKind.Url)
         {
-            if (!LaunchService.IsWebUrl(path)) throw new ArgumentException("请输入有效的 http/https 网址。");
+            if (!LaunchService.IsWebUrl(path)) throw L.Exception<ArgumentException>(L.Text("EnterAValidHttpHttpsUrl"));
             return kind;
         }
-        if (!Path.IsPathFullyQualified(path) || path.Contains('"')) throw new ArgumentException("请输入不含引号的绝对路径。");
+        if (!Path.IsPathFullyQualified(path) || path.Contains('"')) throw L.Exception<ArgumentException>(L.Text("EnterAnAbsolutePathWithoutQuotes"));
         switch (kind)
         {
             case LaunchKind.App:
-                if (directoryExists || !IsApplicationPath(path)) throw new ArgumentException("请选择 .exe、.lnk、.bat 或 .cmd 程序。");
+                if (directoryExists || !IsApplicationPath(path)) throw L.Exception<ArgumentException>(L.Text("ChooseAnExeLnkBatOrCmdApplication"));
                 if (!Path.GetExtension(path).Equals(".lnk", StringComparison.OrdinalIgnoreCase) && workingDirectory.Length > 0
                     && (!Path.IsPathFullyQualified(workingDirectory) || workingDirectory.Contains('"')))
-                    throw new ArgumentException("工作目录必须是有效绝对路径。");
+                    throw L.Exception<ArgumentException>(L.Text("TheWorkingFolderMustBeAValidAbsolutePath"));
                 break;
             case LaunchKind.File:
-                if (directoryExists) throw new ArgumentException("请选择文件，不能选择文件夹。");
+                if (directoryExists) throw L.Exception<ArgumentException>(L.Text("ChooseAFileInsteadOfAFolder"));
                 break;
             case LaunchKind.Folder:
-                if (!directoryExists) throw new ArgumentException("找不到该文件夹。");
+                if (!directoryExists) throw L.Exception<ArgumentException>(L.Text("TheFolderCouldNotBeFound"));
                 break;
-            default: throw new ArgumentException("请选择项目类型。");
+            default: throw L.Exception<ArgumentException>(L.Text("ChooseAnItemType"));
         }
         return kind;
     }

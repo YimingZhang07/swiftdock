@@ -57,15 +57,17 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
-    public void StartupReadAndWriteFailuresKeepTheirMessagesAndState()
+    public void StartupReadAndWriteFailuresShowLocalizedErrorsAndKeepState()
     {
-        using var unreadable = Create(new(), Startup(_ => throw new IOException("读取自启失败")), new(), new());
-        Assert.False(unreadable.StartupAvailable); Assert.True(unreadable.StatusError); Assert.Equal("读取自启失败", unreadable.Status);
+        var readError = new IOException("startup read failed");
+        using var unreadable = Create(new(), Startup(_ => throw readError), new(), new());
+        Assert.False(unreadable.StartupAvailable); Assert.True(unreadable.StatusError); Assert.Equal(Localization.Error(readError).Value, unreadable.Status);
         int writes = 0;
-        using var unwritable = Create(new(), Startup(write: (_, _) => { writes++; throw new IOException("更新自启失败"); }), new(), new());
+        var writeError = new IOException("startup write failed");
+        using var unwritable = Create(new(), Startup(write: (_, _) => { writes++; throw writeError; }), new(), new());
         unwritable.StartupEnabled = true;
         Assert.False(unwritable.StartupEnabled); Assert.Equal(1, writes);
-        Assert.True(unwritable.StatusError); Assert.Equal("更新自启失败", unwritable.Status);
+        Assert.True(unwritable.StatusError); Assert.Equal(Localization.Error(writeError).Value, unwritable.Status);
     }
 
     [Fact]
@@ -109,6 +111,8 @@ public sealed class SettingsViewModelTests
         public HotkeyConfig Hotkey { get; private set; } = new();
         public int Scale { get; private set; } = 100;
         public string Placement { get; private set; } = "lastPosition";
+        public string Language { get; private set; } = "system";
+        public void SetLanguage(string value) { Language = value; Changed(nameof(Language)); }
         public string Theme { get; private set; } = "system";
         public string Backdrop { get; private set; } = "acrylic";
         public int BackdropOpacity { get; private set; }

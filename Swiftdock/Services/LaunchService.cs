@@ -5,14 +5,17 @@ using Swiftdock.Models;
 
 namespace Swiftdock.Services;
 
-public sealed record LaunchResult(bool Accepted, bool Cancelled, string Message);
+public sealed record LaunchResult(bool Accepted, bool Cancelled, UiText Text)
+{
+    public string Message => Text.Value;
+}
 
 public static class LaunchService
 {
     public static ProcessStartInfo CreateStartInfo(LaunchItem item, bool elevate = false)
     {
         string path = item.Kind == LaunchKind.Url ? item.Path : Environment.ExpandEnvironmentVariables(item.Path);
-        if (item.Kind == LaunchKind.Url && !IsWebUrl(path)) throw new ArgumentException("只支持 http/https 网址。");
+        if (item.Kind == LaunchKind.Url && !IsWebUrl(path)) throw L.Exception<ArgumentException>(L.Text("OnlyHttpHttpsUrlsAreSupported"));
         var info = new ProcessStartInfo(path) { UseShellExecute = true };
         if (item.Kind == LaunchKind.App)
         {
@@ -36,15 +39,15 @@ public static class LaunchService
         try
         {
             using var process = Process.Start(CreateStartInfo(snapshot, elevate));
-            return new LaunchResult(true, false, "Shell 已接受启动请求");
+            return new LaunchResult(true, false, L.Text("TheShellAcceptedTheLaunchRequest"));
         }
         catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
         {
-            return new LaunchResult(false, true, "已取消提权");
+            return new LaunchResult(false, true, L.Text("ElevationWasCancelled"));
         }
         catch (Exception ex) when (ex is Win32Exception or IOException or InvalidOperationException or ArgumentException or UnauthorizedAccessException)
         {
-            return new LaunchResult(false, false, ex.Message);
+            return new LaunchResult(false, false, L.Text("LaunchFailed", ex.HResult));
         }
     });
 }

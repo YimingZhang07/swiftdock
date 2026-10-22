@@ -269,6 +269,8 @@ public sealed class LauncherTests(ITestOutputHelper output)
         app.Click(app.ById("SettingsButton"));
         var dialog = app.Dialog("设置");
         app.AssertLivePanelScale(dialog);
+        app.AssertUiLanguage(dialog, english: true);
+        app.AssertUiLanguage(dialog, english: false);
         app.NavigateSettings(dialog, "Panel");
         var toggle = app.ById("WebsiteIconsBox", dialog);
         Assert.Equal(ToggleState.On, toggle.Patterns.Toggle.Pattern.ToggleState.Value);
@@ -282,6 +284,7 @@ public sealed class LauncherTests(ITestOutputHelper output)
         app.Click(app.Named("关闭", ControlType.Button, dialog), dialog);
         Eventually(() => !app.HasWindow("设置"), "settings window to close");
         using var config = app.ExitAndReadConfig();
+        Assert.Equal("zh-CN", config.RootElement.GetProperty("language").GetString());
         Assert.False(config.RootElement.GetProperty("autoFetchWebsiteIcons").GetBoolean());
         Assert.Equal("cursor", config.RootElement.GetProperty("placement").GetString());
         foreach (string property in new[] { "windowLeft", "windowTop", "windowWidth", "windowHeight" })

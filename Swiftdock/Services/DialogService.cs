@@ -16,7 +16,7 @@ public interface IDialogService
     void CloseSettings();
     void CloseEditor();
     LaunchItem? EditItem(LauncherWindow owner, LaunchItem? item, bool openIconPicker = false);
-    string? Name(LauncherWindow owner, string title, string value);
+    string? Name(LauncherWindow owner, UiText title, string value);
     Task<bool> ConfirmDeleteGroupAsync(LauncherWindow owner, string name);
     bool ShowEditor(LauncherWindow owner, Window editor);
 }
@@ -78,7 +78,7 @@ internal sealed class DialogService(IServiceProvider services) : IDialogService
         window.OpenPickerOnLoad = openIconPicker;
         return ShowEditor(owner, window) ? model.Result : null;
     }
-    public string? Name(LauncherWindow owner, string title, string value)
+    public string? Name(LauncherWindow owner, UiText title, string value)
     {
         if (!owner.CanEdit || owner.Launcher.DragActive || HasOpenEditor) return null;
         using var scope = services.CreateScope();
@@ -99,12 +99,13 @@ internal sealed class DialogService(IServiceProvider services) : IDialogService
         if (!owner.CanEdit || owner.Launcher.DragActive || HasOpenEditor) return false;
         using var scope = services.CreateScope();
         var dialog = scope.ServiceProvider.GetRequiredService<Wpf.Ui.Controls.MessageBox>();
-        dialog.Owner = owner; dialog.Title = "删除分组";
-        dialog.Content = $"删除“{name}”及其中的条目？此操作不能用单条撤销恢复。";
-        dialog.PrimaryButtonText = "删除"; dialog.PrimaryButtonAppearance = Wpf.Ui.Controls.ControlAppearance.Danger;
-        dialog.CloseButtonText = "取消"; dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        L.LocalizeChrome(dialog);
+        dialog.Owner = owner; L.Bind(dialog, Window.TitleProperty, L.Text("DeleteGroup"));
+        L.Bind(dialog, System.Windows.Controls.ContentControl.ContentProperty, L.Text("Delete0AndItsItemsThisCannotBeUndoneWithItemUndo", name));
+        L.Bind(dialog, Wpf.Ui.Controls.MessageBox.PrimaryButtonTextProperty, L.Text("Delete")); dialog.PrimaryButtonAppearance = Wpf.Ui.Controls.ControlAppearance.Danger;
+        L.Bind(dialog, Wpf.Ui.Controls.MessageBox.CloseButtonTextProperty, L.Text("Cancel")); dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
         dialog.ResizeMode = ResizeMode.NoResize; dialog.ShowInTaskbar = false; dialog.MaxWidth = 460; dialog.FontFamily = owner.FontFamily;
-        AutomationProperties.SetName(dialog, dialog.Title);
+        L.Bind(dialog, AutomationProperties.NameProperty, L.Text("DeleteGroup"));
         services.GetService<ThemeService>()?.TrackDialog(dialog);
         _editor = dialog; owner.SetSettingsOpen(true);
         try { return await dialog.ShowDialogAsync() == Wpf.Ui.Controls.MessageBoxResult.Primary; }

@@ -11,6 +11,7 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
     {
         ViewModel = viewModel;
         InitializeComponent(); DataContext = viewModel;
+        Swiftdock.Services.Localization.LocalizeChrome(this);
         SettingsNavigation.SetServiceProvider(new PageProvider(viewModel));
         Loaded += (_, _) => { if (SettingsNavigation.SelectedItem is null) NavigateTo("general"); };
         Closed += (_, _) => viewModel.Dispose();

@@ -28,6 +28,7 @@ public partial class App : Application
     private IDialogService? _dialogs;
     private HotkeyService? _hotkey;
     private TaskbarIcon? _tray;
+    private TrayTooltip? _trayTooltip;
     private TrayContextMenu? _trayMenu;
     private System.Drawing.Icon? _trayIcon;
     private SingleInstanceService? _instance;
@@ -50,7 +51,7 @@ public partial class App : Application
             string? launchLog = Argument(e.Args, "--e2e-launch-log");
             if (launchLog is not null && explicitConfig is null)
                 throw new ArgumentException("--e2e-launch-log requires an isolated --config-dir.");
-            if (_performanceRun && explicitConfig is null) throw new ArgumentException("性能检查必须指定独立 --config-dir，禁止修改用户配置。");
+            if (_performanceRun && explicitConfig is null) throw L.Exception<ArgumentException>(L.Text("PerformanceChecksRequireAnIsolatedConfigDirToProtectUserSettings"));
             var paths = DataPaths.Resolve(explicitConfig, Argument(e.Args, "--diagnostics-dir"));
             if (exitRequested)
             {
@@ -63,7 +64,7 @@ public partial class App : Application
                 if (_performanceRun) readOnly = true;
                 else
                 {
-                    var answer = MessageBox.Show((paths.Portable ? "便携 Data 目录不可写。" : "所选配置目录不可写。") + "\n是：使用默认目录\n否：只读运行\n取消：退出", "迅启", MessageBoxButton.YesNoCancel);
+                    var answer = await LocalizedMessageBox.ShowAsync(L.Text("DataFolderChoice", paths.Portable ? L.Text("ThePortableDataFolderIsNotWritable") : L.Text("TheSelectedConfigurationFolderIsNotWritable")), L.Text("Swiftdock"), choices: true);
                     if (answer == MessageBoxResult.Cancel) { Shutdown(); return; }
                     if (answer == MessageBoxResult.Yes) paths = DataPaths.Resolve(DataPaths.DefaultConfigDirectory, Argument(e.Args, "--diagnostics-dir"));
                     else readOnly = true;
@@ -93,7 +94,7 @@ public partial class App : Application
             if (benchmark)
             {
                 string file = Path.Combine(paths.ConfigDirectory, "config.json");
-                if (File.Exists(file)) throw new InvalidOperationException("性能检查必须使用新的空配置目录。");
+                if (File.Exists(file)) throw L.Exception<InvalidOperationException>(L.Text("PerformanceChecksRequireANewEmptyConfigurationFolder"));
                 new AtomicConfigWriter().Write(file, System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
                     BenchmarkRunner.CreateConfig(paths.ConfigDirectory, e.Args.Contains("--single-group")), ConfigJsonContext.Default.AppConfig));
             }
@@ -138,7 +139,7 @@ public partial class App : Application
                     int migrated = _startup.MigrateLegacyDefaultProfile();
                     if (migrated > 0) _log.LegacyStartupMigrated(migrated);
                 }
-                catch (Exception ex) { _log.LegacyStartupMigrationFailed(LogPrivacy.Message(ex.Message)); }
+                catch (Exception ex) { _log.LegacyStartupMigrationFailed(LogPrivacy.Message(L.Diagnostic(ex))); }
             }
             _dialogs = _host.Services.GetRequiredService<IDialogService>();
             MainWindow = _window;
@@ -147,7 +148,7 @@ public partial class App : Application
             try { CreateTray(); }
             catch (InvalidOperationException ex) when (_performanceRun && e.Args.Contains("--allow-unavailable-tray"))
             {
-                _log.TrayUnavailable(LogPrivacy.Message(ex.Message));
+                _log.TrayUnavailable(LogPrivacy.Message(L.Diagnostic(ex)));
             }
             _ = _window.LoadIconsAsync();
             using var identity = WindowsIdentity.GetCurrent();
@@ -155,13 +156,13 @@ public partial class App : Application
             bool elevated = new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
             _log.Startup(Environment.Version.ToString(), Environment.OSVersion.VersionString, elevated,
                 $"v{typeof(App).Assembly.GetName().Version?.ToString(3)}", (DateTime.UtcNow - process.StartTime.ToUniversalTime()).TotalMilliseconds,
-                paths.ConfigDirectory, _store.IsReadOnly, _store.Notice is null ? null : LogPrivacy.Message(_store.Notice));
+                paths.ConfigDirectory, _store.IsReadOnly, _store.Notice is null ? null : LogPrivacy.Message(_store.Notice.English));
             _log.HostTiming(emptyBuilderMs, registrationMs - emptyBuilderMs, hostStartedMs - registrationMs);
-            var notices = new List<string>();
+            var notices = new List<UiText>();
             if (_store.Notice is not null) notices.Add(_store.Notice);
-            if (elevated) notices.Add("当前以管理员权限运行；请用普通权限重启以接收外部拖入。");
-            if (!_hotkey.Registered) notices.Add($"{_viewModel.HotkeyDisplay} 注册失败（{_hotkey.Error}），请从设置修改热键；托盘仍可呼出。");
-            if (notices.Count > 0) _window.SetStatus(string.Join("\n", notices));
+            if (elevated) notices.Add(L.Text("RunningAsAdministratorRestartWithStandardPermissionsToReceiveDrop"));
+            if (!_hotkey.Registered) notices.Add(L.Text("0CouldNotBeRegistered1ChooseAnotherHotkeyInSettingsTheTrayIsStill", _viewModel.HotkeyDisplay, _hotkey.Error));
+            if (notices.Count > 0) _window.SetStatus(UiText.Join(notices, "\n"));
             SessionEnding += OnSessionEnding;
             if (startupProbe)
             {
@@ -179,8 +180,8 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            _log.StartupFailed(LogPrivacy.Message(ex.Message), ex.GetType().Name);
-            if (!_performanceRun && !exitRequested) MessageBox.Show(ex is OperationCanceledException ? "已有实例未及时响应，请稍后重新启动。" : ex.Message, "迅启无法启动");
+            _log.StartupFailed(LogPrivacy.Message(L.Diagnostic(ex)), ex.GetType().Name);
+            if (!_performanceRun && !exitRequested) await LocalizedMessageBox.ShowAsync(ex is OperationCanceledException ? L.Text("TheExistingInstanceDidNotRespondInTimePleaseTryStartingAgainLater") : L.Error(ex), L.Text("SwiftdockCouldNotStart"));
             await ExitAsync(1);
         }
     }
@@ -189,7 +190,7 @@ public partial class App : Application
     {
         int index = Array.IndexOf(args, key);
         if (index < 0) return null;
-        if (index + 1 >= args.Length || args[index + 1].StartsWith("--", StringComparison.Ordinal)) throw new ArgumentException($"{key} 缺少参数。");
+        if (index + 1 >= args.Length || args[index + 1].StartsWith("--", StringComparison.Ordinal)) throw L.Exception<ArgumentException>(L.Text("MissingArgumentFor0", key));
         return args[index + 1];
     }
 
@@ -204,33 +205,31 @@ public partial class App : Application
         if (!_exiting && _window is not null) _dialogs?.ShowSettings(_window);
     }
 
-    private void UpdateTrayText()
-    {
-        if (_tray is not null) _tray.ToolTipText = $"迅启 · {_viewModel!.HotkeyDisplay}";
-    }
+    private void UpdateTrayText() => _trayTooltip?.Update();
     private void CreateTray()
     {
         var menu = new ContextMenu();
-        menu.Items.Add(new MenuItem { Header = "显示迅启", Command = new RelayCommand(() => ShowMain("tray-menu")) });
-        menu.Items.Add(new MenuItem { Header = "设置", Command = new RelayCommand(OpenSettings) });
-        menu.Items.Add(new MenuItem { Header = "打开配置目录", Command = new RelayCommand(() =>
-            _ = LaunchService.StartAsync(new("配置目录", _store!.DirectoryPath, LaunchKind.Folder))) });
-        var startupItem = new MenuItem { Header = "登录时自动启动", IsCheckable = true, IsEnabled = _viewModel!.CanEdit };
+        menu.Items.Add(new LocalizedMenuItem(L.Text("ShowSwiftdock")) { Command = new RelayCommand(() => ShowMain("tray-menu")) });
+        menu.Items.Add(new LocalizedMenuItem(L.Text("Settings")) { Command = new RelayCommand(OpenSettings) });
+        menu.Items.Add(new LocalizedMenuItem(L.Text("OpenConfigurationFolder")) { Command = new RelayCommand(() =>
+            _ = LaunchService.StartAsync(new(L.Text("ConfigurationFolder"), _store!.DirectoryPath, LaunchKind.Folder))) });
+        var startupItem = new LocalizedMenuItem(L.Text("StartAtSignIn")) { IsCheckable = true, IsEnabled = _viewModel!.CanEdit };
         menu.Opened += (_, _) =>
         {
-            try { startupItem.IsChecked = _startup!.IsEnabled; } catch (Exception ex) { _window!.SetStatus(ex.Message); }
+            try { startupItem.IsChecked = _startup!.IsEnabled; } catch (Exception ex) { _window!.SetStatus(L.Error(ex)); }
         };
         startupItem.Click += (_, _) =>
         {
             try { _startup!.SetEnabled(startupItem.IsChecked); }
-            catch (Exception ex) { startupItem.IsChecked = false; _window!.SetStatus($"自启设置失败：{ex.Message}"); ShowMain("startup-error"); }
+            catch (Exception ex) { startupItem.IsChecked = false; _window!.SetStatus(L.Text("CouldNotUpdateStartupSettings0", L.Error(ex))); ShowMain("startup-error"); }
         };
         menu.Items.Add(startupItem);
         menu.Items.Add(new Separator());
-        menu.Items.Add(new MenuItem { Header = "退出迅启", Command = new RelayCommand(() => _ = ExitAsync()) });
+        menu.Items.Add(new LocalizedMenuItem(L.Text("ExitSwiftdock")) { Command = new RelayCommand(() => _ = ExitAsync()) });
         _tray = new TaskbarIcon { NoLeftClickDelay = true,
             LeftClickCommand = new RelayCommand(() => { if (!_exiting) _window?.ToggleFromTray(); }),
             DoubleClickCommand = null };
+        _trayTooltip = new TrayTooltip(_tray, () => _viewModel!.HotkeyDisplay, _log);
         _trayMenu = new TrayContextMenu(_tray, menu, _log);
         _tray.TrayLeftMouseDown += TrayMouseDown;
         UpdateTrayIcon();
@@ -261,6 +260,8 @@ public partial class App : Application
 
     private void DisposeTray()
     {
+        _trayTooltip?.Dispose();
+        _trayTooltip = null;
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= TrayDisplayChanged;
         _trayMenu?.Dispose();
         _trayMenu = null;
@@ -290,9 +291,9 @@ public partial class App : Application
                 try { await _viewModel.FlushAsync(); break; }
                 catch (Exception ex)
                 {
-                    _log.SaveExitFailed(LogPrivacy.Message(ex.Message));
+                    _log.SaveExitFailed(LogPrivacy.Message(L.Diagnostic(ex)));
                     if (_performanceRun) { code = 1; break; }
-                    var answer = MessageBox.Show($"配置尚未保存：{ex.Message}\n是：重试\n否：放弃未保存修改并退出\n取消：返回程序", "迅启", MessageBoxButton.YesNoCancel);
+                    var answer = await LocalizedMessageBox.ShowAsync(L.Text("SettingsHaveNotBeenSaved0YesRetryNoDiscardUnsavedChangesAndExitCa", L.Error(ex)), L.Text("Swiftdock"), choices: true);
                     if (answer == MessageBoxResult.Yes) continue;
                     if (answer == MessageBoxResult.No) break;
                     _exiting = false;
@@ -322,7 +323,7 @@ public partial class App : Application
                 bool saved = _store.SaveAsync(_viewModel.Snapshot(), _viewModel.Revision).Wait(TimeSpan.FromMilliseconds(800));
                 _log.SessionEnding(saved);
             }
-            catch (Exception ex) { _log.SessionEndingFailed(LogPrivacy.Message(ex.Message)); }
+            catch (Exception ex) { _log.SessionEndingFailed(LogPrivacy.Message(L.Diagnostic(ex))); }
         }
         _dialogs?.CloseSettings();
         // UI-affine disposal runs first, before the async config/IPC/log drains.

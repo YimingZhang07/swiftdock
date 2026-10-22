@@ -4,11 +4,11 @@
 
 Your apps, files and websites — one key away.
 
-A quiet Windows 10/11 x64 launcher. Press **Alt+Space**, then click what you need. Version 3.0 uses a Chinese interface; an English interface is planned.
+A quiet Windows 10/11 x64 launcher. Press **Alt+Space**, then click what you need. The interface switches between English and Simplified Chinese.
 
-![Launcher in dark mode](docs/images/launcher-dark.png)
-![Launcher in light mode](docs/images/launcher-light.png)
-![Appearance settings](docs/images/settings.png)
+![Launcher in dark mode](docs/images/launcher-dark-en.png)
+![Launcher in light mode](docs/images/launcher-light-en.png)
+![Appearance settings](docs/images/settings-en.png)
 
 ## Features
 
@@ -28,17 +28,19 @@ The binaries are unsigned. If SmartScreen shows “Windows protected your PC”,
 
 ## Use
 
-1. Press **Alt+Space** or click the tray icon to show or hide the panel. Click an item to launch it. The panel stays visible after launch; × hides it, and **退出迅启** in settings or the tray exits the app.
-2. Click **添加项目** to add an app, file, folder or website, or drag one in from Explorer or a browser. Right-click to edit, change its icon or delete it; **Ctrl+Z** undoes the last item deletion for five seconds.
+1. Press **Alt+Space** or click the tray icon to show or hide the panel. Click an item to launch it. The panel stays visible after launch; × hides it, and **Exit Swiftdock** in settings or the tray exits the app.
+2. Click **Add item** to add an app, file, folder or website, or drag one in from Explorer or a browser. Right-click to edit, change its icon or delete it; **Ctrl+Z** undoes the last item deletion for five seconds.
 3. Use the group tabs to switch groups; **+** adds one. Drag items to reorder or hover over another tab to move across groups. Drag tabs to reorder groups; double-click a tab to rename it.
 4. The pin button keeps the panel on top. Drag the top bar to move it and its edges to resize. Position and size are remembered.
-5. Open **设置 → 外观** for themes, materials, transparency and scale (80–150%). **Ctrl+wheel** over the item area also changes scale. Change the hotkey and start at login in **常规**.
+5. Open **Settings → Appearance** for themes, materials, transparency and scale (80–150%). **Ctrl+wheel** over the item area also changes scale. Change the hotkey and start at login in **General**.
+
+**Settings → General → Language** offers **Follow system**, **中文** and **English**. The default follows your Windows UI language: any Chinese culture uses Simplified Chinese; all others use English. Switching updates open windows, dialogs and the tray immediately. Existing group and item names stay as you entered them.
 
 Arrow keys select items; **Enter** launches, **F2** renames and **Delete** deletes. **Ctrl+Tab** or **Ctrl+1…9** switches groups. **Esc** closes a menu or cancels dragging, then clears selection, then hides the panel.
 
 ## Data and privacy
 
-There is **no telemetry**. Website icons are fetched only for websites you add and only while **自动获取网站图标** is enabled. Requests go directly to those sites, following redirects and their declared icon URLs (which can use a CDN); no third-party icon lookup service is used. Turning the setting off stops these requests and hides cached website icons.
+There is **no telemetry**. Website icons are fetched only for websites you add and only while **Auto-fetch website icons** is enabled. Requests go directly to those sites, following redirects and their declared icon URLs (which can use a CDN); no third-party icon lookup service is used. Turning the setting off stops these requests and hides cached website icons.
 
 Config and its backup live in `%APPDATA%\Swiftdock`; icon caches and diagnostic logs live in `%LOCALAPPDATA%\Swiftdock`. Portable mode keeps everything in `Data\`. The tray menu can open the config folder. Logs remain on your computer; see [logging](docs/LOGGING.md) before sharing them.
 

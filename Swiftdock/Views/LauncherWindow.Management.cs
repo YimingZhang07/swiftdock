@@ -3,6 +3,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media.Animation;
 using System.Windows;
+using Swiftdock.Services;
 using Swiftdock.Models;
 using Swiftdock.ViewModels;
 
@@ -24,8 +25,8 @@ public partial class LauncherWindow
         var tab = (Button)sender;
         var group = (LaunchGroup)tab.Tag;
         var menu = new ContextMenu();
-        menu.Items.Add(new MenuItem { Header = "重命名分组", Command = Launcher.RenameGroupCommand, CommandParameter = group });
-        var delete = new MenuItem { Header = "删除分组…", Command = Launcher.DeleteGroupCommand, CommandParameter = group };
+        menu.Items.Add(new LocalizedMenuItem(L.Text("RenameGroup")) { Command = Launcher.RenameGroupCommand, CommandParameter = group });
+        var delete = new LocalizedMenuItem(L.Text("DeleteGroup321")) { Command = Launcher.DeleteGroupCommand, CommandParameter = group };
         delete.SetResourceReference(ForegroundProperty, "SystemFillColorCriticalBrush");
         menu.Items.Add(delete);
         menu.Opened += (_, _) => Launcher.MenuOpen = true;

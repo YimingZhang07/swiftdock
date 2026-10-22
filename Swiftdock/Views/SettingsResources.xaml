@@ -3,6 +3,7 @@
         xmlns:views="clr-namespace:Swiftdock.Views"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
+        <Style TargetType="TextBlock"><Setter Property="TextWrapping" Value="Wrap" /></Style>
         <views:SelectionConverter x:Key="Selection" />
         <Style TargetType="ui:CardControl" BasedOn="{StaticResource DefaultUiCardControlStyle}">
             <Setter Property="Margin" Value="0,0,0,6" /><Setter Property="MinHeight" Value="60" />
@@ -11,7 +12,7 @@
         <Style x:Key="SettingDescription" TargetType="TextBlock">
             <Setter Property="FontSize" Value="12" /><Setter Property="Margin" Value="0,4,0,0" />
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
-            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
         <Style x:Key="AccentSwatch" TargetType="RadioButton">
             <Setter Property="Width" Value="28" /><Setter Property="Height" Value="28" /><Setter Property="Margin" Value="1,0" />
@@ -27,5 +28,5 @@
                 </ControlTemplate.Triggers>
             </ControlTemplate></Setter.Value></Setter>
         </Style>
-    
+
 </ResourceDictionary>

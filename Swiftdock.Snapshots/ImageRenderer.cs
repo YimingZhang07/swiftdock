@@ -56,9 +56,14 @@ internal static class ImageRenderer
     private static async Task RenderAsync(string output, SnapshotImage image)
     {
         Console.Error.WriteLine("Phase: composition");
+        Swiftdock.Services.Localization.Instance.Apply(image.Language);
         string profile = Path.Combine(output, "profiles", "snapshots-" + Guid.NewGuid().ToString("N"));
         await using var store = ConfigService.Open(profile, writer: new RenderConfigWriter());
         using var state = new MainViewModel(store);
+        state.SetLanguage(image.Language);
+        // Fixture data is created once in its requested UI language.
+        state.Groups[0].Name = Swiftdock.Services.Localization.Instance["Favorites"];
+        if (state.Groups.Count > 1) state.Groups[1].Name = Swiftdock.Services.Localization.Instance["Work"];
         state.SetAutoFetchWebsiteIcons(false);
         state.SetWindowSize(new Size(620, 350));
         state.SetScale(image.Scale);
@@ -113,7 +118,7 @@ internal static class ImageRenderer
             {
                 case "launcher": target = launcherWindow; break;
                 case "launcher-status":
-                    launcher.SetStatus("拖动中 · Esc 取消 · 松开提交");
+                    launcher.SetStatus(Swiftdock.Services.Localization.Text("DraggingEscToCancelReleaseToMove"));
                     target = launcherWindow;
                     break;
                 case "settings-general":
@@ -126,7 +131,7 @@ internal static class ImageRenderer
                     target = settings;
                     break;
                 case "name-dialog":
-                    scope.ServiceProvider.GetRequiredService<NameDialogViewModel>().Initialize("新建分组", "新分组");
+                    scope.ServiceProvider.GetRequiredService<NameDialogViewModel>().Initialize(Swiftdock.Services.Localization.Text("CreateGroup"), Swiftdock.Services.Localization.Text("NewGroup"));
                     target = Open(scope.ServiceProvider.GetRequiredService<NameDialog>());
                     break;
                 case "add-dialog":
@@ -180,9 +185,9 @@ internal static class ImageRenderer
                     // or ShowDialogAsync: the latter enters a modal loop before returning.
                     target = Open(new Wpf.Ui.Controls.MessageBox
                     {
-                        Title = "删除分组", Content = $"删除“{group.Name}”及其中的条目？此操作不能用单条撤销恢复。",
-                        PrimaryButtonText = "删除", PrimaryButtonAppearance = Wpf.Ui.Controls.ControlAppearance.Danger,
-                        CloseButtonText = "取消", ResizeMode = ResizeMode.NoResize, MaxWidth = 460,
+                        Title = Swiftdock.Services.Localization.Text("DeleteGroup"), Content = Swiftdock.Services.Localization.Text("Delete0AndItsItemsThisCannotBeUndoneWithItemUndo", group.Name).Value,
+                        PrimaryButtonText = Swiftdock.Services.Localization.Text("Delete"), PrimaryButtonAppearance = Wpf.Ui.Controls.ControlAppearance.Danger,
+                        CloseButtonText = Swiftdock.Services.Localization.Text("Cancel"), ResizeMode = ResizeMode.NoResize, MaxWidth = 460,
                         FontFamily = launcherWindow.FontFamily
                     });
                     break;

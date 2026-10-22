@@ -24,6 +24,7 @@
 ; Permanent product identity: NEVER change this GUID, including for future versions.
 AppId={{#ProductAppId}
 AppName=Swiftdock
+AppVerName={cm:ProductName} {#AppVersion}
 VersionInfoProductName=Swiftdock
 AppVersion={#AppVersion}
 VersionInfoVersion={#AppVersion}
@@ -51,6 +52,49 @@ RestartApplications=no
 Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 
+[CustomMessages]
+english.ProductName=Swiftdock
+chinesesimplified.ProductName=迅启
+english.LaunchProduct=Launch Swiftdock
+chinesesimplified.LaunchProduct=启动迅启
+english.ExitMessage=Swiftdock or QuickLaunch is still running or its exit could not be verified. Exit it from the tray, then retry.
+chinesesimplified.ExitMessage=迅启或旧版 QuickLaunch 仍在运行或无法确认其已退出。请从托盘退出后重试。
+english.ChooseNewDirectory=Choose a new Swiftdock installation directory.
+chinesesimplified.ChooseNewDirectory=请选择新的迅启安装目录。
+english.DeleteData=Also delete Swiftdock and legacy QuickLaunch configuration, icon cache and logs? Data is kept by default.
+chinesesimplified.DeleteData=是否同时删除迅启和旧版 QuickLaunch 的配置、图标缓存和日志？默认保留。
+
+[Messages]
+english.BeveledLabel=Swiftdock
+chinesesimplified.BeveledLabel=迅启
+english.SetupWindowTitle=Swiftdock Setup
+chinesesimplified.SetupWindowTitle=迅启安装程序
+english.WelcomeLabel2=This will install Swiftdock {#AppVersion} on your computer.%n%nClose other applications before continuing.
+chinesesimplified.WelcomeLabel2=即将在您的电脑上安装迅启 {#AppVersion}。%n%n建议您在继续前关闭其他应用程序。
+
+chinesesimplified.WelcomeLabel1=欢迎使用 迅启 安装向导
+chinesesimplified.SelectDirDesc=您想将 迅启 安装在哪里？
+chinesesimplified.SelectDirLabel3=安装程序将安装 迅启 到下面的文件夹中。
+chinesesimplified.SelectTasksLabel2=选择您想要安装程序在安装 迅启 时执行的附加任务，然后点击“下一步”。
+chinesesimplified.ReadyLabel1=安装程序准备就绪，现在可以开始安装 迅启 到您的计算机。
+chinesesimplified.PreparingDesc=安装程序正在准备安装 迅启 到您的计算机。
+chinesesimplified.PreviousInstallNotCompleted=先前的程序安装或卸载未完成，需要您重启计算机以完成该安装。%n%n在重启计算机后，再次运行安装程序以完成 迅启 的安装。
+chinesesimplified.PrepareToInstallNeedsRestart=安装程序必须重启您的计算机。计算机重启后，请再次运行安装程序以完成 迅启 的安装。%n%n要立即重启吗？
+chinesesimplified.InstallingLabel=安装程序正在安装 迅启 到您的计算机，请稍候。
+chinesesimplified.FinishedHeadingLabel=完成 迅启 安装向导
+chinesesimplified.FinishedLabelNoIcons=安装程序已在您的计算机中安装了 迅启。
+chinesesimplified.FinishedLabel=安装程序已在您的计算机中安装了 迅启。您可以通过已安装的快捷方式运行此应用程序。
+chinesesimplified.FinishedRestartLabel=为完成 迅启 的安装，安装程序必须重新启动您的计算机。要立即重启吗？
+chinesesimplified.FinishedRestartMessage=为完成 迅启 的安装，安装程序必须重新启动您的计算机。%n%n要立即重启吗？
+chinesesimplified.ConfirmUninstall=确定要完全删除迅启及其所有组件吗？
+chinesesimplified.UninstallStatusLabel=正在从您的电脑中删除迅启，请稍候。
+chinesesimplified.UninstalledAll=迅启已成功从您的电脑中删除。
+chinesesimplified.UninstalledMost=迅启卸载完成。%n%n某些文件未能删除，可手动删除。
+chinesesimplified.UninstalledAndNeedsRestart=要完成迅启的卸载，必须重新启动电脑。%n%n现在重新启动吗？
+chinesesimplified.StatusUninstalling=正在卸载迅启…
+chinesesimplified.ShutdownBlockReasonInstallingApp=正在安装迅启。
+chinesesimplified.ShutdownBlockReasonUninstallingApp=正在卸载迅启。
+
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
@@ -64,14 +108,13 @@ Name: "{autoprograms}\Swiftdock"; Filename: "{app}\Swiftdock.exe"
 Name: "{autodesktop}\Swiftdock"; Filename: "{app}\Swiftdock.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\Swiftdock.exe"; Description: "{cm:LaunchProgram,Swiftdock}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\Swiftdock.exe"; Description: "{cm:LaunchProduct}"; Flags: nowait postinstall skipifsilent
 
 [Code]
 const
   RunKey = 'Software\Microsoft\Windows\CurrentVersion\Run';
   UninstallKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#ProductAppId}_is1';
-  ExitMessage = '迅启或旧版 QuickLaunch 仍在运行或无法确认其已退出。请从托盘退出后重试。' + #13#10 +
-    'Swiftdock or QuickLaunch is still running or its exit could not be verified. Exit it from the tray, then retry.';
+
 
 var
   PreviousDirectory, PreviousUninstaller: String;
@@ -138,17 +181,33 @@ begin
   Result := False;
 end;
 
+function IsLegacyDirectory(Directory: String): Boolean;
+begin
+  Result := LegacyInstallation and
+    (CompareText(RemoveBackslash(ExpandFileName(PreviousDirectory)), RemoveBackslash(ExpandFileName(Directory))) = 0);
+end;
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if (CurPageID = wpSelectDir) and IsLegacyDirectory(WizardDirValue) then begin
+    MsgBox(CustomMessage('ChooseNewDirectory'), mbInformation, MB_OK);
+    Result := False;
+  end;
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   Result := '';
-  if LegacyInstallation and (CompareText(ExpandFileName(PreviousDirectory), ExpandFileName(ExpandConstant('{app}'))) = 0) then begin
-    Result := '请选择新的迅启安装目录。' + #13#10 + 'Choose a new Swiftdock installation directory.';
+  { Defensive guard for silent installs using /DIR without a directory page. }
+  if IsLegacyDirectory(ExpandConstant('{app}')) then begin
+    Result := CustomMessage('ChooseNewDirectory');
     Exit;
   end;
-  if not StopApp(ExpandConstant('{app}\Swiftdock.exe')) then begin Result := ExitMessage; Exit; end;
+  if not StopApp(ExpandConstant('{app}\Swiftdock.exe')) then begin Result := CustomMessage('ExitMessage'); Exit; end;
   if PreviousDirectory <> '' then begin
-    if not StopApp(AddBackslash(PreviousDirectory) + 'QuickLaunch.exe') then begin Result := ExitMessage; Exit; end;
-    if not StopApp(AddBackslash(PreviousDirectory) + 'Swiftdock.exe') then Result := ExitMessage;
+    if not StopApp(AddBackslash(PreviousDirectory) + 'QuickLaunch.exe') then begin Result := CustomMessage('ExitMessage'); Exit; end;
+    if not StopApp(AddBackslash(PreviousDirectory) + 'Swiftdock.exe') then Result := CustomMessage('ExitMessage');
   end;
 end;
 
@@ -157,10 +216,10 @@ begin
   Result := StopApp(ExpandConstant('{app}\Swiftdock.exe'));
   while not Result do begin
     if UninstallSilent then begin
-      Log(ExitMessage);
+      Log(CustomMessage('ExitMessage'));
       Exit;
     end;
-    if MsgBox(ExitMessage, mbError, MB_RETRYCANCEL) <> IDRETRY then Exit;
+    if MsgBox(CustomMessage('ExitMessage'), mbError, MB_RETRYCANCEL) <> IDRETRY then Exit;
     Result := StopApp(ExpandConstant('{app}\Swiftdock.exe'));
   end;
 end;
@@ -309,8 +368,7 @@ begin
     if not StopInstalledAppForUninstall then Abort;
     RemoveInstalledStartupValues;
     if not UninstallSilent then
-      if MsgBox('是否同时删除迅启和旧版 QuickLaunch 的配置、图标缓存和日志？默认保留。' + #13#10 +
-          'Also delete Swiftdock and legacy QuickLaunch configuration, icon cache and logs? Data is kept by default.' + #13#10#13#10 +
+      if MsgBox(CustomMessage('DeleteData') + #13#10#13#10 +
           ExpandConstant('{userappdata}\Swiftdock') + #13#10 + ExpandConstant('{localappdata}\Swiftdock') + #13#10 +
           ExpandConstant('{userappdata}\QuickLaunch') + #13#10 + ExpandConstant('{localappdata}\QuickLaunch'),
           mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then begin

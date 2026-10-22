@@ -1,0 +1,1169 @@
+<?xml version='1.0' encoding='utf-8'?>
+<root>
+  <data name="0CouldNotBeRegistered1ChooseAnotherHotkeyInSettingsTheTrayIsStill" xml:space="preserve">
+    <value>{0} could not be registered ({1}). Choose another hotkey in Settings; the tray is still available.</value>
+  </data>
+  <data name="0IsNotAValidHttpHttpsUrl" xml:space="preserve">
+    <value>{0} is not a valid http/https URL.</value>
+  </data>
+  <data name="AHotkeyRequiresAtLeastOneModifierAndASupportedMainKey" xml:space="preserve">
+    <value>A hotkey requires at least one modifier and a supported main key.</value>
+  </data>
+  <data name="About" xml:space="preserve">
+    <value>About</value>
+  </data>
+  <data name="AboutVersion" xml:space="preserve">
+    <value>{0} · {1} {2}</value>
+  </data>
+  <data name="AccentColor" xml:space="preserve">
+    <value>Accent color</value>
+  </data>
+  <data name="Acrylic" xml:space="preserve">
+    <value>Acrylic</value>
+  </data>
+  <data name="ActivationWasNotConfirmedClickThePanelToContinueDetailsWereLogged" xml:space="preserve">
+    <value>Activation was not confirmed. Click the panel to continue. Details were logged.</value>
+  </data>
+  <data name="Add" xml:space="preserve">
+    <value>Add</value>
+  </data>
+  <data name="AddItem" xml:space="preserve">
+    <value>Add item</value>
+  </data>
+  <data name="AddItemOrDropFiles" xml:space="preserve">
+    <value>Add item (or drop files)</value>
+  </data>
+  <data name="AddUpTo256ItemsAtOnceDropDataMustNotExceed1Mb" xml:space="preserve">
+    <value>Add up to 256 items at once. Drop data must not exceed 1 MB.</value>
+  </data>
+  <data name="Added0Items12" xml:space="preserve">
+    <value>Added {0} items. {1} {2}</value>
+  </data>
+  <data name="AddressBook" xml:space="preserve">
+    <value>Address book</value>
+  </data>
+  <data name="AdjustPanelIconsTextAndSpacing" xml:space="preserve">
+    <value>Adjust panel icons, text and spacing</value>
+  </data>
+  <data name="AdvancedOptions" xml:space="preserve">
+    <value>Advanced options</value>
+  </data>
+  <data name="Alarm" xml:space="preserve">
+    <value>Alarm</value>
+  </data>
+  <data name="Alert" xml:space="preserve">
+    <value>Alert</value>
+  </data>
+  <data name="AllFiles" xml:space="preserve">
+    <value>All files (*.*)|*.*</value>
+  </data>
+  <data name="Amber" xml:space="preserve">
+    <value>Amber</value>
+  </data>
+  <data name="App" xml:space="preserve">
+    <value>App</value>
+  </data>
+  <data name="AppList" xml:space="preserve">
+    <value>App list</value>
+  </data>
+  <data name="Appearance" xml:space="preserve">
+    <value>Appearance</value>
+  </data>
+  <data name="ApplicationPath" xml:space="preserve">
+    <value>Application path</value>
+  </data>
+  <data name="ApplicationsExeLnkBatCmdExeLnkBatCmd" xml:space="preserve">
+    <value>Applications (*.exe;*.lnk;*.bat;*.cmd)|*.exe;*.lnk;*.bat;*.cmd</value>
+  </data>
+  <data name="AppliedChangesWillBeSavedAutomatically" xml:space="preserve">
+    <value>Applied. Changes will be saved automatically.</value>
+  </data>
+  <data name="AppliesImmediatelyToPanelAndDialogs" xml:space="preserve">
+    <value>Applies immediately to panel and dialogs</value>
+  </data>
+  <data name="Apply" xml:space="preserve">
+    <value>Apply</value>
+  </data>
+  <data name="Appointment" xml:space="preserve">
+    <value>Appointment</value>
+  </data>
+  <data name="Approvals" xml:space="preserve">
+    <value>Approvals</value>
+  </data>
+  <data name="AppsDevelopment" xml:space="preserve">
+    <value>Apps / Development</value>
+  </data>
+  <data name="Archive" xml:space="preserve">
+    <value>Archive</value>
+  </data>
+  <data name="AreaChart" xml:space="preserve">
+    <value>Area chart</value>
+  </data>
+  <data name="Arguments" xml:space="preserve">
+    <value>Arguments</value>
+  </data>
+  <data name="Assistant" xml:space="preserve">
+    <value>Assistant</value>
+  </data>
+  <data name="AtLeastOneMonitorIsRequired" xml:space="preserve">
+    <value>At least one monitor is required.</value>
+  </data>
+  <data name="Attachment" xml:space="preserve">
+    <value>Attachment</value>
+  </data>
+  <data name="AutoFetchIsOffChooseAnIconManually" xml:space="preserve">
+    <value>Auto-fetch is off. Choose an icon manually.</value>
+  </data>
+  <data name="AutoFetchWebsiteIcons" xml:space="preserve">
+    <value>Auto-fetch website icons</value>
+  </data>
+  <data name="BackgroundMaterial" xml:space="preserve">
+    <value>Background material</value>
+  </data>
+  <data name="BarChart" xml:space="preserve">
+    <value>Bar chart</value>
+  </data>
+  <data name="Blue" xml:space="preserve">
+    <value>Blue</value>
+  </data>
+  <data name="Board" xml:space="preserve">
+    <value>Board</value>
+  </data>
+  <data name="Book" xml:space="preserve">
+    <value>Book</value>
+  </data>
+  <data name="Bookmark" xml:space="preserve">
+    <value>Bookmark</value>
+  </data>
+  <data name="Books" xml:space="preserve">
+    <value>Books</value>
+  </data>
+  <data name="Broadcast" xml:space="preserve">
+    <value>Broadcast</value>
+  </data>
+  <data name="Browse" xml:space="preserve">
+    <value>Browse…</value>
+  </data>
+  <data name="Calculator" xml:space="preserve">
+    <value>Calculator</value>
+  </data>
+  <data name="Calendar" xml:space="preserve">
+    <value>Calendar</value>
+  </data>
+  <data name="Camera" xml:space="preserve">
+    <value>Camera</value>
+  </data>
+  <data name="Campus" xml:space="preserve">
+    <value>Campus</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="CancelImport" xml:space="preserve">
+    <value>Cancel import</value>
+  </data>
+  <data name="Cannot" xml:space="preserve">
+    <value>Cannot</value>
+  </data>
+  <data name="Certificate" xml:space="preserve">
+    <value>Certificate</value>
+  </data>
+  <data name="ChangeIcon" xml:space="preserve">
+    <value>Change icon</value>
+  </data>
+  <data name="ChangeIcon327" xml:space="preserve">
+    <value>Change icon…</value>
+  </data>
+  <data name="Chart" xml:space="preserve">
+    <value>Chart</value>
+  </data>
+  <data name="Chat" xml:space="preserve">
+    <value>Chat</value>
+  </data>
+  <data name="CheckingTarget" xml:space="preserve">
+    <value>Checking target…</value>
+  </data>
+  <data name="Chinese" xml:space="preserve">
+    <value>中文</value>
+    <comment>Language endonym: keep this label unchanged in every UI language.</comment>
+  </data>
+  <data name="ChooseAFileInsteadOfAFolder" xml:space="preserve">
+    <value>Choose a file instead of a folder.</value>
+  </data>
+  <data name="ChooseAnExeLnkBatOrCmdApplication" xml:space="preserve">
+    <value>Choose an .exe, .lnk, .bat or .cmd application.</value>
+  </data>
+  <data name="ChooseAnItemType" xml:space="preserve">
+    <value>Choose an item type.</value>
+  </data>
+  <data name="ChooseApplication" xml:space="preserve">
+    <value>Choose application</value>
+  </data>
+  <data name="ChooseFile" xml:space="preserve">
+    <value>Choose file</value>
+  </data>
+  <data name="ChooseFolder" xml:space="preserve">
+    <value>Choose folder</value>
+  </data>
+  <data name="ChooseFromFile" xml:space="preserve">
+    <value>Choose from file…</value>
+  </data>
+  <data name="ChooseIcon" xml:space="preserve">
+    <value>Choose icon</value>
+  </data>
+  <data name="Clipboard" xml:space="preserve">
+    <value>Clipboard</value>
+  </data>
+  <data name="Clock" xml:space="preserve">
+    <value>Clock</value>
+  </data>
+  <data name="Close" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="Cloud" xml:space="preserve">
+    <value>Cloud</value>
+  </data>
+  <data name="CloudStorage" xml:space="preserve">
+    <value>Cloud storage</value>
+  </data>
+  <data name="Code" xml:space="preserve">
+    <value>Code</value>
+  </data>
+  <data name="CodeBlock" xml:space="preserve">
+    <value>Code block</value>
+  </data>
+  <data name="Color" xml:space="preserve">
+    <value>Color</value>
+  </data>
+  <data name="Colors" xml:space="preserve">
+    <value>Colors</value>
+  </data>
+  <data name="ColumnsMustBeBetween1And12" xml:space="preserve">
+    <value>Columns must be between 1 and 12.</value>
+  </data>
+  <data name="Comment" xml:space="preserve">
+    <value>Comment</value>
+  </data>
+  <data name="Communication" xml:space="preserve">
+    <value>Communication</value>
+  </data>
+  <data name="Completed" xml:space="preserve">
+    <value>Completed</value>
+  </data>
+  <data name="Computer" xml:space="preserve">
+    <value>Computer</value>
+  </data>
+  <data name="ConfigurationCannotBeChangedRightNow" xml:space="preserve">
+    <value>Configuration cannot be changed right now.</value>
+  </data>
+  <data name="ConfigurationExceeds4MbTheExistingFileWasKept" xml:space="preserve">
+    <value>Configuration exceeds 4 MB. The existing file was kept.</value>
+  </data>
+  <data name="ConfigurationExceedsThe4MbLimit" xml:space="preserve">
+    <value>Configuration exceeds the 4 MB limit.</value>
+  </data>
+  <data name="ConfigurationFolder" xml:space="preserve">
+    <value>Configuration folder</value>
+  </data>
+  <data name="ConfigurationHasNoValidVersion" xml:space="preserve">
+    <value>Configuration has no valid version.</value>
+  </data>
+  <data name="ConfigurationIsEmpty" xml:space="preserve">
+    <value>Configuration is empty.</value>
+  </data>
+  <data name="ConfigurationIsReadOnly" xml:space="preserve">
+    <value>Configuration is read-only.</value>
+  </data>
+  <data name="ConfigurationIsReadOnlyAndCannotBeChanged" xml:space="preserve">
+    <value>Configuration is read-only and cannot be changed.</value>
+  </data>
+  <data name="ConfigurationIsReadOnlyWritingIsDisabled" xml:space="preserve">
+    <value>Configuration is read-only; writing is disabled.</value>
+  </data>
+  <data name="ConfigurationIsReadOnlyYouCanLaunchItemsButCannotAddOrReorderThem" xml:space="preserve">
+    <value>Configuration is read-only. You can launch items, but cannot add or reorder them.</value>
+  </data>
+  <data name="ConfigurationRestoredFromBackupTheDamagedFileWasKept" xml:space="preserve">
+    <value>Configuration restored from backup. The damaged file was kept.</value>
+  </data>
+  <data name="ConfigurationVersion0IsNewerThanSupportedVersion1OverwritingIsDis" xml:space="preserve">
+    <value>Configuration version {0} is newer than supported version 1. Overwriting is disabled.</value>
+  </data>
+  <data name="ContactCard" xml:space="preserve">
+    <value>Contact card</value>
+  </data>
+  <data name="ContactEachWebsiteDirectlyForItsIcon" xml:space="preserve">
+    <value>Contact each website directly for its icon</value>
+  </data>
+  <data name="Contacts" xml:space="preserve">
+    <value>Contacts</value>
+  </data>
+  <data name="Conversation" xml:space="preserve">
+    <value>Conversation</value>
+  </data>
+  <data name="CouldNot" xml:space="preserve">
+    <value>Could not</value>
+  </data>
+  <data name="CouldNotAccessStartupSettingsForTheCurrentUser" xml:space="preserve">
+    <value>Could not access startup settings for the current user.</value>
+  </data>
+  <data name="CouldNotDetermineTheCurrentUserSid" xml:space="preserve">
+    <value>Could not determine the current user SID.</value>
+  </data>
+  <data name="CouldNotOpenTheFileLocation0" xml:space="preserve">
+    <value>Could not open the file location: {0}</value>
+  </data>
+  <data name="CouldNotPreserveTheDamagedFileRunningReadOnlyAutomaticRepairStopp" xml:space="preserve">
+    <value>Could not preserve the damaged file. Running read-only; automatic repair stopped: {0}</value>
+  </data>
+  <data name="CouldNotReadConfigurationTheOriginalFileWasKept0" xml:space="preserve">
+    <value>Could not read configuration. The original file was kept: {0}</value>
+  </data>
+  <data name="CouldNotReadTheBackupTheOriginalFileWasKept0" xml:space="preserve">
+    <value>Could not read the backup. The original file was kept: {0}</value>
+  </data>
+  <data name="CouldNotReadThisCommonLocation" xml:space="preserve">
+    <value>Could not read this common location.</value>
+  </data>
+  <data name="CouldNotUpdateStartupSettings0" xml:space="preserve">
+    <value>Could not update startup settings: {0}</value>
+  </data>
+  <data name="CreateAGroupOrDropAnItemHere" xml:space="preserve">
+    <value>Create a group, or drop an item here</value>
+  </data>
+  <data name="CreateGroup" xml:space="preserve">
+    <value>Create group</value>
+  </data>
+  <data name="Dark" xml:space="preserve">
+    <value>Dark</value>
+  </data>
+  <data name="DataFolderChoice" xml:space="preserve">
+    <value>{0}
+Yes: use the default folder
+No: run read-only
+Cancel: exit</value>
+  </data>
+  <data name="DataHandbook" xml:space="preserve">
+    <value>Data handbook</value>
+  </data>
+  <data name="Database" xml:space="preserve">
+    <value>Database</value>
+  </data>
+  <data name="Debug" xml:space="preserve">
+    <value>Debug</value>
+  </data>
+  <data name="DefaultPositionAndSizeRestoredChangesWillBeSavedAutomatically" xml:space="preserve">
+    <value>Default position and size restored. Changes will be saved automatically.</value>
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="Delete0AndItsItemsThisCannotBeUndoneWithItemUndo" xml:space="preserve">
+    <value>Delete “{0}” and its items? This cannot be undone with item undo.</value>
+  </data>
+  <data name="DeleteGroup" xml:space="preserve">
+    <value>Delete group</value>
+  </data>
+  <data name="DeleteGroup321" xml:space="preserve">
+    <value>Delete group…</value>
+  </data>
+  <data name="DeletedItemRestored" xml:space="preserve">
+    <value>Deleted item restored.</value>
+  </data>
+  <data name="DeletedPressCtrlZWithin5SecondsToUndo" xml:space="preserve">
+    <value>Deleted. Press Ctrl+Z within 5 seconds to undo.</value>
+  </data>
+  <data name="Design" xml:space="preserve">
+    <value>Design</value>
+  </data>
+  <data name="Desktop" xml:space="preserve">
+    <value>Desktop</value>
+  </data>
+  <data name="DeviceConnection" xml:space="preserve">
+    <value>Device connection</value>
+  </data>
+  <data name="Devices" xml:space="preserve">
+    <value>Devices</value>
+  </data>
+  <data name="DiagnosticLogs" xml:space="preserve">
+    <value>Diagnostic logs</value>
+  </data>
+  <data name="DocumentFolder" xml:space="preserve">
+    <value>Document folder</value>
+  </data>
+  <data name="Documents" xml:space="preserve">
+    <value>Documents</value>
+  </data>
+  <data name="Downloads" xml:space="preserve">
+    <value>Downloads</value>
+  </data>
+  <data name="DragTheTitleBarToMoveEdgesToResize" xml:space="preserve">
+    <value>Drag the title bar to move; edges to resize</value>
+  </data>
+  <data name="DraggingEscToCancelReleaseToMove" xml:space="preserve">
+    <value>Dragging · Esc to cancel · Release to move</value>
+  </data>
+  <data name="DropAUnicodeUrlOrPlainText" xml:space="preserve">
+    <value>Drop a Unicode URL or plain text.</value>
+  </data>
+  <data name="DropDataIsTooLarge" xml:space="preserve">
+    <value>Drop data is too large.</value>
+  </data>
+  <data name="DropFilesFoldersOrUrlsHere" xml:space="preserve">
+    <value>Drop files, folders or URLs here</value>
+  </data>
+  <data name="DroppedTextIsTooLong" xml:space="preserve">
+    <value>Dropped text is too long.</value>
+  </data>
+  <data name="DuplicateItemsWereSkipped" xml:space="preserve">
+    <value>Duplicate items were skipped.</value>
+  </data>
+  <data name="Edit" xml:space="preserve">
+    <value>Edit…</value>
+  </data>
+  <data name="EditDocument" xml:space="preserve">
+    <value>Edit document</value>
+  </data>
+  <data name="EditItem" xml:space="preserve">
+    <value>Edit item</value>
+  </data>
+  <data name="ElevationWasCancelled" xml:space="preserve">
+    <value>Elevation was cancelled</value>
+  </data>
+  <data name="English" xml:space="preserve">
+    <value>English</value>
+  </data>
+  <data name="EnterAName" xml:space="preserve">
+    <value>Enter a name.</value>
+  </data>
+  <data name="EnterAValidHttpHttpsUrl" xml:space="preserve">
+    <value>Enter a valid http/https URL.</value>
+  </data>
+  <data name="EnterAnAbsolutePathWithoutQuotes" xml:space="preserve">
+    <value>Enter an absolute path without quotes.</value>
+  </data>
+  <data name="Error" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="ExitSwiftdock" xml:space="preserve">
+    <value>Exit Swiftdock</value>
+  </data>
+  <data name="Extension" xml:space="preserve">
+    <value>Extension</value>
+  </data>
+  <data name="Failed" xml:space="preserve">
+    <value>Failed</value>
+  </data>
+  <data name="Favorite" xml:space="preserve">
+    <value>Favorite</value>
+  </data>
+  <data name="Favorites" xml:space="preserve">
+    <value>Favorites</value>
+  </data>
+  <data name="File" xml:space="preserve">
+    <value>File</value>
+  </data>
+  <data name="FilePath" xml:space="preserve">
+    <value>File path</value>
+  </data>
+  <data name="Flag" xml:space="preserve">
+    <value>Flag</value>
+  </data>
+  <data name="Folder" xml:space="preserve">
+    <value>Folder</value>
+  </data>
+  <data name="FolderPath" xml:space="preserve">
+    <value>Folder path</value>
+  </data>
+  <data name="FollowPointer" xml:space="preserve">
+    <value>Follow pointer</value>
+  </data>
+  <data name="FollowSystem" xml:space="preserve">
+    <value>Follow system</value>
+  </data>
+  <data name="ForSelectionsAndPrimaryActions" xml:space="preserve">
+    <value>For selections and primary actions</value>
+  </data>
+  <data name="Form" xml:space="preserve">
+    <value>Form</value>
+  </data>
+  <data name="Games" xml:space="preserve">
+    <value>Games</value>
+  </data>
+  <data name="Gauge" xml:space="preserve">
+    <value>Gauge</value>
+  </data>
+  <data name="General" xml:space="preserve">
+    <value>General</value>
+  </data>
+  <data name="Gift" xml:space="preserve">
+    <value>Gift</value>
+  </data>
+  <data name="Gray" xml:space="preserve">
+    <value>Gray</value>
+  </data>
+  <data name="Green" xml:space="preserve">
+    <value>Green</value>
+  </data>
+  <data name="Group0ContainsAnInvalidItemOriginalDataWasKept" xml:space="preserve">
+    <value>Group {0} contains an invalid item. Original data was kept.</value>
+  </data>
+  <data name="GroupNameMustNotBeEmpty" xml:space="preserve">
+    <value>Group name must not be empty.</value>
+  </data>
+  <data name="GroupsMustNotBeNull" xml:space="preserve">
+    <value>Groups must not be null.</value>
+  </data>
+  <data name="Headphones" xml:space="preserve">
+    <value>Headphones</value>
+  </data>
+  <data name="Headset" xml:space="preserve">
+    <value>Headset</value>
+  </data>
+  <data name="Heart" xml:space="preserve">
+    <value>Heart</value>
+  </data>
+  <data name="Help" xml:space="preserve">
+    <value>Help</value>
+  </data>
+  <data name="HideEsc0ToShow" xml:space="preserve">
+    <value>Hide (Esc) · {0} to show</value>
+  </data>
+  <data name="HidePanel" xml:space="preserve">
+    <value>Hide panel</value>
+  </data>
+  <data name="History" xml:space="preserve">
+    <value>History</value>
+  </data>
+  <data name="Home" xml:space="preserve">
+    <value>Home</value>
+  </data>
+  <data name="House" xml:space="preserve">
+    <value>House</value>
+  </data>
+  <data name="IconsAndImagesIcoPngJpgBmpExeDllIcoPngJpgBmpExeDll" xml:space="preserve">
+    <value>Icons and images (*.ico;*.png;*.jpg;*.bmp;*.exe;*.dll)|*.ico;*.png;*.jpg;*.bmp;*.exe;*.dll</value>
+  </data>
+  <data name="Ideas" xml:space="preserve">
+    <value>Ideas</value>
+  </data>
+  <data name="ImageSearch" xml:space="preserve">
+    <value>Image search</value>
+  </data>
+  <data name="ImportCancelled" xml:space="preserve">
+    <value>Import cancelled.</value>
+  </data>
+  <data name="ImportFailed0" xml:space="preserve">
+    <value>Import failed: {0}</value>
+  </data>
+  <data name="InvalidGroupNameOrItems" xml:space="preserve">
+    <value>Invalid group name or items.</value>
+  </data>
+  <data name="InvalidOrDuplicateId0" xml:space="preserve">
+    <value>Invalid or duplicate ID: {0}</value>
+  </data>
+  <data name="InvalidUrlByteStreamLength" xml:space="preserve">
+    <value>Invalid URL byte stream length.</value>
+  </data>
+  <data name="ItemUpdatedChangesWillBeSavedAutomatically" xml:space="preserve">
+    <value>Item updated. Changes will be saved automatically.</value>
+  </data>
+  <data name="KeepOnTop" xml:space="preserve">
+    <value>Keep on top</value>
+  </data>
+  <data name="KeepTransparencyWhenInactive" xml:space="preserve">
+    <value>Keep transparency when inactive</value>
+  </data>
+  <data name="Key" xml:space="preserve">
+    <value>Key</value>
+  </data>
+  <data name="Language" xml:space="preserve">
+    <value>Language</value>
+  </data>
+  <data name="LastPosition" xml:space="preserve">
+    <value>Last position</value>
+  </data>
+  <data name="LaunchFailed" xml:space="preserve">
+    <value>Could not launch the target (error {0}).</value>
+  </data>
+  <data name="LaunchStatus" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="Library" xml:space="preserve">
+    <value>Library</value>
+  </data>
+  <data name="Life" xml:space="preserve">
+    <value>Life</value>
+  </data>
+  <data name="Light" xml:space="preserve">
+    <value>Light</value>
+  </data>
+  <data name="Lightbulb" xml:space="preserve">
+    <value>Lightbulb</value>
+  </data>
+  <data name="LineChart" xml:space="preserve">
+    <value>Line chart</value>
+  </data>
+  <data name="Link" xml:space="preserve">
+    <value>Link</value>
+  </data>
+  <data name="List" xml:space="preserve">
+    <value>List</value>
+  </data>
+  <data name="LoadedTheBackupReadOnly" xml:space="preserve">
+    <value>Loaded the backup read-only.</value>
+  </data>
+  <data name="Location" xml:space="preserve">
+    <value>Location</value>
+  </data>
+  <data name="Locations" xml:space="preserve">
+    <value>Locations</value>
+  </data>
+  <data name="Lock" xml:space="preserve">
+    <value>Lock</value>
+  </data>
+  <data name="Locked" xml:space="preserve">
+    <value>Locked</value>
+  </data>
+  <data name="Magenta" xml:space="preserve">
+    <value>Magenta</value>
+  </data>
+  <data name="Mail" xml:space="preserve">
+    <value>Mail</value>
+  </data>
+  <data name="Mailbox" xml:space="preserve">
+    <value>Mailbox</value>
+  </data>
+  <data name="MainKey" xml:space="preserve">
+    <value>Main key</value>
+  </data>
+  <data name="Maintenance" xml:space="preserve">
+    <value>Maintenance</value>
+  </data>
+  <data name="Map" xml:space="preserve">
+    <value>Map</value>
+  </data>
+  <data name="Mark" xml:space="preserve">
+    <value>Mark</value>
+  </data>
+  <data name="Maximize" xml:space="preserve">
+    <value>Maximize</value>
+  </data>
+  <data name="Media" xml:space="preserve">
+    <value>Media</value>
+  </data>
+  <data name="Mica" xml:space="preserve">
+    <value>Mica</value>
+  </data>
+  <data name="Microphone" xml:space="preserve">
+    <value>Microphone</value>
+  </data>
+  <data name="Minimize" xml:space="preserve">
+    <value>Minimize</value>
+  </data>
+  <data name="MissingArgumentFor0" xml:space="preserve">
+    <value>Missing argument for {0}.</value>
+  </data>
+  <data name="MoveCancelledTheOriginalOrderWasKept" xml:space="preserve">
+    <value>Move cancelled. The original order was kept.</value>
+  </data>
+  <data name="MoveFailed0" xml:space="preserve">
+    <value>Move failed: {0}</value>
+  </data>
+  <data name="Moved0ChangesWillBeSavedAutomatically" xml:space="preserve">
+    <value>Moved {0}. Changes will be saved automatically.</value>
+  </data>
+  <data name="Music" xml:space="preserve">
+    <value>Music</value>
+  </data>
+  <data name="Name" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="NameAndTargetMustNotBeEmpty" xml:space="preserve">
+    <value>Name and target must not be empty.</value>
+  </data>
+  <data name="Network" xml:space="preserve">
+    <value>Network</value>
+  </data>
+  <data name="NewGroup" xml:space="preserve">
+    <value>New group</value>
+  </data>
+  <data name="NewGroup0" xml:space="preserve">
+    <value>New group {0}</value>
+  </data>
+  <data name="News" xml:space="preserve">
+    <value>News</value>
+  </data>
+  <data name="No" xml:space="preserve">
+    <value>No</value>
+  </data>
+  <data name="NoDeletionToUndoOrMoreThan5SecondsHavePassed" xml:space="preserve">
+    <value>No deletion to undo, or more than 5 seconds have passed.</value>
+  </data>
+  <data name="NotSaved" xml:space="preserve">
+    <value>Not saved</value>
+  </data>
+  <data name="NotSaved0" xml:space="preserve">
+    <value>Not saved: {0}</value>
+  </data>
+  <data name="Notepad" xml:space="preserve">
+    <value>Notepad</value>
+  </data>
+  <data name="Notes" xml:space="preserve">
+    <value>Notes</value>
+  </data>
+  <data name="Office" xml:space="preserve">
+    <value>Office</value>
+  </data>
+  <data name="OfficeBuilding" xml:space="preserve">
+    <value>Office building</value>
+  </data>
+  <data name="Ok" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="OnlyHttpHttpsUrlsAndAbsoluteFilePathsAreSupported" xml:space="preserve">
+    <value>Only http/https URLs and absolute file paths are supported.</value>
+  </data>
+  <data name="OnlyHttpHttpsUrlsAreSupported" xml:space="preserve">
+    <value>Only http/https URLs are supported.</value>
+  </data>
+  <data name="Open" xml:space="preserve">
+    <value>Open</value>
+  </data>
+  <data name="OpenConfigurationFolder" xml:space="preserve">
+    <value>Open configuration folder</value>
+  </data>
+  <data name="OpenFileLocation" xml:space="preserve">
+    <value>Open file location</value>
+  </data>
+  <data name="OpenLogFolder" xml:space="preserve">
+    <value>Open log folder</value>
+  </data>
+  <data name="OpensWithTheDefaultAppForThisFile" xml:space="preserve">
+    <value>Opens with the default app for this file.</value>
+  </data>
+  <data name="OperationFailed" xml:space="preserve">
+    <value>The operation failed (error 0x{0:X8}).</value>
+  </data>
+  <data name="Options" xml:space="preserve">
+    <value>Options</value>
+  </data>
+  <data name="OrAddAnItemWithTheButtonAbove" xml:space="preserve">
+    <value>Or add an item with the button above</value>
+  </data>
+  <data name="Orange" xml:space="preserve">
+    <value>Orange</value>
+  </data>
+  <data name="Painting" xml:space="preserve">
+    <value>Painting</value>
+  </data>
+  <data name="Panel" xml:space="preserve">
+    <value>Panel</value>
+  </data>
+  <data name="PanelMaterialDialogsUseMica" xml:space="preserve">
+    <value>Panel material; dialogs use Mica</value>
+  </data>
+  <data name="PanelPositionAndSize" xml:space="preserve">
+    <value>Panel position and size</value>
+  </data>
+  <data name="PerformanceChecksRequireANewEmptyConfigurationFolder" xml:space="preserve">
+    <value>Performance checks require a new, empty configuration folder.</value>
+  </data>
+  <data name="PerformanceChecksRequireAnIsolatedConfigDirToProtectUserSettings" xml:space="preserve">
+    <value>Performance checks require an isolated --config-dir to protect user settings.</value>
+  </data>
+  <data name="Phone" xml:space="preserve">
+    <value>Phone</value>
+  </data>
+  <data name="Pictures" xml:space="preserve">
+    <value>Pictures</value>
+  </data>
+  <data name="PieChart" xml:space="preserve">
+    <value>Pie chart</value>
+  </data>
+  <data name="Pin" xml:space="preserve">
+    <value>Pin</value>
+  </data>
+  <data name="Pink" xml:space="preserve">
+    <value>Pink</value>
+  </data>
+  <data name="Play" xml:space="preserve">
+    <value>Play</value>
+  </data>
+  <data name="Poll" xml:space="preserve">
+    <value>Poll</value>
+  </data>
+  <data name="PositionWhenThePanelIsShownAgain" xml:space="preserve">
+    <value>Position when the panel is shown again</value>
+  </data>
+  <data name="Power" xml:space="preserve">
+    <value>Power</value>
+  </data>
+  <data name="Print" xml:space="preserve">
+    <value>Print</value>
+  </data>
+  <data name="Privacy" xml:space="preserve">
+    <value>Privacy</value>
+  </data>
+  <data name="ProtectedDocument" xml:space="preserve">
+    <value>Protected document</value>
+  </data>
+  <data name="Protection" xml:space="preserve">
+    <value>Protection</value>
+  </data>
+  <data name="Purple" xml:space="preserve">
+    <value>Purple</value>
+  </data>
+  <data name="ReadOnlyConfiguration" xml:space="preserve">
+    <value>Read-only configuration</value>
+  </data>
+  <data name="ReadOnlyNotice" xml:space="preserve">
+    <value>{0} {1}</value>
+  </data>
+  <data name="Reading" xml:space="preserve">
+    <value>Reading</value>
+  </data>
+  <data name="Reading283" xml:space="preserve">
+    <value>Reading…</value>
+  </data>
+  <data name="ReadingDroppedItems" xml:space="preserve">
+    <value>Reading dropped items…</value>
+  </data>
+  <data name="Receipt" xml:space="preserve">
+    <value>Receipt</value>
+  </data>
+  <data name="Record" xml:space="preserve">
+    <value>Record</value>
+  </data>
+  <data name="RefreshIcon" xml:space="preserve">
+    <value>Refresh icon</value>
+  </data>
+  <data name="Registered0" xml:space="preserve">
+    <value>Registered: {0}</value>
+  </data>
+  <data name="RegistrationFailedError0ChooseAnotherCombination" xml:space="preserve">
+    <value>Registration failed (error {0}). Choose another combination.</value>
+  </data>
+  <data name="Rename" xml:space="preserve">
+    <value>Rename</value>
+  </data>
+  <data name="RenameGroup" xml:space="preserve">
+    <value>Rename group</value>
+  </data>
+  <data name="RenameItem" xml:space="preserve">
+    <value>Rename item</value>
+  </data>
+  <data name="ResetPositionAndSize" xml:space="preserve">
+    <value>Reset position and size</value>
+  </data>
+  <data name="ResetToDefault" xml:space="preserve">
+    <value>Reset to default</value>
+  </data>
+  <data name="Restore" xml:space="preserve">
+    <value>Restore</value>
+  </data>
+  <data name="Robot" xml:space="preserve">
+    <value>Robot</value>
+  </data>
+  <data name="RunAsAdministrator" xml:space="preserve">
+    <value>Run as administrator</value>
+  </data>
+  <data name="RunningAsAdministratorRestartWithStandardPermissionsToReceiveDrop" xml:space="preserve">
+    <value>Running as administrator. Restart with standard permissions to receive dropped files.</value>
+  </data>
+  <data name="Save" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="Saved" xml:space="preserve">
+    <value>Saved</value>
+  </data>
+  <data name="Saving" xml:space="preserve">
+    <value>Saving…</value>
+  </data>
+  <data name="Scale" xml:space="preserve">
+    <value>Scale</value>
+  </data>
+  <data name="ScatterChart" xml:space="preserve">
+    <value>Scatter chart</value>
+  </data>
+  <data name="Schedule" xml:space="preserve">
+    <value>Schedule</value>
+  </data>
+  <data name="Search" xml:space="preserve">
+    <value>Search</value>
+  </data>
+  <data name="Security" xml:space="preserve">
+    <value>Security</value>
+  </data>
+  <data name="Send" xml:space="preserve">
+    <value>Send</value>
+  </data>
+  <data name="Server" xml:space="preserve">
+    <value>Server</value>
+  </data>
+  <data name="Settings" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="SettingsHaveNotBeenSaved0YesRetryNoDiscardUnsavedChangesAndExitCa" xml:space="preserve">
+    <value>Settings have not been saved: {0}
+Yes: retry
+No: discard unsaved changes and exit
+Cancel: return to the app</value>
+  </data>
+  <data name="Shield" xml:space="preserve">
+    <value>Shield</value>
+  </data>
+  <data name="Shopping" xml:space="preserve">
+    <value>Shopping</value>
+  </data>
+  <data name="ShortcutsUseTheirOwnArgumentsAndWorkingFolder" xml:space="preserve">
+    <value>Shortcuts use their own arguments and working folder.</value>
+  </data>
+  <data name="ShowHidePanel" xml:space="preserve">
+    <value>Show / hide panel</value>
+  </data>
+  <data name="ShowPosition" xml:space="preserve">
+    <value>Show position</value>
+  </data>
+  <data name="ShowSwiftdock" xml:space="preserve">
+    <value>Show Swiftdock</value>
+  </data>
+  <data name="Simple" xml:space="preserve">
+    <value>Simple</value>
+  </data>
+  <data name="Slate" xml:space="preserve">
+    <value>Slate</value>
+  </data>
+  <data name="Solid" xml:space="preserve">
+    <value>Solid</value>
+  </data>
+  <data name="SolidBackgroundsForPanelAndDialogs" xml:space="preserve">
+    <value>Solid backgrounds for panel and dialogs</value>
+  </data>
+  <data name="Star" xml:space="preserve">
+    <value>Star</value>
+  </data>
+  <data name="StartAtSignIn" xml:space="preserve">
+    <value>Start at sign-in</value>
+  </data>
+  <data name="StartWhenSigningInToWindows" xml:space="preserve">
+    <value>Start when signing in to Windows</value>
+  </data>
+  <data name="StartupSettingsUpdated" xml:space="preserve">
+    <value>Startup settings updated.</value>
+  </data>
+  <data name="Store" xml:space="preserve">
+    <value>Store</value>
+  </data>
+  <data name="Swiftdock" xml:space="preserve">
+    <value>Swiftdock</value>
+  </data>
+  <data name="Swiftdock0" xml:space="preserve">
+    <value>Swiftdock · {0}</value>
+  </data>
+  <data name="SwiftdockCouldNotStart" xml:space="preserve">
+    <value>Swiftdock could not start</value>
+  </data>
+  <data name="Sync" xml:space="preserve">
+    <value>Sync</value>
+  </data>
+  <data name="System" xml:space="preserve">
+    <value>System</value>
+  </data>
+  <data name="SystemIcon" xml:space="preserve">
+    <value>{0} icon {1}</value>
+  </data>
+  <data name="Table" xml:space="preserve">
+    <value>Table</value>
+  </data>
+  <data name="Tag" xml:space="preserve">
+    <value>Tag</value>
+  </data>
+  <data name="TargetError" xml:space="preserve">
+    <value>{0}
+{1}</value>
+  </data>
+  <data name="Task" xml:space="preserve">
+    <value>Task</value>
+  </data>
+  <data name="Teal" xml:space="preserve">
+    <value>Teal</value>
+  </data>
+  <data name="Terminal" xml:space="preserve">
+    <value>Terminal</value>
+  </data>
+  <data name="Text" xml:space="preserve">
+    <value>Text</value>
+  </data>
+  <data name="TheAppIsUsingTheRepositoryDevelopmentRuntimeEnableStartupFromASta" xml:space="preserve">
+    <value>The app is using the repository development runtime. Enable startup from a standalone release, or install the .NET 10 Windows Desktop Runtime first.</value>
+  </data>
+  <data name="TheConfigurationFolderIsInUseOrNotWritableRunningReadOnly0" xml:space="preserve">
+    <value>The configuration folder is in use or not writable. Running read-only: {0}</value>
+  </data>
+  <data name="TheDamagedConfigurationWasKeptUsingDefaultContent0" xml:space="preserve">
+    <value>The damaged configuration was kept. Using default content. {0}</value>
+  </data>
+  <data name="TheExistingInstanceDidNotAcknowledgeTheShowRequest" xml:space="preserve">
+    <value>The existing instance did not acknowledge the show request.</value>
+  </data>
+  <data name="TheExistingInstanceDidNotRespondInTimePleaseTryStartingAgainLater" xml:space="preserve">
+    <value>The existing instance did not respond in time. Please try starting again later.</value>
+  </data>
+  <data name="TheExistingInstanceReturnedAnInvalidPid" xml:space="preserve">
+    <value>The existing instance returned an invalid PID.</value>
+  </data>
+  <data name="TheFolderCouldNotBeFound" xml:space="preserve">
+    <value>The folder could not be found.</value>
+  </data>
+  <data name="TheItemNoLongerExists" xml:space="preserve">
+    <value>The item no longer exists.</value>
+  </data>
+  <data name="TheNewCombinationIsInUseOrUnavailable0TheOriginalHotkeyAndSetting" xml:space="preserve">
+    <value>The new combination is in use or unavailable ({0}). The original hotkey and settings were kept.</value>
+  </data>
+  <data name="ThePathContainsInvalidQuotes" xml:space="preserve">
+    <value>The path contains invalid quotes.</value>
+  </data>
+  <data name="ThePortableDataFolderIsNotWritable" xml:space="preserve">
+    <value>The portable Data folder is not writable.</value>
+  </data>
+  <data name="TheSelectedConfigurationFolderIsNotWritable" xml:space="preserve">
+    <value>The selected configuration folder is not writable.</value>
+  </data>
+  <data name="TheShellAcceptedTheLaunchRequest" xml:space="preserve">
+    <value>The shell accepted the launch request</value>
+  </data>
+  <data name="TheTargetDoesNotExistOrCannotBeAccessed0" xml:space="preserve">
+    <value>The target does not exist or cannot be accessed: {0}</value>
+  </data>
+  <data name="TheUrlFileHasNoValidHttpHttpsUrl" xml:space="preserve">
+    <value>The .url file has no valid http/https URL.</value>
+  </data>
+  <data name="TheUrlFileIsTooLarge" xml:space="preserve">
+    <value>The .url file is too large.</value>
+  </data>
+  <data name="TheWebsiteIconWillBeFetchedAfterAdding" xml:space="preserve">
+    <value>The website icon will be fetched after adding.</value>
+  </data>
+  <data name="TheWorkingFolderMustBeAValidAbsolutePath" xml:space="preserve">
+    <value>The working folder must be a valid absolute path.</value>
+  </data>
+  <data name="Theme" xml:space="preserve">
+    <value>Theme</value>
+  </data>
+  <data name="ThisGroupAlreadyContainsTheSameLaunchItem" xml:space="preserve">
+    <value>This group already contains the same launch item.</value>
+  </data>
+  <data name="ToDo" xml:space="preserve">
+    <value>To-do</value>
+  </data>
+  <data name="Toolbox" xml:space="preserve">
+    <value>Toolbox</value>
+  </data>
+  <data name="Tools" xml:space="preserve">
+    <value>Tools</value>
+  </data>
+  <data name="Transparency" xml:space="preserve">
+    <value>Transparency</value>
+  </data>
+  <data name="Travel" xml:space="preserve">
+    <value>Travel</value>
+  </data>
+  <data name="Trend" xml:space="preserve">
+    <value>Trend</value>
+  </data>
+  <data name="Typography" xml:space="preserve">
+    <value>Typography</value>
+  </data>
+  <data name="Unable" xml:space="preserve">
+    <value>Unable</value>
+  </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>Unavailable</value>
+  </data>
+  <data name="Unpin" xml:space="preserve">
+    <value>Unpin</value>
+  </data>
+  <data name="UnsupportedLegacyConfigurationVersion" xml:space="preserve">
+    <value>Unsupported legacy configuration version.</value>
+  </data>
+  <data name="Upload" xml:space="preserve">
+    <value>Upload</value>
+  </data>
+  <data name="Url" xml:space="preserve">
+    <value>URL</value>
+  </data>
+  <data name="UserFolder" xml:space="preserve">
+    <value>User folder</value>
+  </data>
+  <data name="UsingSolidMaterialIsNotSupported" xml:space="preserve">
+    <value>Using solid: material is not supported</value>
+  </data>
+  <data name="UsingSolidMaterialIsUnavailable" xml:space="preserve">
+    <value>Using solid: material is unavailable</value>
+  </data>
+  <data name="UsingSolidWindowsHighContrastIsOn" xml:space="preserve">
+    <value>Using solid: Windows high contrast is on</value>
+  </data>
+  <data name="UsingSolidWindowsTransparencyIsOff" xml:space="preserve">
+    <value>Using solid: Windows transparency is off</value>
+  </data>
+  <data name="UsingTemporaryDefaultContent" xml:space="preserve">
+    <value>Using temporary default content.</value>
+  </data>
+  <data name="UsingWindowsHighContrastColors" xml:space="preserve">
+    <value>Using Windows high contrast colors</value>
+  </data>
+  <data name="UsingWindowsHighContrastTheme" xml:space="preserve">
+    <value>Using Windows high contrast theme</value>
+  </data>
+  <data name="Vault" xml:space="preserve">
+    <value>Vault</value>
+  </data>
+  <data name="Version" xml:space="preserve">
+    <value>Version</value>
+  </data>
+  <data name="Video" xml:space="preserve">
+    <value>Video</value>
+  </data>
+  <data name="VideoMeeting" xml:space="preserve">
+    <value>Video meeting</value>
+  </data>
+  <data name="WaitInTheSystemTrayAfterStartup" xml:space="preserve">
+    <value>Wait in the system tray after startup</value>
+  </data>
+  <data name="WaitingToSave" xml:space="preserve">
+    <value>Waiting to save</value>
+  </data>
+  <data name="Wallet" xml:space="preserve">
+    <value>Wallet</value>
+  </data>
+  <data name="Weather" xml:space="preserve">
+    <value>Weather</value>
+  </data>
+  <data name="Web" xml:space="preserve">
+    <value>Web</value>
+  </data>
+  <data name="WiFi" xml:space="preserve">
+    <value>Wi-Fi</value>
+  </data>
+  <data name="Work" xml:space="preserve">
+    <value>Work</value>
+  </data>
+  <data name="WorkingFolder" xml:space="preserve">
+    <value>Working folder</value>
+  </data>
+  <data name="Wrench" xml:space="preserve">
+    <value>Wrench</value>
+  </data>
+  <data name="Yes" xml:space="preserve">
+    <value>Yes</value>
+  </data>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+</root>

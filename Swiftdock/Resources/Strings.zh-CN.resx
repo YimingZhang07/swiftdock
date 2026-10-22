@@ -1,0 +1,1169 @@
+<?xml version='1.0' encoding='utf-8'?>
+<root>
+  <data name="0CouldNotBeRegistered1ChooseAnotherHotkeyInSettingsTheTrayIsStill" xml:space="preserve">
+    <value>{0} 注册失败（{1}），请从设置修改热键；托盘仍可呼出。</value>
+  </data>
+  <data name="0IsNotAValidHttpHttpsUrl" xml:space="preserve">
+    <value>{0} 不是有效 http/https 网址。</value>
+  </data>
+  <data name="AHotkeyRequiresAtLeastOneModifierAndASupportedMainKey" xml:space="preserve">
+    <value>热键需要至少一个修饰键和受支持的主键。</value>
+  </data>
+  <data name="About" xml:space="preserve">
+    <value>关于</value>
+  </data>
+  <data name="AboutVersion" xml:space="preserve">
+    <value>{0} · {1} {2}</value>
+  </data>
+  <data name="AccentColor" xml:space="preserve">
+    <value>强调色</value>
+  </data>
+  <data name="Acrylic" xml:space="preserve">
+    <value>亚克力</value>
+  </data>
+  <data name="ActivationWasNotConfirmedClickThePanelToContinueDetailsWereLogged" xml:space="preserve">
+    <value>激活未确认，可点击面板继续；详情已写入诊断日志。</value>
+  </data>
+  <data name="Add" xml:space="preserve">
+    <value>添加</value>
+  </data>
+  <data name="AddItem" xml:space="preserve">
+    <value>添加项目</value>
+  </data>
+  <data name="AddItemOrDropFiles" xml:space="preserve">
+    <value>添加项目（也可拖入文件）</value>
+  </data>
+  <data name="AddUpTo256ItemsAtOnceDropDataMustNotExceed1Mb" xml:space="preserve">
+    <value>一次最多添加 256 个项目，且拖入数据不能超过 1MB。</value>
+  </data>
+  <data name="Added0Items12" xml:space="preserve">
+    <value>已添加 {0} 项。{1} {2}</value>
+  </data>
+  <data name="AddressBook" xml:space="preserve">
+    <value>通讯录</value>
+  </data>
+  <data name="AdjustPanelIconsTextAndSpacing" xml:space="preserve">
+    <value>调整面板中的图标、文字和间距</value>
+  </data>
+  <data name="AdvancedOptions" xml:space="preserve">
+    <value>高级选项</value>
+  </data>
+  <data name="Alarm" xml:space="preserve">
+    <value>闹钟</value>
+  </data>
+  <data name="Alert" xml:space="preserve">
+    <value>提醒</value>
+  </data>
+  <data name="AllFiles" xml:space="preserve">
+    <value>所有文件 (*.*)|*.*</value>
+  </data>
+  <data name="Amber" xml:space="preserve">
+    <value>琥珀</value>
+  </data>
+  <data name="App" xml:space="preserve">
+    <value>应用</value>
+  </data>
+  <data name="AppList" xml:space="preserve">
+    <value>应用列表</value>
+  </data>
+  <data name="Appearance" xml:space="preserve">
+    <value>外观</value>
+  </data>
+  <data name="ApplicationPath" xml:space="preserve">
+    <value>程序路径</value>
+  </data>
+  <data name="ApplicationsExeLnkBatCmdExeLnkBatCmd" xml:space="preserve">
+    <value>程序 (*.exe;*.lnk;*.bat;*.cmd)|*.exe;*.lnk;*.bat;*.cmd</value>
+  </data>
+  <data name="AppliedChangesWillBeSavedAutomatically" xml:space="preserve">
+    <value>已应用，配置将自动保存。</value>
+  </data>
+  <data name="AppliesImmediatelyToPanelAndDialogs" xml:space="preserve">
+    <value>立即应用于面板和对话框</value>
+  </data>
+  <data name="Apply" xml:space="preserve">
+    <value>应用</value>
+  </data>
+  <data name="Appointment" xml:space="preserve">
+    <value>预约</value>
+  </data>
+  <data name="Approvals" xml:space="preserve">
+    <value>审批</value>
+  </data>
+  <data name="AppsDevelopment" xml:space="preserve">
+    <value>应用 / 开发</value>
+  </data>
+  <data name="Archive" xml:space="preserve">
+    <value>压缩包</value>
+  </data>
+  <data name="AreaChart" xml:space="preserve">
+    <value>面积图</value>
+  </data>
+  <data name="Arguments" xml:space="preserve">
+    <value>启动参数</value>
+  </data>
+  <data name="Assistant" xml:space="preserve">
+    <value>智能助手</value>
+  </data>
+  <data name="AtLeastOneMonitorIsRequired" xml:space="preserve">
+    <value>至少需要一个显示器。</value>
+  </data>
+  <data name="Attachment" xml:space="preserve">
+    <value>附件</value>
+  </data>
+  <data name="AutoFetchIsOffChooseAnIconManually" xml:space="preserve">
+    <value>自动获取网站图标已关闭，可手动选择图标。</value>
+  </data>
+  <data name="AutoFetchWebsiteIcons" xml:space="preserve">
+    <value>自动获取网站图标</value>
+  </data>
+  <data name="BackgroundMaterial" xml:space="preserve">
+    <value>背景材质</value>
+  </data>
+  <data name="BarChart" xml:space="preserve">
+    <value>柱状图</value>
+  </data>
+  <data name="Blue" xml:space="preserve">
+    <value>蓝</value>
+  </data>
+  <data name="Board" xml:space="preserve">
+    <value>看板</value>
+  </data>
+  <data name="Book" xml:space="preserve">
+    <value>书</value>
+  </data>
+  <data name="Bookmark" xml:space="preserve">
+    <value>书签</value>
+  </data>
+  <data name="Books" xml:space="preserve">
+    <value>书籍</value>
+  </data>
+  <data name="Broadcast" xml:space="preserve">
+    <value>广播</value>
+  </data>
+  <data name="Browse" xml:space="preserve">
+    <value>浏览…</value>
+  </data>
+  <data name="Calculator" xml:space="preserve">
+    <value>计算器</value>
+  </data>
+  <data name="Calendar" xml:space="preserve">
+    <value>日历</value>
+  </data>
+  <data name="Camera" xml:space="preserve">
+    <value>相机</value>
+  </data>
+  <data name="Campus" xml:space="preserve">
+    <value>园区</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="CancelImport" xml:space="preserve">
+    <value>取消导入</value>
+  </data>
+  <data name="Cannot" xml:space="preserve">
+    <value>不能</value>
+  </data>
+  <data name="Certificate" xml:space="preserve">
+    <value>证书</value>
+  </data>
+  <data name="ChangeIcon" xml:space="preserve">
+    <value>更换图标</value>
+  </data>
+  <data name="ChangeIcon327" xml:space="preserve">
+    <value>更换图标…</value>
+  </data>
+  <data name="Chart" xml:space="preserve">
+    <value>图表</value>
+  </data>
+  <data name="Chat" xml:space="preserve">
+    <value>聊天</value>
+  </data>
+  <data name="CheckingTarget" xml:space="preserve">
+    <value>正在检查目标…</value>
+  </data>
+  <data name="Chinese" xml:space="preserve">
+    <value>中文</value>
+    <comment>Language endonym: keep this label unchanged in every UI language.</comment>
+  </data>
+  <data name="ChooseAFileInsteadOfAFolder" xml:space="preserve">
+    <value>请选择文件，不能选择文件夹。</value>
+  </data>
+  <data name="ChooseAnExeLnkBatOrCmdApplication" xml:space="preserve">
+    <value>请选择 .exe、.lnk、.bat 或 .cmd 程序。</value>
+  </data>
+  <data name="ChooseAnItemType" xml:space="preserve">
+    <value>请选择项目类型。</value>
+  </data>
+  <data name="ChooseApplication" xml:space="preserve">
+    <value>选择程序</value>
+  </data>
+  <data name="ChooseFile" xml:space="preserve">
+    <value>选择文件</value>
+  </data>
+  <data name="ChooseFolder" xml:space="preserve">
+    <value>选择文件夹</value>
+  </data>
+  <data name="ChooseFromFile" xml:space="preserve">
+    <value>从文件选择…</value>
+  </data>
+  <data name="ChooseIcon" xml:space="preserve">
+    <value>选择图标</value>
+  </data>
+  <data name="Clipboard" xml:space="preserve">
+    <value>剪贴板</value>
+  </data>
+  <data name="Clock" xml:space="preserve">
+    <value>时钟</value>
+  </data>
+  <data name="Close" xml:space="preserve">
+    <value>关闭</value>
+  </data>
+  <data name="Cloud" xml:space="preserve">
+    <value>云</value>
+  </data>
+  <data name="CloudStorage" xml:space="preserve">
+    <value>云端</value>
+  </data>
+  <data name="Code" xml:space="preserve">
+    <value>代码</value>
+  </data>
+  <data name="CodeBlock" xml:space="preserve">
+    <value>代码块</value>
+  </data>
+  <data name="Color" xml:space="preserve">
+    <value>彩色</value>
+  </data>
+  <data name="Colors" xml:space="preserve">
+    <value>颜色</value>
+  </data>
+  <data name="ColumnsMustBeBetween1And12" xml:space="preserve">
+    <value>columns 必须为 1–12。</value>
+  </data>
+  <data name="Comment" xml:space="preserve">
+    <value>评论</value>
+  </data>
+  <data name="Communication" xml:space="preserve">
+    <value>沟通</value>
+  </data>
+  <data name="Completed" xml:space="preserve">
+    <value>已完成</value>
+  </data>
+  <data name="Computer" xml:space="preserve">
+    <value>电脑</value>
+  </data>
+  <data name="ConfigurationCannotBeChangedRightNow" xml:space="preserve">
+    <value>当前不能修改配置。</value>
+  </data>
+  <data name="ConfigurationExceeds4MbTheExistingFileWasKept" xml:space="preserve">
+    <value>配置超过 4MB 上限，未覆盖已有配置。</value>
+  </data>
+  <data name="ConfigurationExceedsThe4MbLimit" xml:space="preserve">
+    <value>配置超过 4MB 限制。</value>
+  </data>
+  <data name="ConfigurationFolder" xml:space="preserve">
+    <value>配置目录</value>
+  </data>
+  <data name="ConfigurationHasNoValidVersion" xml:space="preserve">
+    <value>配置缺少有效 version。</value>
+  </data>
+  <data name="ConfigurationIsEmpty" xml:space="preserve">
+    <value>配置为空。</value>
+  </data>
+  <data name="ConfigurationIsReadOnly" xml:space="preserve">
+    <value>配置只读。</value>
+  </data>
+  <data name="ConfigurationIsReadOnlyAndCannotBeChanged" xml:space="preserve">
+    <value>当前配置只读，不能修改。</value>
+  </data>
+  <data name="ConfigurationIsReadOnlyWritingIsDisabled" xml:space="preserve">
+    <value>配置只读，禁止写入。</value>
+  </data>
+  <data name="ConfigurationIsReadOnlyYouCanLaunchItemsButCannotAddOrReorderThem" xml:space="preserve">
+    <value>当前为只读配置，可启动项目，不能添加或排序。</value>
+  </data>
+  <data name="ConfigurationRestoredFromBackupTheDamagedFileWasKept" xml:space="preserve">
+    <value>已从备份恢复配置，损坏文件已保留。</value>
+  </data>
+  <data name="ConfigurationVersion0IsNewerThanSupportedVersion1OverwritingIsDis" xml:space="preserve">
+    <value>配置版本 {0} 高于当前支持的版本 1；已禁止覆盖。</value>
+  </data>
+  <data name="ContactCard" xml:space="preserve">
+    <value>联系卡</value>
+  </data>
+  <data name="ContactEachWebsiteDirectlyForItsIcon" xml:space="preserve">
+    <value>直接联系网址所在的网站获取图标</value>
+  </data>
+  <data name="Contacts" xml:space="preserve">
+    <value>联系人</value>
+  </data>
+  <data name="Conversation" xml:space="preserve">
+    <value>对话</value>
+  </data>
+  <data name="CouldNot" xml:space="preserve">
+    <value>未能</value>
+  </data>
+  <data name="CouldNotAccessStartupSettingsForTheCurrentUser" xml:space="preserve">
+    <value>无法访问当前用户自启设置。</value>
+  </data>
+  <data name="CouldNotDetermineTheCurrentUserSid" xml:space="preserve">
+    <value>无法确定当前用户 SID。</value>
+  </data>
+  <data name="CouldNotOpenTheFileLocation0" xml:space="preserve">
+    <value>无法打开所在位置：{0}</value>
+  </data>
+  <data name="CouldNotPreserveTheDamagedFileRunningReadOnlyAutomaticRepairStopp" xml:space="preserve">
+    <value>无法保留损坏文件，已转为只读且停止自动修复：{0}</value>
+  </data>
+  <data name="CouldNotReadConfigurationTheOriginalFileWasKept0" xml:space="preserve">
+    <value>读取配置失败，未覆盖原文件：{0}</value>
+  </data>
+  <data name="CouldNotReadTheBackupTheOriginalFileWasKept0" xml:space="preserve">
+    <value>读取备份失败，未覆盖原文件：{0}</value>
+  </data>
+  <data name="CouldNotReadThisCommonLocation" xml:space="preserve">
+    <value>无法读取该常用位置。</value>
+  </data>
+  <data name="CouldNotUpdateStartupSettings0" xml:space="preserve">
+    <value>自启设置失败：{0}</value>
+  </data>
+  <data name="CreateAGroupOrDropAnItemHere" xml:space="preserve">
+    <value>新建分组；也可把条目拖到这里</value>
+  </data>
+  <data name="CreateGroup" xml:space="preserve">
+    <value>新建分组</value>
+  </data>
+  <data name="Dark" xml:space="preserve">
+    <value>深色</value>
+  </data>
+  <data name="DataFolderChoice" xml:space="preserve">
+    <value>{0}
+是：使用默认目录
+否：只读运行
+取消：退出</value>
+  </data>
+  <data name="DataHandbook" xml:space="preserve">
+    <value>数据手册</value>
+  </data>
+  <data name="Database" xml:space="preserve">
+    <value>数据库</value>
+  </data>
+  <data name="Debug" xml:space="preserve">
+    <value>调试</value>
+  </data>
+  <data name="DefaultPositionAndSizeRestoredChangesWillBeSavedAutomatically" xml:space="preserve">
+    <value>已恢复默认位置和大小，配置将自动保存。</value>
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value>删除</value>
+  </data>
+  <data name="Delete0AndItsItemsThisCannotBeUndoneWithItemUndo" xml:space="preserve">
+    <value>删除“{0}”及其中的条目？此操作不能用单条撤销恢复。</value>
+  </data>
+  <data name="DeleteGroup" xml:space="preserve">
+    <value>删除分组</value>
+  </data>
+  <data name="DeleteGroup321" xml:space="preserve">
+    <value>删除分组…</value>
+  </data>
+  <data name="DeletedItemRestored" xml:space="preserve">
+    <value>已恢复删除的条目。</value>
+  </data>
+  <data name="DeletedPressCtrlZWithin5SecondsToUndo" xml:space="preserve">
+    <value>已删除，5 秒内按 Ctrl+Z 撤销。</value>
+  </data>
+  <data name="Design" xml:space="preserve">
+    <value>设计</value>
+  </data>
+  <data name="Desktop" xml:space="preserve">
+    <value>桌面</value>
+  </data>
+  <data name="DeviceConnection" xml:space="preserve">
+    <value>设备连接</value>
+  </data>
+  <data name="Devices" xml:space="preserve">
+    <value>设备</value>
+  </data>
+  <data name="DiagnosticLogs" xml:space="preserve">
+    <value>诊断日志</value>
+  </data>
+  <data name="DocumentFolder" xml:space="preserve">
+    <value>文档文件夹</value>
+  </data>
+  <data name="Documents" xml:space="preserve">
+    <value>文档</value>
+  </data>
+  <data name="Downloads" xml:space="preserve">
+    <value>下载</value>
+  </data>
+  <data name="DragTheTitleBarToMoveEdgesToResize" xml:space="preserve">
+    <value>拖动顶栏移动，拖动边缘调整大小</value>
+  </data>
+  <data name="DraggingEscToCancelReleaseToMove" xml:space="preserve">
+    <value>拖动中 · Esc 取消 · 松开提交</value>
+  </data>
+  <data name="DropAUnicodeUrlOrPlainText" xml:space="preserve">
+    <value>请用 Unicode 网址或纯文本拖入。</value>
+  </data>
+  <data name="DropDataIsTooLarge" xml:space="preserve">
+    <value>拖入数据过大。</value>
+  </data>
+  <data name="DropFilesFoldersOrUrlsHere" xml:space="preserve">
+    <value>拖入文件、文件夹或网址</value>
+  </data>
+  <data name="DroppedTextIsTooLong" xml:space="preserve">
+    <value>拖入文本过长。</value>
+  </data>
+  <data name="DuplicateItemsWereSkipped" xml:space="preserve">
+    <value>重复项目已跳过。</value>
+  </data>
+  <data name="Edit" xml:space="preserve">
+    <value>编辑…</value>
+  </data>
+  <data name="EditDocument" xml:space="preserve">
+    <value>编辑文档</value>
+  </data>
+  <data name="EditItem" xml:space="preserve">
+    <value>编辑项目</value>
+  </data>
+  <data name="ElevationWasCancelled" xml:space="preserve">
+    <value>已取消提权</value>
+  </data>
+  <data name="English" xml:space="preserve">
+    <value>English</value>
+  </data>
+  <data name="EnterAName" xml:space="preserve">
+    <value>请输入名称。</value>
+  </data>
+  <data name="EnterAValidHttpHttpsUrl" xml:space="preserve">
+    <value>请输入有效的 http/https 网址。</value>
+  </data>
+  <data name="EnterAnAbsolutePathWithoutQuotes" xml:space="preserve">
+    <value>请输入不含引号的绝对路径。</value>
+  </data>
+  <data name="Error" xml:space="preserve">
+    <value>错误</value>
+  </data>
+  <data name="ExitSwiftdock" xml:space="preserve">
+    <value>退出迅启</value>
+  </data>
+  <data name="Extension" xml:space="preserve">
+    <value>扩展</value>
+  </data>
+  <data name="Failed" xml:space="preserve">
+    <value>失败</value>
+  </data>
+  <data name="Favorite" xml:space="preserve">
+    <value>收藏</value>
+  </data>
+  <data name="Favorites" xml:space="preserve">
+    <value>常用</value>
+  </data>
+  <data name="File" xml:space="preserve">
+    <value>文件</value>
+  </data>
+  <data name="FilePath" xml:space="preserve">
+    <value>文件路径</value>
+  </data>
+  <data name="Flag" xml:space="preserve">
+    <value>旗帜</value>
+  </data>
+  <data name="Folder" xml:space="preserve">
+    <value>文件夹</value>
+  </data>
+  <data name="FolderPath" xml:space="preserve">
+    <value>文件夹路径</value>
+  </data>
+  <data name="FollowPointer" xml:space="preserve">
+    <value>跟随鼠标</value>
+  </data>
+  <data name="FollowSystem" xml:space="preserve">
+    <value>跟随系统</value>
+  </data>
+  <data name="ForSelectionsAndPrimaryActions" xml:space="preserve">
+    <value>用于选中状态和主要操作</value>
+  </data>
+  <data name="Form" xml:space="preserve">
+    <value>表单</value>
+  </data>
+  <data name="Games" xml:space="preserve">
+    <value>游戏</value>
+  </data>
+  <data name="Gauge" xml:space="preserve">
+    <value>仪表</value>
+  </data>
+  <data name="General" xml:space="preserve">
+    <value>常规</value>
+  </data>
+  <data name="Gift" xml:space="preserve">
+    <value>礼物</value>
+  </data>
+  <data name="Gray" xml:space="preserve">
+    <value>灰</value>
+  </data>
+  <data name="Green" xml:space="preserve">
+    <value>绿</value>
+  </data>
+  <data name="Group0ContainsAnInvalidItemOriginalDataWasKept" xml:space="preserve">
+    <value>分组 {0} 中有无效条目；未丢弃或覆盖原数据。</value>
+  </data>
+  <data name="GroupNameMustNotBeEmpty" xml:space="preserve">
+    <value>分组名称不能为空。</value>
+  </data>
+  <data name="GroupsMustNotBeNull" xml:space="preserve">
+    <value>groups 不能为 null。</value>
+  </data>
+  <data name="Headphones" xml:space="preserve">
+    <value>耳机</value>
+  </data>
+  <data name="Headset" xml:space="preserve">
+    <value>通话耳机</value>
+  </data>
+  <data name="Heart" xml:space="preserve">
+    <value>心形</value>
+  </data>
+  <data name="Help" xml:space="preserve">
+    <value>帮助</value>
+  </data>
+  <data name="HideEsc0ToShow" xml:space="preserve">
+    <value>隐藏 (Esc) · {0} 呼出</value>
+  </data>
+  <data name="HidePanel" xml:space="preserve">
+    <value>隐藏面板</value>
+  </data>
+  <data name="History" xml:space="preserve">
+    <value>历史</value>
+  </data>
+  <data name="Home" xml:space="preserve">
+    <value>主页</value>
+  </data>
+  <data name="House" xml:space="preserve">
+    <value>住宅</value>
+  </data>
+  <data name="IconsAndImagesIcoPngJpgBmpExeDllIcoPngJpgBmpExeDll" xml:space="preserve">
+    <value>图标和图片 (*.ico;*.png;*.jpg;*.bmp;*.exe;*.dll)|*.ico;*.png;*.jpg;*.bmp;*.exe;*.dll</value>
+  </data>
+  <data name="Ideas" xml:space="preserve">
+    <value>灵感</value>
+  </data>
+  <data name="ImageSearch" xml:space="preserve">
+    <value>图片搜索</value>
+  </data>
+  <data name="ImportCancelled" xml:space="preserve">
+    <value>已取消导入。</value>
+  </data>
+  <data name="ImportFailed0" xml:space="preserve">
+    <value>拖入失败：{0}</value>
+  </data>
+  <data name="InvalidGroupNameOrItems" xml:space="preserve">
+    <value>分组名称或 items 无效。</value>
+  </data>
+  <data name="InvalidOrDuplicateId0" xml:space="preserve">
+    <value>无效或重复 ID：{0}</value>
+  </data>
+  <data name="InvalidUrlByteStreamLength" xml:space="preserve">
+    <value>网址字节流长度无效。</value>
+  </data>
+  <data name="ItemUpdatedChangesWillBeSavedAutomatically" xml:space="preserve">
+    <value>条目已更新，将自动保存。</value>
+  </data>
+  <data name="KeepOnTop" xml:space="preserve">
+    <value>置顶</value>
+  </data>
+  <data name="KeepTransparencyWhenInactive" xml:space="preserve">
+    <value>失去焦点时保持透明</value>
+  </data>
+  <data name="Key" xml:space="preserve">
+    <value>钥匙</value>
+  </data>
+  <data name="Language" xml:space="preserve">
+    <value>语言</value>
+  </data>
+  <data name="LastPosition" xml:space="preserve">
+    <value>上次位置</value>
+  </data>
+  <data name="LaunchFailed" xml:space="preserve">
+    <value>无法启动目标（错误 {0}）。</value>
+  </data>
+  <data name="LaunchStatus" xml:space="preserve">
+    <value>{0}：{1}</value>
+  </data>
+  <data name="Library" xml:space="preserve">
+    <value>资料库</value>
+  </data>
+  <data name="Life" xml:space="preserve">
+    <value>生活</value>
+  </data>
+  <data name="Light" xml:space="preserve">
+    <value>浅色</value>
+  </data>
+  <data name="Lightbulb" xml:space="preserve">
+    <value>灯泡</value>
+  </data>
+  <data name="LineChart" xml:space="preserve">
+    <value>折线图</value>
+  </data>
+  <data name="Link" xml:space="preserve">
+    <value>链接</value>
+  </data>
+  <data name="List" xml:space="preserve">
+    <value>清单</value>
+  </data>
+  <data name="LoadedTheBackupReadOnly" xml:space="preserve">
+    <value>从备份只读加载。</value>
+  </data>
+  <data name="Location" xml:space="preserve">
+    <value>位置</value>
+  </data>
+  <data name="Locations" xml:space="preserve">
+    <value>常用位置</value>
+  </data>
+  <data name="Lock" xml:space="preserve">
+    <value>锁</value>
+  </data>
+  <data name="Locked" xml:space="preserve">
+    <value>锁定</value>
+  </data>
+  <data name="Magenta" xml:space="preserve">
+    <value>玫红</value>
+  </data>
+  <data name="Mail" xml:space="preserve">
+    <value>邮件</value>
+  </data>
+  <data name="Mailbox" xml:space="preserve">
+    <value>邮箱</value>
+  </data>
+  <data name="MainKey" xml:space="preserve">
+    <value>主键</value>
+  </data>
+  <data name="Maintenance" xml:space="preserve">
+    <value>维护</value>
+  </data>
+  <data name="Map" xml:space="preserve">
+    <value>地图</value>
+  </data>
+  <data name="Mark" xml:space="preserve">
+    <value>标记</value>
+  </data>
+  <data name="Maximize" xml:space="preserve">
+    <value>最大化</value>
+  </data>
+  <data name="Media" xml:space="preserve">
+    <value>媒体</value>
+  </data>
+  <data name="Mica" xml:space="preserve">
+    <value>云母</value>
+  </data>
+  <data name="Microphone" xml:space="preserve">
+    <value>麦克风</value>
+  </data>
+  <data name="Minimize" xml:space="preserve">
+    <value>最小化</value>
+  </data>
+  <data name="MissingArgumentFor0" xml:space="preserve">
+    <value>{0} 缺少参数。</value>
+  </data>
+  <data name="MoveCancelledTheOriginalOrderWasKept" xml:space="preserve">
+    <value>已取消移动，原顺序不变。</value>
+  </data>
+  <data name="MoveFailed0" xml:space="preserve">
+    <value>移动失败：{0}</value>
+  </data>
+  <data name="Moved0ChangesWillBeSavedAutomatically" xml:space="preserve">
+    <value>已移动 {0}，将自动保存。</value>
+  </data>
+  <data name="Music" xml:space="preserve">
+    <value>音乐</value>
+  </data>
+  <data name="Name" xml:space="preserve">
+    <value>名称</value>
+  </data>
+  <data name="NameAndTargetMustNotBeEmpty" xml:space="preserve">
+    <value>名称和目标不能为空。</value>
+  </data>
+  <data name="Network" xml:space="preserve">
+    <value>网络</value>
+  </data>
+  <data name="NewGroup" xml:space="preserve">
+    <value>新分组</value>
+  </data>
+  <data name="NewGroup0" xml:space="preserve">
+    <value>新分组 {0}</value>
+  </data>
+  <data name="News" xml:space="preserve">
+    <value>新闻</value>
+  </data>
+  <data name="No" xml:space="preserve">
+    <value>否</value>
+  </data>
+  <data name="NoDeletionToUndoOrMoreThan5SecondsHavePassed" xml:space="preserve">
+    <value>没有可恢复的删除记录，或已超过 5 秒。</value>
+  </data>
+  <data name="NotSaved" xml:space="preserve">
+    <value>尚未保存</value>
+  </data>
+  <data name="NotSaved0" xml:space="preserve">
+    <value>尚未保存：{0}</value>
+  </data>
+  <data name="Notepad" xml:space="preserve">
+    <value>记事本</value>
+  </data>
+  <data name="Notes" xml:space="preserve">
+    <value>笔记</value>
+  </data>
+  <data name="Office" xml:space="preserve">
+    <value>办公</value>
+  </data>
+  <data name="OfficeBuilding" xml:space="preserve">
+    <value>办公楼</value>
+  </data>
+  <data name="Ok" xml:space="preserve">
+    <value>确定</value>
+  </data>
+  <data name="OnlyHttpHttpsUrlsAndAbsoluteFilePathsAreSupported" xml:space="preserve">
+    <value>只接受 http/https 网址或绝对文件路径。</value>
+  </data>
+  <data name="OnlyHttpHttpsUrlsAreSupported" xml:space="preserve">
+    <value>只支持 http/https 网址。</value>
+  </data>
+  <data name="Open" xml:space="preserve">
+    <value>打开</value>
+  </data>
+  <data name="OpenConfigurationFolder" xml:space="preserve">
+    <value>打开配置目录</value>
+  </data>
+  <data name="OpenFileLocation" xml:space="preserve">
+    <value>打开所在位置</value>
+  </data>
+  <data name="OpenLogFolder" xml:space="preserve">
+    <value>打开日志目录</value>
+  </data>
+  <data name="OpensWithTheDefaultAppForThisFile" xml:space="preserve">
+    <value>使用系统默认程序打开该文件。</value>
+  </data>
+  <data name="OperationFailed" xml:space="preserve">
+    <value>操作失败（错误 0x{0:X8}）。</value>
+  </data>
+  <data name="Options" xml:space="preserve">
+    <value>选项</value>
+  </data>
+  <data name="OrAddAnItemWithTheButtonAbove" xml:space="preserve">
+    <value>或点击右上角添加项目</value>
+  </data>
+  <data name="Orange" xml:space="preserve">
+    <value>橙</value>
+  </data>
+  <data name="Painting" xml:space="preserve">
+    <value>绘画</value>
+  </data>
+  <data name="Panel" xml:space="preserve">
+    <value>面板</value>
+  </data>
+  <data name="PanelMaterialDialogsUseMica" xml:space="preserve">
+    <value>应用于面板；对话框使用云母背景</value>
+  </data>
+  <data name="PanelPositionAndSize" xml:space="preserve">
+    <value>面板位置和大小</value>
+  </data>
+  <data name="PerformanceChecksRequireANewEmptyConfigurationFolder" xml:space="preserve">
+    <value>性能检查必须使用新的空配置目录。</value>
+  </data>
+  <data name="PerformanceChecksRequireAnIsolatedConfigDirToProtectUserSettings" xml:space="preserve">
+    <value>性能检查必须指定独立 --config-dir，禁止修改用户配置。</value>
+  </data>
+  <data name="Phone" xml:space="preserve">
+    <value>电话</value>
+  </data>
+  <data name="Pictures" xml:space="preserve">
+    <value>图片</value>
+  </data>
+  <data name="PieChart" xml:space="preserve">
+    <value>饼图</value>
+  </data>
+  <data name="Pin" xml:space="preserve">
+    <value>固定</value>
+  </data>
+  <data name="Pink" xml:space="preserve">
+    <value>粉</value>
+  </data>
+  <data name="Play" xml:space="preserve">
+    <value>播放</value>
+  </data>
+  <data name="Poll" xml:space="preserve">
+    <value>投票</value>
+  </data>
+  <data name="PositionWhenThePanelIsShownAgain" xml:space="preserve">
+    <value>选择面板再次显示时的位置</value>
+  </data>
+  <data name="Power" xml:space="preserve">
+    <value>电源</value>
+  </data>
+  <data name="Print" xml:space="preserve">
+    <value>打印</value>
+  </data>
+  <data name="Privacy" xml:space="preserve">
+    <value>隐私</value>
+  </data>
+  <data name="ProtectedDocument" xml:space="preserve">
+    <value>加密文档</value>
+  </data>
+  <data name="Protection" xml:space="preserve">
+    <value>防护</value>
+  </data>
+  <data name="Purple" xml:space="preserve">
+    <value>紫</value>
+  </data>
+  <data name="ReadOnlyConfiguration" xml:space="preserve">
+    <value>只读配置</value>
+  </data>
+  <data name="ReadOnlyNotice" xml:space="preserve">
+    <value>{0} {1}</value>
+  </data>
+  <data name="Reading" xml:space="preserve">
+    <value>阅读</value>
+  </data>
+  <data name="Reading283" xml:space="preserve">
+    <value>正在读取…</value>
+  </data>
+  <data name="ReadingDroppedItems" xml:space="preserve">
+    <value>正在解析拖入项目…</value>
+  </data>
+  <data name="Receipt" xml:space="preserve">
+    <value>收据</value>
+  </data>
+  <data name="Record" xml:space="preserve">
+    <value>记录</value>
+  </data>
+  <data name="RefreshIcon" xml:space="preserve">
+    <value>刷新图标</value>
+  </data>
+  <data name="Registered0" xml:space="preserve">
+    <value>当前已注册：{0}</value>
+  </data>
+  <data name="RegistrationFailedError0ChooseAnotherCombination" xml:space="preserve">
+    <value>注册失败，错误码 {0}；请选择其他组合。</value>
+  </data>
+  <data name="Rename" xml:space="preserve">
+    <value>重命名</value>
+  </data>
+  <data name="RenameGroup" xml:space="preserve">
+    <value>重命名分组</value>
+  </data>
+  <data name="RenameItem" xml:space="preserve">
+    <value>重命名条目</value>
+  </data>
+  <data name="ResetPositionAndSize" xml:space="preserve">
+    <value>恢复默认位置和大小</value>
+  </data>
+  <data name="ResetToDefault" xml:space="preserve">
+    <value>恢复默认</value>
+  </data>
+  <data name="Restore" xml:space="preserve">
+    <value>还原</value>
+  </data>
+  <data name="Robot" xml:space="preserve">
+    <value>机器人</value>
+  </data>
+  <data name="RunAsAdministrator" xml:space="preserve">
+    <value>以管理员身份运行</value>
+  </data>
+  <data name="RunningAsAdministratorRestartWithStandardPermissionsToReceiveDrop" xml:space="preserve">
+    <value>当前以管理员权限运行；请用普通权限重启以接收外部拖入。</value>
+  </data>
+  <data name="Save" xml:space="preserve">
+    <value>保存</value>
+  </data>
+  <data name="Saved" xml:space="preserve">
+    <value>已保存</value>
+  </data>
+  <data name="Saving" xml:space="preserve">
+    <value>保存中…</value>
+  </data>
+  <data name="Scale" xml:space="preserve">
+    <value>缩放</value>
+  </data>
+  <data name="ScatterChart" xml:space="preserve">
+    <value>散点图</value>
+  </data>
+  <data name="Schedule" xml:space="preserve">
+    <value>日程</value>
+  </data>
+  <data name="Search" xml:space="preserve">
+    <value>搜索</value>
+  </data>
+  <data name="Security" xml:space="preserve">
+    <value>安全</value>
+  </data>
+  <data name="Send" xml:space="preserve">
+    <value>发送</value>
+  </data>
+  <data name="Server" xml:space="preserve">
+    <value>服务器</value>
+  </data>
+  <data name="Settings" xml:space="preserve">
+    <value>设置</value>
+  </data>
+  <data name="SettingsHaveNotBeenSaved0YesRetryNoDiscardUnsavedChangesAndExitCa" xml:space="preserve">
+    <value>配置尚未保存：{0}
+是：重试
+否：放弃未保存修改并退出
+取消：返回程序</value>
+  </data>
+  <data name="Shield" xml:space="preserve">
+    <value>盾牌</value>
+  </data>
+  <data name="Shopping" xml:space="preserve">
+    <value>购物</value>
+  </data>
+  <data name="ShortcutsUseTheirOwnArgumentsAndWorkingFolder" xml:space="preserve">
+    <value>快捷方式使用自身的参数和工作目录。</value>
+  </data>
+  <data name="ShowHidePanel" xml:space="preserve">
+    <value>呼出 / 隐藏面板</value>
+  </data>
+  <data name="ShowPosition" xml:space="preserve">
+    <value>呼出位置</value>
+  </data>
+  <data name="ShowSwiftdock" xml:space="preserve">
+    <value>显示迅启</value>
+  </data>
+  <data name="Simple" xml:space="preserve">
+    <value>简约</value>
+  </data>
+  <data name="Slate" xml:space="preserve">
+    <value>石板灰</value>
+  </data>
+  <data name="Solid" xml:space="preserve">
+    <value>纯色</value>
+  </data>
+  <data name="SolidBackgroundsForPanelAndDialogs" xml:space="preserve">
+    <value>面板和对话框均使用纯色背景</value>
+  </data>
+  <data name="Star" xml:space="preserve">
+    <value>星标</value>
+  </data>
+  <data name="StartAtSignIn" xml:space="preserve">
+    <value>登录时自动启动</value>
+  </data>
+  <data name="StartWhenSigningInToWindows" xml:space="preserve">
+    <value>登录 Windows 时自动启动</value>
+  </data>
+  <data name="StartupSettingsUpdated" xml:space="preserve">
+    <value>自启设置已更新。</value>
+  </data>
+  <data name="Store" xml:space="preserve">
+    <value>商店</value>
+  </data>
+  <data name="Swiftdock" xml:space="preserve">
+    <value>迅启</value>
+  </data>
+  <data name="Swiftdock0" xml:space="preserve">
+    <value>迅启 · {0}</value>
+  </data>
+  <data name="SwiftdockCouldNotStart" xml:space="preserve">
+    <value>迅启无法启动</value>
+  </data>
+  <data name="Sync" xml:space="preserve">
+    <value>同步</value>
+  </data>
+  <data name="System" xml:space="preserve">
+    <value>系统</value>
+  </data>
+  <data name="SystemIcon" xml:space="preserve">
+    <value>{0} 图标 {1}</value>
+  </data>
+  <data name="Table" xml:space="preserve">
+    <value>表格</value>
+  </data>
+  <data name="Tag" xml:space="preserve">
+    <value>标签</value>
+  </data>
+  <data name="TargetError" xml:space="preserve">
+    <value>{0}
+{1}</value>
+  </data>
+  <data name="Task" xml:space="preserve">
+    <value>任务</value>
+  </data>
+  <data name="Teal" xml:space="preserve">
+    <value>青</value>
+  </data>
+  <data name="Terminal" xml:space="preserve">
+    <value>终端</value>
+  </data>
+  <data name="Text" xml:space="preserve">
+    <value>文本</value>
+  </data>
+  <data name="TheAppIsUsingTheRepositoryDevelopmentRuntimeEnableStartupFromASta" xml:space="preserve">
+    <value>当前使用仓库内的开发运行时。请从独立发布版启用自启，或先安装 .NET 10 Windows Desktop Runtime。</value>
+  </data>
+  <data name="TheConfigurationFolderIsInUseOrNotWritableRunningReadOnly0" xml:space="preserve">
+    <value>配置目录被其他会话占用或不可写，当前只读：{0}</value>
+  </data>
+  <data name="TheDamagedConfigurationWasKeptUsingDefaultContent0" xml:space="preserve">
+    <value>原配置损坏并已保留，当前使用默认内容。{0}</value>
+  </data>
+  <data name="TheExistingInstanceDidNotAcknowledgeTheShowRequest" xml:space="preserve">
+    <value>已有实例未确认显示请求。</value>
+  </data>
+  <data name="TheExistingInstanceDidNotRespondInTimePleaseTryStartingAgainLater" xml:space="preserve">
+    <value>已有实例未及时响应，请稍后重新启动。</value>
+  </data>
+  <data name="TheExistingInstanceReturnedAnInvalidPid" xml:space="preserve">
+    <value>已有实例返回无效 PID。</value>
+  </data>
+  <data name="TheFolderCouldNotBeFound" xml:space="preserve">
+    <value>找不到该文件夹。</value>
+  </data>
+  <data name="TheItemNoLongerExists" xml:space="preserve">
+    <value>条目已不存在。</value>
+  </data>
+  <data name="TheNewCombinationIsInUseOrUnavailable0TheOriginalHotkeyAndSetting" xml:space="preserve">
+    <value>新组合被占用或不可用（{0}）；原有热键和配置已保留。</value>
+  </data>
+  <data name="ThePathContainsInvalidQuotes" xml:space="preserve">
+    <value>路径包含非法引号。</value>
+  </data>
+  <data name="ThePortableDataFolderIsNotWritable" xml:space="preserve">
+    <value>便携 Data 目录不可写。</value>
+  </data>
+  <data name="TheSelectedConfigurationFolderIsNotWritable" xml:space="preserve">
+    <value>所选配置目录不可写。</value>
+  </data>
+  <data name="TheShellAcceptedTheLaunchRequest" xml:space="preserve">
+    <value>Shell 已接受启动请求</value>
+  </data>
+  <data name="TheTargetDoesNotExistOrCannotBeAccessed0" xml:space="preserve">
+    <value>目标不存在或无法访问：{0}</value>
+  </data>
+  <data name="TheUrlFileHasNoValidHttpHttpsUrl" xml:space="preserve">
+    <value>.url 不包含有效 http/https 网址。</value>
+  </data>
+  <data name="TheUrlFileIsTooLarge" xml:space="preserve">
+    <value>.url 文件过大。</value>
+  </data>
+  <data name="TheWebsiteIconWillBeFetchedAfterAdding" xml:space="preserve">
+    <value>添加后会自动获取网站图标。</value>
+  </data>
+  <data name="TheWorkingFolderMustBeAValidAbsolutePath" xml:space="preserve">
+    <value>工作目录必须是有效绝对路径。</value>
+  </data>
+  <data name="Theme" xml:space="preserve">
+    <value>主题</value>
+  </data>
+  <data name="ThisGroupAlreadyContainsTheSameLaunchItem" xml:space="preserve">
+    <value>该组已有相同的启动条目。</value>
+  </data>
+  <data name="ToDo" xml:space="preserve">
+    <value>待办</value>
+  </data>
+  <data name="Toolbox" xml:space="preserve">
+    <value>工具箱</value>
+  </data>
+  <data name="Tools" xml:space="preserve">
+    <value>工具</value>
+  </data>
+  <data name="Transparency" xml:space="preserve">
+    <value>透明度</value>
+  </data>
+  <data name="Travel" xml:space="preserve">
+    <value>出行</value>
+  </data>
+  <data name="Trend" xml:space="preserve">
+    <value>趋势</value>
+  </data>
+  <data name="Typography" xml:space="preserve">
+    <value>排版</value>
+  </data>
+  <data name="Unable" xml:space="preserve">
+    <value>无法</value>
+  </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>不可</value>
+  </data>
+  <data name="Unpin" xml:space="preserve">
+    <value>取消置顶</value>
+  </data>
+  <data name="UnsupportedLegacyConfigurationVersion" xml:space="preserve">
+    <value>不支持的旧配置版本。</value>
+  </data>
+  <data name="Upload" xml:space="preserve">
+    <value>上传</value>
+  </data>
+  <data name="Url" xml:space="preserve">
+    <value>网址</value>
+  </data>
+  <data name="UserFolder" xml:space="preserve">
+    <value>用户目录</value>
+  </data>
+  <data name="UsingSolidMaterialIsNotSupported" xml:space="preserve">
+    <value>当前使用纯色：系统不支持所选材质</value>
+  </data>
+  <data name="UsingSolidMaterialIsUnavailable" xml:space="preserve">
+    <value>当前使用纯色：背景材质暂不可用</value>
+  </data>
+  <data name="UsingSolidWindowsHighContrastIsOn" xml:space="preserve">
+    <value>当前使用纯色：Windows 高对比度已开启</value>
+  </data>
+  <data name="UsingSolidWindowsTransparencyIsOff" xml:space="preserve">
+    <value>当前使用纯色：Windows 透明效果已关闭</value>
+  </data>
+  <data name="UsingTemporaryDefaultContent" xml:space="preserve">
+    <value>使用临时默认内容。</value>
+  </data>
+  <data name="UsingWindowsHighContrastColors" xml:space="preserve">
+    <value>当前使用 Windows 高对比度配色</value>
+  </data>
+  <data name="UsingWindowsHighContrastTheme" xml:space="preserve">
+    <value>当前使用 Windows 高对比度主题</value>
+  </data>
+  <data name="Vault" xml:space="preserve">
+    <value>保险库</value>
+  </data>
+  <data name="Version" xml:space="preserve">
+    <value>版本</value>
+  </data>
+  <data name="Video" xml:space="preserve">
+    <value>视频</value>
+  </data>
+  <data name="VideoMeeting" xml:space="preserve">
+    <value>视频会议</value>
+  </data>
+  <data name="WaitInTheSystemTrayAfterStartup" xml:space="preserve">
+    <value>启动后在系统托盘中待命</value>
+  </data>
+  <data name="WaitingToSave" xml:space="preserve">
+    <value>等待保存</value>
+  </data>
+  <data name="Wallet" xml:space="preserve">
+    <value>钱包</value>
+  </data>
+  <data name="Weather" xml:space="preserve">
+    <value>天气</value>
+  </data>
+  <data name="Web" xml:space="preserve">
+    <value>网页</value>
+  </data>
+  <data name="WiFi" xml:space="preserve">
+    <value>无线网络</value>
+  </data>
+  <data name="Work" xml:space="preserve">
+    <value>工作</value>
+  </data>
+  <data name="WorkingFolder" xml:space="preserve">
+    <value>工作目录</value>
+  </data>
+  <data name="Wrench" xml:space="preserve">
+    <value>扳手</value>
+  </data>
+  <data name="Yes" xml:space="preserve">
+    <value>是</value>
+  </data>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+</root>

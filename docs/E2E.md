@@ -8,7 +8,7 @@ Run from an unlocked Windows desktop with the repository SDK installed:
 .\scripts\E2E.ps1 -Filter 'Add_url_with_icon,Settings_live_preferences'
 ```
 
-The script restores the existing lock file, builds Release with `-warnaserror`, then runs only `Swiftdock.E2E`. Results go to `artifacts/e2e/e2e.trx`. `Validate.ps1` restores/builds only the app + unit project and runs the fast unit cases. `Snapshots.ps1` independently builds a small rendering tool and emits 55 review PNGs plus `artifacts/validation/snapshots.json`, with a text-contrast guard for dark settings pages.
+The script restores the existing lock file, builds Release with `-warnaserror`, then runs only `Swiftdock.E2E`. Results go to `artifacts/e2e/e2e.trx`. `Validate.ps1` restores/builds only the app + unit project and runs the fast unit cases. `Snapshots.ps1` independently builds a small rendering tool and emits 110 review PNGs in Chinese and English plus `artifacts/validation/snapshots.json`, with a text-contrast guard for dark settings pages.
 
 `-Filter` selects scenario method names by a case-insensitive literal substring. Comma-separated terms are ORed, whitespace is trimmed, and all data rows of each matching scenario run. The script prints the selected names before starting. No match fails explicitly; omitting the filter runs the full suite. The per-scenario supervisor, 60-second deadline, overall timeout and cleanup are unchanged. Use the focused run while iterating and run the full suite once before merge.
 
@@ -308,3 +308,11 @@ Plain page text uses NavigationView's page background composited over the theme
 background; template labels/checkmarks use their painted control background so
 intentional black-on-accent text is not mistaken for black-on-dark-page text.
 Errors include the text, foreground/background colours and computed ratio.
+
+## Language switching
+
+Every scenario seeds `language: "zh-CN"` so its existing Chinese element names are independent of Windows language. `Settings_live_preferences_are_persisted` also switches to English and back with real input, checks navigation, the Language label, panel add name/tooltip, tray menu items and the saved `language`. The language checks require a reachable tray icon; they fail if tray verification cannot send input safely.
+
+Before querying the shell, each language step waits up to four seconds for a fresh `tray.tooltip` event from the test process and checks both WPF/native tooltip values and `shellUpdated`. The harness logs all taskbar and candidate flyout Button names containing the test hotkey suffix, including stale names, and includes them in a final failure. For language checks it allows two three-second name waits with one verified flyout close/reopen. Windows 11 Explorer can concatenate the original and updated tooltips in the overflow icon's UIA Name, so a name must equal the expected-language tooltip or end with a space followed by that complete tooltip. A name containing only the old tooltip or ending with it is rejected. The matching element must still be unique, and the same rule is checked again before input.
+
+For Task 30 desktop review, run `Settings_live_preferences_are_persisted`, `Settings_navigation_and_transparency_drag_persist_after_exit`, and the existing editor/icon-picker and tray scenarios. `scripts/Snapshots.ps1 -TimeoutSeconds 300` renders both languages offscreen; English images have an `-en.png` suffix.

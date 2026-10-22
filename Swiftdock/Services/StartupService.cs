@@ -24,7 +24,7 @@ public sealed class StartupService
             return key?.GetValue(name) as string;
         }, (name, command) =>
         {
-            using var key = Registry.CurrentUser.CreateSubKey(registryPath) ?? throw new IOException("无法访问当前用户自启设置。");
+            using var key = Registry.CurrentUser.CreateSubKey(registryPath) ?? throw L.Exception<IOException>(L.Text("CouldNotAccessStartupSettingsForTheCurrentUser"));
             if (command is not null) key.SetValue(name, command, RegistryValueKind.String);
             else key.DeleteValue(name, throwOnMissingValue: false);
         }, portable, valueNames: () =>
@@ -93,7 +93,7 @@ public sealed class StartupService
     public void SetEnabled(bool enabled)
     {
         if (enabled && _registryPath == RunKey && !_canStartAtLogin())
-            throw new InvalidOperationException("当前使用仓库内的开发运行时。请从独立发布版启用自启，或先安装 .NET 10 Windows Desktop Runtime。");
+            throw L.Exception<InvalidOperationException>(L.Text("TheAppIsUsingTheRepositoryDevelopmentRuntimeEnableStartupFromASta"));
         _writeValue(ValueName, enabled ? Command : null);
     }
     internal static bool CanStartAtLogin(bool selfContained, string sharedDesktopRuntimes)

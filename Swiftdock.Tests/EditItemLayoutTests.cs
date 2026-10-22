@@ -75,10 +75,12 @@ public sealed class EditItemLayoutTests
     {
         await using var log = new TestLogging();
         using var icons = log.CreateIcons(Path.Combine(Path.GetTempPath(), "Swiftdock-layout-" + Guid.NewGuid().ToString("N")));
+        foreach (string language in new[] { "zh-CN", "en" })
         foreach (var theme in new[] { ApplicationTheme.Dark, ApplicationTheme.Light })
         foreach (double scale in new[] { 1d, 2d })
         foreach (bool edit in new[] { false, true })
         {
+            Swiftdock.Services.Localization.Instance.Apply(language);
             ApplicationThemeManager.Apply(theme, Wpf.Ui.Controls.WindowBackdropType.None, updateAccent: false);
             var picker = new DialogFilePicker();
             using var model = new EditItemViewModel(picker, new ItemEditorEnvironment());
@@ -99,7 +101,7 @@ public sealed class EditItemLayoutTests
                 await Dispatcher.Yield(DispatcherPriority.DataBind);
                 double height = Measure();
                 Assert.True(height > 300); Assert.False(model.AdvancedExpanded);
-                Assert.Equal(edit ? "添加后会自动获取网站图标。" : "自动获取网站图标已关闭，可手动选择图标。", dialog.UrlDescription.Text);
+                Assert.Equal(Swiftdock.Services.Localization.Instance[edit ? "TheWebsiteIconWillBeFetchedAfterAdding" : "AutoFetchIsOffChooseAnIconManually"], dialog.UrlDescription.Text);
                 foreach (var kind in Enum.GetValues<LaunchKind>())
                 {
                     model.SelectTypeCommand.Execute(kind);

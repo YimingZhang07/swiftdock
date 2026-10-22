@@ -54,6 +54,7 @@ internal static class WpfTestHost
         var dispatcher = await DispatcherTask.Value;
         await dispatcher.InvokeAsync(async () =>
         {
+            string language = Swiftdock.Services.Localization.Instance.Culture.Name;
             var theme = ApplicationThemeManager.GetAppTheme();
             var resources = Application.Current.Resources;
             var dictionaries = resources.MergedDictionaries.ToArray();
@@ -80,6 +81,7 @@ internal static class WpfTestHost
                     // The saved dictionaries can contain already-resolved brushes. Reload last
                     // to restore both WPF-UI's cached theme and its palette-derived resources.
                     ApplicationThemeManager.Apply(theme, WindowBackdropType.None, updateAccent: false);
+                    Swiftdock.Services.Localization.Instance.Apply(language);
                 }
             }
         }).Task.Unwrap().WaitAsync(TimeSpan.FromSeconds(45));

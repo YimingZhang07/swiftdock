@@ -26,7 +26,7 @@ public sealed partial class LauncherViewModel : ObservableObject, IDisposable
     private bool _closing;
     private LaunchGroup _selectedGroup;
     private bool _dragActive, _importing;
-    private string _statusText = "", _toastText = "";
+    private UiText _statusText = "", _toastText = "";
     private bool _toastVisible;
     public MainViewModel State { get; }
     public ObservableCollection<LaunchGroup> Groups => State.Groups;
@@ -40,11 +40,12 @@ public sealed partial class LauncherViewModel : ObservableObject, IDisposable
     public LaunchItem? SelectedItem => SelectionFor(SelectedGroup).Item;
     public bool DragActive => _dragActive;
     public bool Importing => _importing;
-    public string StatusText => _statusText;
-    public string ToastText => _toastText.ReplaceLineEndings(" ");
+    public string StatusText => _statusText.Value;
+    public string HideTooltip => L.Text("HideEsc0ToShow", State.HotkeyDisplay);
+    public string ToastText => _toastText.Value.ReplaceLineEndings(" ");
     public bool ToastVisible => _toastVisible;
     public TimeSpan? ToastDuration => Importing || _closing ? null : TimeSpan.FromSeconds(
-        new[] { "失败", "错误", "无法", "未能", "尚未保存", "不可", "不能" }.Any(ToastText.Contains) ? 6 : 4);
+        new[] { L.Text("Failed"), L.Text("Error"), L.Text("Unable"), L.Text("CouldNot"), L.Text("NotSaved"), L.Text("Unavailable"), L.Text("Cannot") }.Any(word => ToastText.Contains(word.Value, StringComparison.OrdinalIgnoreCase)) ? 6 : 4);
     public event Action<bool>? GroupSelected;
     public event Action? FocusSelectionRequested;
     public event Action? RevealSelectionRequested;
@@ -57,13 +58,14 @@ public sealed partial class LauncherViewModel : ObservableObject, IDisposable
 
     public LauncherViewModel(MainViewModel state, ILauncherDialogs dialogs, ILauncherActions actions, ILogger log)
     {
+        L.Observe(LanguageChanged);
         State = state; _dialogs = dialogs; _actions = actions; _log = log;
         InitializeDragDrop();
         _selectedGroup = Groups.FirstOrDefault(g => g.Id == state.LastGroupId) ?? Groups[0];
         foreach (var group in Groups) SelectionFor(group);
         Groups.CollectionChanged += GroupsChanged;
         State.PropertyChanged += StateChanged;
-        if (IsReadOnly) SetStatus("当前为只读配置，可启动项目，不能添加或排序。");
+        if (IsReadOnly) SetStatus(L.Text("ConfigurationIsReadOnlyYouCanLaunchItemsButCannotAddOrReorderThem"));
     }
 
     public TileSelection SelectionFor(LaunchGroup group)
@@ -76,9 +78,12 @@ public sealed partial class LauncherViewModel : ObservableObject, IDisposable
         }
         return selection;
     }
+    private void LanguageChanged(object? sender, PropertyChangedEventArgs e)
+    { OnPropertyChanged(nameof(StatusText)); OnPropertyChanged(nameof(ToastText)); OnPropertyChanged(nameof(HideTooltip)); }
     private void SelectionChanged(object? sender, PropertyChangedEventArgs e) => OnPropertyChanged(nameof(SelectedItem));
     private void StateChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(MainViewModel.HotkeyDisplay)) OnPropertyChanged(nameof(HideTooltip));
         if (e.PropertyName != nameof(MainViewModel.CanEdit)) return;
         OnPropertyChanged(nameof(CanEdit)); NotifyCommands();
     }
@@ -190,15 +195,15 @@ public sealed partial class LauncherViewModel : ObservableObject, IDisposable
         catch (OperationCanceledException) { return; }
         if (_closing || cancellation.IsCancellationRequested) return;
         State.RecordLaunch(item!, result);
-        SetStatus($"{item!.Name}：{result.Message}", toast: !result.Accepted || result.Cancelled);
-        _log.LaunchResult((int)item.Kind, result.Accepted, result.Cancelled, LogPrivacy.Message(result.Message));
+        SetStatus(L.Text("LaunchStatus", item!.Name, result.Text), toast: !result.Accepted || result.Cancelled);
+        _log.LaunchResult((int)item.Kind, result.Accepted, result.Cancelled, LogPrivacy.Message(result.Text.English));
     }
     [RelayCommand(CanExecute = nameof(CanOpenLocation))]
     private async Task OpenLocationAsync(LaunchItem? item)
     {
         if (!CanOpenLocation(item)) return;
         try { await _actions.OpenLocationAsync(item!); }
-        catch (Exception ex) { SetStatus($"无法打开所在位置：{ex.Message}"); }
+        catch (Exception ex) { SetStatus(L.Text("CouldNotOpenTheFileLocation0", L.Error(ex))); }
     }
     [RelayCommand(CanExecute = nameof(CanManageItem))]
     private void Edit(LaunchItem? item) { if (CanManageItem(item)) EditItem(item); }
@@ -213,32 +218,32 @@ public sealed partial class LauncherViewModel : ObservableObject, IDisposable
         try
         {
             if (original is not null) State.UpdateItem(group, original, result);
-            else if (State.IsDuplicate(group, result)) throw new InvalidOperationException("该组已有相同的启动条目。");
+            else if (State.IsDuplicate(group, result)) throw L.Exception<InvalidOperationException>(L.Text("ThisGroupAlreadyContainsTheSameLaunchItem"));
             else group.Items.Add(result);
-            SetStatus("条目已更新，将自动保存。", toast: false);
+            SetStatus(L.Text("ItemUpdatedChangesWillBeSavedAutomatically"), toast: false);
             ContentChanged?.Invoke(); IconsRequested?.Invoke(); SelectItem(original?.Id ?? result.Id);
         }
-        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { SetStatus(ex.Message); }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { SetStatus(L.Error(ex)); }
     }
     [RelayCommand(CanExecute = nameof(CanManageItem))]
     private void Rename(LaunchItem? item)
     {
         if (!CanManageItem(item)) return;
         var group = SelectedGroup;
-        if (_dialogs.Name("重命名条目", item!.Name) is { } value && CanManage && Groups.Contains(group))
+        if (_dialogs.Name(L.Text("RenameItem"), item!.Name) is { } value && CanManage && Groups.Contains(group))
         { State.UpdateItem(group, item, item with { Name = value }); SelectItem(item.Id); }
     }
     [RelayCommand(CanExecute = nameof(CanManageItem))]
     private void Delete(LaunchItem? item)
     {
         if (!CanManageItem(item)) return;
-        State.DeleteItem(SelectedGroup, item!); SetStatus("已删除，5 秒内按 Ctrl+Z 撤销。");
+        State.DeleteItem(SelectedGroup, item!); SetStatus(L.Text("DeletedPressCtrlZWithin5SecondsToUndo"));
         ContentChanged?.Invoke(); ClearSelectionCommand.Execute(null);
     }
     [RelayCommand(CanExecute = nameof(CanManage))]
     private void UndoDelete()
     {
-        if (CanManage) SetStatus(State.UndoDelete() ? "已恢复删除的条目。" : "没有可恢复的删除记录，或已超过 5 秒。");
+        if (CanManage) SetStatus(State.UndoDelete() ? L.Text("DeletedItemRestored") : L.Text("NoDeletionToUndoOrMoreThan5SecondsHavePassed"));
     }
     [RelayCommand(CanExecute = nameof(CanUseItem))]
     private void RefreshIcon(LaunchItem? item)
@@ -248,19 +253,19 @@ public sealed partial class LauncherViewModel : ObservableObject, IDisposable
     }
     private string NewGroupName()
     {
-        int n = 1; string name = "新分组";
-        while (Groups.Any(g => g.Name == name)) name = $"新分组 {++n}";
+        int n = 1; string name = L.Text("NewGroup");
+        while (Groups.Any(g => g.Name == name)) name = L.Text("NewGroup0", ++n);
         return name;
     }
     [RelayCommand(CanExecute = nameof(CanManage))]
     private void AddGroup()
     {
-        if (CanManage && _dialogs.Name("新建分组", NewGroupName()) is { } value && CanManage) SetSelectedGroup(State.AddGroup(value));
+        if (CanManage && _dialogs.Name(L.Text("CreateGroup"), NewGroupName()) is { } value && CanManage) SetSelectedGroup(State.AddGroup(value));
     }
     [RelayCommand(CanExecute = nameof(CanManageGroup))]
     private void RenameGroup(LaunchGroup? group)
     {
-        if (CanManageGroup(group) && _dialogs.Name("重命名分组", group!.Name) is { } value && CanManageGroup(group)) State.RenameGroup(group!, value);
+        if (CanManageGroup(group) && _dialogs.Name(L.Text("RenameGroup"), group!.Name) is { } value && CanManageGroup(group)) State.RenameGroup(group!, value);
     }
     [RelayCommand(CanExecute = nameof(CanManageGroup))]
     private async Task DeleteGroupAsync(LaunchGroup? group)
@@ -276,7 +281,7 @@ public sealed partial class LauncherViewModel : ObservableObject, IDisposable
         return group;
     }
 
-    public void SetStatus(string text, bool toast = true)
+    public void SetStatus(UiText text, bool toast = true)
     {
         SetProperty(ref _statusText, text, nameof(StatusText));
         if (!toast) return;
@@ -294,7 +299,7 @@ public sealed partial class LauncherViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ToastDuration)); NotifyCommands();
     }
     [RelayCommand(CanExecute = nameof(Importing))]
-    private void CancelImport() { if (Importing) { _importStop?.Cancel(); SetStatus("已取消导入。"); } }
+    private void CancelImport() { if (Importing) { _importStop?.Cancel(); SetStatus(L.Text("ImportCancelled")); } }
     public async Task ImportAsync(LaunchGroup target, int slot, DropSnapshot snapshot)
     {
         if (!CanManage || !Groups.Contains(target)) return;
@@ -305,7 +310,7 @@ public sealed partial class LauncherViewModel : ObservableObject, IDisposable
         {
             SetImporting(true);
             pending = State.BeginImport(target, slot, Math.Max(1, snapshot.Paths.Length));
-            SetStatus("正在解析拖入项目…");
+            SetStatus(L.Text("ReadingDroppedItems"));
             var resolution = await _actions.ResolveDropAsync(snapshot, stop.Token).WaitAsync(stop.Token);
             await WhenIdle.WaitAsync(stop.Token);
             if (_closing || stop.IsCancellationRequested) return;
@@ -313,7 +318,7 @@ public sealed partial class LauncherViewModel : ObservableObject, IDisposable
             if (target == SelectedGroup) ContentChanged?.Invoke();
             IconsRequested?.Invoke();
             if (committed.Duplicate is not null && target == SelectedGroup) DuplicateFound?.Invoke(committed.Duplicate);
-            SetStatus($"已添加 {committed.Added} 项。{(committed.Duplicate is null ? "" : "重复项目已跳过。")} {string.Join("；", resolution.Errors)}");
+            SetStatus(L.Text("Added0Items12", committed.Added, committed.Duplicate is null ? (UiText)"" : L.Text("DuplicateItemsWereSkipped"), UiText.Join(resolution.Messages)));
             _log.DropResolved(committed.Added, resolution.Errors.Count);
         }
         catch (OperationCanceledException) { }
@@ -326,7 +331,7 @@ public sealed partial class LauncherViewModel : ObservableObject, IDisposable
             SetImporting(false);
         }
     }
-    public void ReportImportFailure(Exception ex) { SetStatus($"拖入失败：{ex.Message}"); _log.DropFailed(LogPrivacy.Message(ex.Message)); }
+    public void ReportImportFailure(Exception ex) { SetStatus(L.Text("ImportFailed0", L.Error(ex))); _log.DropFailed(LogPrivacy.Message(L.Diagnostic(ex))); }
     public void PrepareExit() { _closing = true; RequestDragCancel(); _shutdown.Cancel(); NotifyCommands(); }
     public void ResumeAfterExitFailure()
     {
@@ -334,6 +339,7 @@ public sealed partial class LauncherViewModel : ObservableObject, IDisposable
     }
     public void Dispose()
     {
+        L.Unobserve(LanguageChanged);
         PrepareExit(); _shutdown.Dispose();
         Groups.CollectionChanged -= GroupsChanged; State.PropertyChanged -= StateChanged;
         foreach (var selection in _selections.Values) { selection.PropertyChanged -= SelectionChanged; selection.Dispose(); }

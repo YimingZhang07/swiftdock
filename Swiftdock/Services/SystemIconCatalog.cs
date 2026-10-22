@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace Swiftdock.Services;
 
-public sealed record CatalogIcon(string Name, string Spec);
+public sealed record CatalogIcon(UiText Label, string Spec) { public string Name => Label.Value; }
 
 // Only resource metadata is enumerated here. Bitmaps use IconService on demand.
 internal static partial class SystemIconCatalog
@@ -34,7 +34,7 @@ internal static partial class SystemIconCatalog
                     if ((nuint)name is > 0 and <= ushort.MaxValue)
                     {
                         int id = (int)name;
-                        icons.Add(new($"{Path.GetFileName(library)} · {id}", $"file:{library},-{id}"));
+                        icons.Add(new(L.Text("SystemIcon", Path.GetFileName(library), id), $"file:{library},-{id}"));
                     }
                     return true;
                 };

@@ -1,10 +1,10 @@
-﻿<Window x:Class="Swiftdock.Views.LauncherWindow"
+<Window x:Class="Swiftdock.Views.LauncherWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="clr-namespace:Swiftdock.Services" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:Swiftdock.Views"
         xmlns:gong="urn:gong-wpf-dragdrop"
         xmlns:drop="clr-namespace:Swiftdock.DragDrop"
-        Title="迅启" Width="620" Height="500" WindowStyle="None"
+        Title="{loc:Loc Swiftdock}" Width="620" Height="500" WindowStyle="None"
         ResizeMode="CanResize" AllowsTransparency="False" ShowInTaskbar="False" Topmost="{Binding State.AlwaysOnTop, Mode=OneWay}"
         Background="{DynamicResource ApplicationBackgroundBrush}" Foreground="{DynamicResource TextFillColorPrimaryBrush}" FontFamily="Segoe UI, Microsoft YaHei UI"
         UseLayoutRounding="True" Focusable="False" FocusVisualStyle="{x:Null}">
@@ -66,11 +66,11 @@
         <Style x:Key="PinIconButton" TargetType="ToggleButton" BasedOn="{StaticResource IconButton}">
             <!-- Pin / Unpin exist in both Segoe Fluent Icons and Segoe MDL2 Assets. -->
             <Setter Property="Content" Value="&#xE77A;" />
-            <Setter Property="ToolTip" Value="置顶" />
+            <Setter Property="ToolTip" Value="{loc:Loc KeepOnTop}" />
             <Style.Triggers>
                 <Trigger Property="IsChecked" Value="True">
                     <Setter Property="Content" Value="&#xE718;" />
-                    <Setter Property="ToolTip" Value="取消置顶" />
+                    <Setter Property="ToolTip" Value="{loc:Loc Unpin}" />
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -122,14 +122,14 @@
         <ItemsPanelTemplate x:Key="TilePanel"><local:TilePanel ItemWidth="{Binding DataContext.State.CellSize, RelativeSource={RelativeSource AncestorType=Window}}" ItemHeight="{Binding DataContext.State.CellSize, RelativeSource={RelativeSource AncestorType=Window}}" /></ItemsPanelTemplate>
         <ContextMenu x:Key="ItemContextMenu" Opened="ItemMenuOpened" Closed="ItemMenuClosed"
                      DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
-            <MenuItem Header="打开" Command="{Binding LaunchCommand}" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-            <MenuItem Header="以管理员身份运行" Command="{Binding LaunchElevatedCommand}" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-            <MenuItem Header="打开所在位置" Command="{Binding OpenLocationCommand}" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-            <MenuItem Header="编辑…" Tag="edit" Command="{Binding EditCommand}" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-            <MenuItem Header="更换图标…" Tag="edit" Command="{Binding ChangeIconCommand}" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-            <MenuItem Header="重命名" Tag="edit" Command="{Binding RenameCommand}" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-            <MenuItem Header="删除" Tag="edit" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Command="{Binding DeleteCommand}" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
-            <Separator /><MenuItem Header="刷新图标" Command="{Binding RefreshIconCommand}" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+            <MenuItem Header="{loc:Loc Open}" Command="{Binding LaunchCommand}" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+            <MenuItem Header="{loc:Loc RunAsAdministrator}" Command="{Binding LaunchElevatedCommand}" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+            <MenuItem Header="{loc:Loc OpenFileLocation}" Command="{Binding OpenLocationCommand}" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+            <MenuItem Header="{loc:Loc Edit}" Tag="edit" Command="{Binding EditCommand}" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+            <MenuItem Header="{loc:Loc ChangeIcon327}" Tag="edit" Command="{Binding ChangeIconCommand}" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+            <MenuItem Header="{loc:Loc Rename}" Tag="edit" Command="{Binding RenameCommand}" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+            <MenuItem Header="{loc:Loc Delete}" Tag="edit" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Command="{Binding DeleteCommand}" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+            <Separator /><MenuItem Header="{loc:Loc RefreshIcon}" Command="{Binding RefreshIconCommand}" CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
         </ContextMenu>
         <Style x:Key="TileList" TargetType="local:TileListBox">
             <Setter Property="gong:DragDrop.DropInfoBuilder" Value="{StaticResource LauncherDropInfo}" />
@@ -158,7 +158,7 @@
             <Setter Property="Background" Value="Transparent" /><Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
             <Setter Property="Margin" Value="{Binding Source={StaticResource PanelMetrics}, Path=Inset2}" /><Setter Property="Padding" Value="{Binding Source={StaticResource PanelMetrics}, Path=Inset4}" /><Setter Property="Opacity" Value="0.55" />
             <Setter Property="Focusable" Value="False" /><Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="ToolTip" Value="{Binding ToolTip}" /><Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+            <Setter Property="ToolTip" Value="{Binding ToolTip.Value}" /><Setter Property="AutomationProperties.Name" Value="{Binding DisplayName.Value}" />
             <Setter Property="Tag" Value="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}" />
             <Setter Property="ContextMenu" Value="{StaticResource ItemContextMenu}" />
             <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="local:TileListBoxItem">
@@ -171,7 +171,7 @@
                                            Foreground="{DynamicResource SystemFillColorCriticalBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
                                 <Ellipse x:Name="ErrorBadge" Fill="{DynamicResource SystemFillColorCriticalBrush}" Width="{Binding Source={StaticResource PanelMetrics}, Path=Length8}" Height="{Binding Source={StaticResource PanelMetrics}, Path=Length8}" HorizontalAlignment="Right" VerticalAlignment="Bottom" />
                             </Grid>
-                            <TextBlock x:Name="TileLabel" Text="{Binding Name}" FontSize="{Binding Source={StaticResource PanelMetrics}, Path=Length12}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"
+                            <TextBlock x:Name="TileLabel" Text="{Binding DisplayName.Value}" FontSize="{Binding Source={StaticResource PanelMetrics}, Path=Length12}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"
                                        LineHeight="{Binding Source={StaticResource PanelMetrics}, Path=Length14}" LineStackingStrategy="BlockLineHeight" Height="{Binding Source={StaticResource PanelMetrics}, Path=Length28}" TextAlignment="Center" Margin="{Binding Source={StaticResource PanelMetrics}, Path=Inset0_6_0_0}" />
                         </StackPanel>
                     </Border>
@@ -209,12 +209,12 @@
                             <DataTrigger Binding="{Binding State.StorageWarning}" Value=""><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
                         </Style.Triggers></Style></TextBlock.Style>
                     </TextBlock>
-                    <Button x:Name="AddItemButton" Style="{StaticResource IconButton}" Content="&#xECC8;" ToolTip="添加项目（也可拖入文件）" AutomationProperties.Name="添加项目" Command="{Binding AddItemCommand}" IsEnabled="{Binding CanEdit}" />
-                    <Button x:Name="SettingsButton" Style="{StaticResource IconButton}" Content="&#xE713;" ToolTip="设置" AutomationProperties.Name="设置" Click="SettingsClick" />
-                    <ToggleButton x:Name="PinButton" Style="{StaticResource PinIconButton}" AutomationProperties.Name="置顶" AutomationProperties.AutomationId="PinButton"
+                    <Button x:Name="AddItemButton" AutomationProperties.AutomationId="AddItemButton" Style="{StaticResource IconButton}" Content="&#xECC8;" ToolTip="{loc:Loc AddItemOrDropFiles}" AutomationProperties.Name="{loc:Loc AddItem}" Command="{Binding AddItemCommand}" IsEnabled="{Binding CanEdit}" />
+                    <Button x:Name="SettingsButton" Style="{StaticResource IconButton}" Content="&#xE713;" ToolTip="{loc:Loc Settings}" AutomationProperties.Name="{loc:Loc Settings}" Click="SettingsClick" />
+                    <ToggleButton x:Name="PinButton" Style="{StaticResource PinIconButton}" AutomationProperties.Name="{loc:Loc KeepOnTop}" AutomationProperties.AutomationId="PinButton"
                                   IsChecked="{Binding State.AlwaysOnTop, Mode=TwoWay}" IsEnabled="{Binding CanEdit}" />
-                    <Button x:Name="HidePanelButton" Style="{StaticResource IconButton}" Content="&#xE8BB;" FontSize="{Binding Source={StaticResource PanelMetrics}, Path=Length10}" AutomationProperties.Name="隐藏面板" Command="{Binding HidePanelCommand}"
-                            ToolTip="{Binding State.HotkeyDisplay, StringFormat=隐藏 (Esc)  ·  {0} 呼出}" />
+                    <Button x:Name="HidePanelButton" Style="{StaticResource IconButton}" Content="&#xE8BB;" FontSize="{Binding Source={StaticResource PanelMetrics}, Path=Length10}" AutomationProperties.Name="{loc:Loc HidePanel}" Command="{Binding HidePanelCommand}"
+                            ToolTip="{Binding HideTooltip}" />
                 </StackPanel>
                 <ScrollViewer x:Name="TabsViewport" DockPanel.Dock="Left" Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" PreviewMouseWheel="TabsMouseWheel" VerticalAlignment="Center">
                     <ScrollViewer.Margin><MultiBinding Converter="{StaticResource TabInset}">
@@ -238,8 +238,8 @@
                                 </local:GroupTabButton>
                             </DataTemplate></ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        <Button x:Name="AddGroupButton" Style="{StaticResource AddGroupIconButton}" Content="&#xE710;" FontSize="{Binding Source={StaticResource PanelMetrics}, Path=Length12}" ToolTip="新建分组；也可把条目拖到这里"
-                                AutomationProperties.Name="新建分组" Click="AddGroupClick" IsEnabled="{Binding CanEdit}"
+                        <Button x:Name="AddGroupButton" Style="{StaticResource AddGroupIconButton}" Content="&#xE710;" FontSize="{Binding Source={StaticResource PanelMetrics}, Path=Length12}" ToolTip="{loc:Loc CreateAGroupOrDropAnItemHere}"
+                                AutomationProperties.Name="{loc:Loc CreateGroup}" Click="AddGroupClick" IsEnabled="{Binding CanEdit}"
                                 gong:DragDrop.IsDropTarget="True" gong:DragDrop.DropHandler="{Binding NewGroupDropTarget}"
                                 gong:DragDrop.DropInfoBuilder="{StaticResource LauncherDropInfo}"
                                 gong:DragDrop.DropTargetAdornerPen="{StaticResource DropInsertionPen}" />
@@ -258,14 +258,14 @@
                     <Setter Property="Visibility" Value="Collapsed" />
                     <Style.Triggers><DataTrigger Binding="{Binding SelectedGroup.Items.Count}" Value="0"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers>
                 </Style></StackPanel.Style>
-                <TextBlock Text="拖入文件、文件夹或网址" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextAlignment="Center" FontSize="{Binding Source={StaticResource PanelMetrics}, Path=Length13}" />
-                <TextBlock Text="或点击右上角添加项目" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextAlignment="Center" FontSize="{Binding Source={StaticResource PanelMetrics}, Path=Length12}" Margin="{Binding Source={StaticResource PanelMetrics}, Path=Inset0_6_0_0}" />
+                <TextBlock Text="{loc:Loc DropFilesFoldersOrUrlsHere}" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextAlignment="Center" FontSize="{Binding Source={StaticResource PanelMetrics}, Path=Length13}" />
+                <TextBlock Text="{loc:Loc OrAddAnItemWithTheButtonAbove}" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextAlignment="Center" FontSize="{Binding Source={StaticResource PanelMetrics}, Path=Length12}" Margin="{Binding Source={StaticResource PanelMetrics}, Path=Inset0_6_0_0}" />
             </StackPanel>
         </Grid>
         <Grid Grid.Row="1" VerticalAlignment="Bottom" Height="{Binding Source={StaticResource PanelMetrics}, Path=Length24}" Margin="{Binding Source={StaticResource PanelMetrics}, Path=Inset16_0}" ClipToBounds="True">
             <local:ToastSurface x:Name="Toast" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" Opacity="0">
                 <DockPanel>
-                    <Button x:Name="CancelImportButton" DockPanel.Dock="Right" Style="{StaticResource ToastLink}" FontSize="{Binding Source={StaticResource PanelMetrics}, Path=Length12}" Content="取消" AutomationProperties.Name="取消导入"
+                    <Button x:Name="CancelImportButton" DockPanel.Dock="Right" Style="{StaticResource ToastLink}" FontSize="{Binding Source={StaticResource PanelMetrics}, Path=Length12}" Content="{loc:Loc Cancel}" AutomationProperties.Name="{loc:Loc CancelImport}"
                             Command="{Binding CancelImportCommand}" Visibility="{Binding Importing, Converter={StaticResource BoolToVisibility}}" />
                     <TextBlock x:Name="Status" Text="{Binding ToastText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="NoWrap"
                                TextTrimming="CharacterEllipsis" TextAlignment="Center" FontSize="{Binding Source={StaticResource PanelMetrics}, Path=Length12}" IsHitTestVisible="False" />

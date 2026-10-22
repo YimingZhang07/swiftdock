@@ -14,10 +14,11 @@ public sealed record LaunchItem([property: JsonRequired] string Name, [property:
     public long LaunchCount { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull), JsonConverter(typeof(IconValueConverter))]
     public string? Icon { get; init; }
-    [JsonIgnore] public string? ErrorMessage { get; init; }
+    [JsonIgnore] public UiText? ErrorMessage { get; init; }
     [JsonIgnore] public IconVisual Visual { get; init; } = new();
     [JsonIgnore] public bool IsPending { get; init; }
-    [JsonIgnore] public string ToolTip => ErrorMessage is null ? Path : $"{Path}\n{ErrorMessage}";
+    [JsonIgnore] public UiText DisplayName => IsPending ? L.Text("Reading283") : Name;
+    [JsonIgnore] public UiText ToolTip => ErrorMessage is null ? Path : L.Text("TargetError", Path, ErrorMessage);
     [JsonIgnore] public string Glyph => IsPending ? "…" : ErrorMessage is not null ? "!" : Kind switch
     {
         LaunchKind.Folder => "▤", LaunchKind.Url => "↗", LaunchKind.File => "▧", _ => "▣"

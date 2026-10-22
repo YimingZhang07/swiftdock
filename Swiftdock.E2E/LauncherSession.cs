@@ -31,6 +31,8 @@ internal sealed partial class LauncherSession
     private byte[]? _panelImage;
     private Window? _targetWindow;
     private bool _stopped;
+    private bool _englishUi;
+    private string PanelTitle => _englishUi ? "Swiftdock" : "迅启";
     private Point? _cursor;
 
     private LauncherSession(ITestOutputHelper output, string test) { _output = output; _test = test; }
@@ -112,7 +114,7 @@ internal sealed partial class LauncherSession
         Eventually(() =>
         {
             Assert.False(_process.HasExited, "Swiftdock exited during startup; inspect the retained diagnostics.");
-            Panel = FindVisibleWindow("迅启")!;
+            Panel = FindVisibleWindow(PanelTitle)!;
             return Panel is not null && Tiles().Length == 4;
         }, "the Swiftdock panel and four seeded tiles", 8000);
         Foreground();
@@ -159,7 +161,7 @@ internal sealed partial class LauncherSession
         var config = new
         {
             // F12 is reserved for Windows debuggers; F11 keeps the unusual chord registerable.
-            version = 1, hotkey = new { modifiers = new[] { "Control", "Alt", "Shift" }, key = "F11" },
+            version = 1, language = "zh-CN", hotkey = new { modifiers = new[] { "Control", "Alt", "Shift" }, key = "F11" },
             iconSize, scale = iconSize is null ? 100 : (int?)null, columns = 6, autoFetchWebsiteIcons = websiteIcons,
             theme, backdrop, accent,
             windowWidth, windowHeight, windowLeft = 80, windowTop = 80,
@@ -242,7 +244,7 @@ internal sealed partial class LauncherSession
     public AutomationElement ById(string id, AutomationElement? root = null)
     {
         AutomationElement? result = null;
-        Eventually(() => IsVisible(result = (root ?? FindVisibleWindow("迅启"))?.FindFirstDescendant(cf => cf.ByAutomationId(id))), $"visible AutomationId '{id}'");
+        Eventually(() => IsVisible(result = (root ?? FindVisibleWindow(PanelTitle))?.FindFirstDescendant(cf => cf.ByAutomationId(id))), $"visible AutomationId '{id}'");
         return result!;
     }
 
@@ -351,13 +353,13 @@ internal sealed partial class LauncherSession
         }
     }
 
-    public void AssertVisible(bool visible) => Eventually(() => HasWindow("迅启") == visible, $"panel visible = {visible}");
+    public void AssertVisible(bool visible) => Eventually(() => HasWindow(PanelTitle) == visible, $"panel visible = {visible}");
 
     public void Foreground(Window? window = null)
     {
         CheckAbort();
         Window? target = null;
-        Eventually(() => IsVisible(target = window ?? FindVisibleWindow("迅启")), "a visible window before sending input");
+        Eventually(() => IsVisible(target = window ?? FindVisibleWindow(PanelTitle)), "a visible window before sending input");
         if (window is null) Panel = target!;
         _targetWindow = target;
         nint handle = target!.Properties.NativeWindowHandle.Value;
@@ -660,7 +662,7 @@ internal sealed partial class LauncherSession
             catch (Exception ex) { return $"<unavailable: {ex.Message}>"; }
         }
         return $"name={Read(() => JsonSerializer.Serialize(element.Name))}; class={Read(() => JsonSerializer.Serialize(element.ClassName))}; "
-            + $"automationId={Read(() => JsonSerializer.Serialize(element.AutomationId))}; hwnd={Read(() => $"0x{element.Properties.NativeWindowHandle.Value:X}")}; "
+            + $"automationId={Read(() => JsonSerializer.Serialize(element.AutomationId))}; hwnd={Read(() => $"0x{element.Properties.NativeWindowHandle.ValueOrDefault:X}")}; "
             + $"type={Read(() => element.ControlType.ToString())}; pid={Read(() => element.Properties.ProcessId.Value.ToString())}; offscreen={Read(() => element.IsOffscreen.ToString())}";
     }
 

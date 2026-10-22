@@ -90,3 +90,13 @@ Config writes are atomic, with backup recovery and preserved broken originals; f
 ```
 
 Benchmarks generate isolated data (four groups × 50 items, or one group of 200), show/hide and switch groups without launching items, and disable website requests. Background processes may lack foreground permission; focus failures are reported separately. First, prewarmed, idle-resume and first/visited-group timings remain distinct. Do not force GC or trim the working set. Logs go to `artifacts/benchmarks/` and `artifacts/startup/`. Startup measurements may explicitly use `-AllowUnavailableTray` in a trayless environment; this allowance applies only in performance mode. See [LOGGING.md](LOGGING.md) for CLEF events, privacy and diagnostic-reading scripts.
+
+To check resources inside a single-file release without starting the application, run after `Release.ps1 -SkipTests`:
+
+```powershell
+$env:SWIFTDOCK_PUBLISHED_EXE = (Resolve-Path artifacts/staging/3.0.0/Swiftdock.exe).Path
+.\scripts\dotnet.ps1 test Swiftdock.Tests/Swiftdock.Tests.csproj -c Release --no-build --no-restore --filter BothCulturesResolveFromPublishedBundleWhenProvided
+Remove-Item Env:SWIFTDOCK_PUBLISHED_EXE
+```
+
+The existing unit host reads the bundled app and Chinese satellite into an isolated assembly context and resolves both resource cultures. It does not launch the app or installer.

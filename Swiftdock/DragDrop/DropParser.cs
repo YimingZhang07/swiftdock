@@ -9,7 +9,10 @@ using Swiftdock.Services;
 namespace Swiftdock.DragDrop;
 
 public sealed record DropSnapshot(string[] Formats, string[] Paths, string? Text, string? Title);
-public sealed record DropResolution(IReadOnlyList<LaunchItem> Items, IReadOnlyList<string> Errors);
+public sealed record DropResolution(IReadOnlyList<LaunchItem> Items, IReadOnlyList<UiText> Messages)
+{
+    public IReadOnlyList<string> Errors => Messages.Select(t => t.Value).ToArray();
+}
 
 public static class DropParser
 {
@@ -29,7 +32,7 @@ public static class DropParser
         if (data.GetDataPresent(DataFormats.FileDrop, false) && data.GetData(DataFormats.FileDrop, false) is string[] paths)
         {
             if (paths.Length > 256 || paths.Sum(p => (long)p.Length) > MaxPayloadBytes / 2)
-                throw new InvalidDataException("一次最多添加 256 个项目，且拖入数据不能超过 1MB。");
+                throw L.Exception<InvalidDataException>(L.Text("AddUpTo256ItemsAtOnceDropDataMustNotExceed1Mb"));
             return new(formats, paths.ToArray(), null, null);
         }
         string? title = null;
@@ -48,7 +51,7 @@ public static class DropParser
                 text = value is string str ? str : DecodeUrl(ReadBytes(value), format != "UniformResourceLocator");
             }
             catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or System.Runtime.InteropServices.ExternalException) { continue; }
-            if (text.Length > MaxPayloadBytes / 2) throw new InvalidDataException("拖入文本过长。");
+            if (text.Length > MaxPayloadBytes / 2) throw L.Exception<InvalidDataException>(L.Text("DroppedTextIsTooLong"));
             if (format == "text/x-moz-url")
             {
                 var lines = text.Split('\n');
@@ -59,7 +62,7 @@ public static class DropParser
             if (LaunchService.IsWebUrl(text)) return new(formats, [], text, title);
         }
         string? plain = data.GetData(DataFormats.UnicodeText, false) as string;
-        if (plain?.Length > MaxPayloadBytes / 2) throw new InvalidDataException("拖入文本过长。");
+        if (plain?.Length > MaxPayloadBytes / 2) throw L.Exception<InvalidDataException>(L.Text("DroppedTextIsTooLong"));
         return new(formats, [], plain?.Trim(), title);
     }
 
@@ -67,7 +70,7 @@ public static class DropParser
     {
         if (value is byte[] bytes)
         {
-            if (bytes.Length > MaxPayloadBytes) throw new InvalidDataException("拖入数据过大。");
+            if (bytes.Length > MaxPayloadBytes) throw L.Exception<InvalidDataException>(L.Text("DropDataIsTooLarge"));
             return bytes.ToArray();
         }
         if (value is not Stream source) return [];
@@ -80,7 +83,7 @@ public static class DropParser
             int read;
             while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
             {
-                if (copy.Length + read > MaxPayloadBytes) throw new InvalidDataException("拖入数据过大。");
+                if (copy.Length + read > MaxPayloadBytes) throw L.Exception<InvalidDataException>(L.Text("DropDataIsTooLarge"));
                 copy.Write(buffer, 0, read);
             }
             return copy.ToArray();
@@ -91,9 +94,9 @@ public static class DropParser
     public static string DecodeUrl(byte[] bytes, bool unicode)
     {
         if (bytes.Length > MaxPayloadBytes || (unicode && bytes.Length % 2 != 0))
-            throw new InvalidDataException("网址字节流长度无效。");
+            throw L.Exception<InvalidDataException>(L.Text("InvalidUrlByteStreamLength"));
         // ANSI URL payloads are accepted only when ASCII; Unicode/text fallback is preferred.
-        if (!unicode && bytes.Any(b => b > 127)) throw new InvalidDataException("请用 Unicode 网址或纯文本拖入。");
+        if (!unicode && bytes.Any(b => b > 127)) throw L.Exception<InvalidDataException>(L.Text("DropAUnicodeUrlOrPlainText"));
         return (unicode ? new UnicodeEncoding(false, false, true).GetString(bytes) : Encoding.ASCII.GetString(bytes)).Split('\0')[0].TrimStart('\uFEFF');
     }
 
@@ -110,14 +113,14 @@ public static class DropParser
     public static Task<DropResolution> ResolveAsync(DropSnapshot snapshot, CancellationToken token) => Task.Run(async () =>
     {
         var items = new List<LaunchItem>();
-        var errors = new List<string>();
+        var errors = new List<UiText>();
         var paths = snapshot.Paths;
         if (paths.Length == 0 && snapshot.Text is { } text)
         {
             if (LaunchService.IsWebUrl(text))
                 return new DropResolution([new(snapshot.Title ?? new Uri(text).Host, text, LaunchKind.Url)], []);
             string candidate = Environment.ExpandEnvironmentVariables(text.Trim('"'));
-            if (!Path.IsPathFullyQualified(candidate)) return new DropResolution([], ["只接受 http/https 网址或绝对文件路径。"]);
+            if (!Path.IsPathFullyQualified(candidate)) return new DropResolution([], [L.Text("OnlyHttpHttpsUrlsAndAbsoluteFilePathsAreSupported")]);
             paths = [candidate];
         }
         foreach (var original in paths)
@@ -128,15 +131,15 @@ public static class DropParser
                 string path = Environment.ExpandEnvironmentVariables(original);
                 if (Directory.Exists(path))
                     items.Add(new(Path.GetFileName(Path.TrimEndingDirectorySeparator(path)) is { Length: > 0 } name ? name : path, ItemIdentity.PortablePath(path), LaunchKind.Folder));
-                else if (!File.Exists(path)) errors.Add($"目标不存在或无法访问：{path}");
+                else if (!File.Exists(path)) errors.Add(L.Text("TheTargetDoesNotExistOrCannotBeAccessed0", path));
                 else if (Path.GetExtension(path).Equals(".url", StringComparison.OrdinalIgnoreCase))
                 {
                     using var reader = new StreamReader(path, detectEncodingFromByteOrderMarks: true);
-                    if (reader.BaseStream.Length > 65536) throw new InvalidDataException(".url 文件过大。");
+                    if (reader.BaseStream.Length > 65536) throw L.Exception<InvalidDataException>(L.Text("TheUrlFileIsTooLarge"));
                     var content = await reader.ReadToEndAsync(token);
                     string? url = content.Split('\n').Select(line => line.Trim())
                         .FirstOrDefault(line => line.StartsWith("URL=", StringComparison.OrdinalIgnoreCase))?[4..].Trim();
-                    if (url is null || !LaunchService.IsWebUrl(url)) throw new InvalidDataException(".url 不包含有效 http/https 网址。");
+                    if (url is null || !LaunchService.IsWebUrl(url)) throw L.Exception<InvalidDataException>(L.Text("TheUrlFileHasNoValidHttpHttpsUrl"));
                     items.Add(new(Path.GetFileNameWithoutExtension(path), url, LaunchKind.Url));
                 }
                 else
@@ -152,7 +155,7 @@ public static class DropParser
                 }
             }
             catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException)
-            { errors.Add(ex.Message); }
+            { errors.Add(L.Error(ex)); }
         }
         token.ThrowIfCancellationRequested();
         return new DropResolution(items, errors);

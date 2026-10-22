@@ -17,6 +17,9 @@ internal static partial class LoggingLogEvents
 
 internal static partial class AppLogEvents
 {
+    [LoggerMessage(38, LogLevel.Information, "Tray tooltip changed: {culture}; WPF {toolTipText}; native {shellToolTip}; shell updated {shellUpdated}", EventName = "tray.tooltip")]
+    internal static partial void TrayTooltipChanged(this ILogger logger, string culture, string toolTipText, string shellToolTip, bool shellUpdated);
+
     [LoggerMessage(35, LogLevel.Information, "Copied the legacy QuickLaunch configuration into Swiftdock; legacy files retained", EventName = "migration.config")]
     internal static partial void LegacyConfigCopied(this ILogger logger);
 

@@ -9,6 +9,7 @@ public partial class NameDialog : Wpf.Ui.Controls.FluentWindow
     {
         ViewModel = viewModel;
         InitializeComponent(); DataContext = viewModel;
+        L.LocalizeChrome(this);
         viewModel.Accepted += Accept;
         Loaded += (_, _) => { NameBox.Focus(); NameBox.SelectAll(); };
         Closed += (_, _) => viewModel.Accepted -= Accept;

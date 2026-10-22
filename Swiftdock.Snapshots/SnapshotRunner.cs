@@ -126,6 +126,8 @@ internal static class SnapshotRunner
         foreach (string theme in new[] { "dark", "light" })
         foreach (int scale in new[] { 80, 150 })
             images.Add(new($"launcher-{scale}-{theme}.png", "launcher", theme, Selected: true, Scale: scale));
+        foreach (var image in images.ToArray())
+            images.Add(image with { File = Path.GetFileNameWithoutExtension(image.File) + "-en.png", Language = "en" });
         return images;
     }
 
@@ -146,4 +148,4 @@ internal static class SnapshotRunner
     private sealed record SnapshotFailure(string? Image, string Error);
 }
 
-internal sealed record SnapshotImage(string File, string Kind, string Theme, string Accent = "blue", string Backdrop = "solid", bool Selected = false, int Scale = 100);
+internal sealed record SnapshotImage(string File, string Kind, string Theme, string Accent = "blue", string Backdrop = "solid", bool Selected = false, int Scale = 100, string Language = "zh-CN");

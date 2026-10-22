@@ -3,8 +3,9 @@ using Wpf.Ui.Controls;
 
 namespace Swiftdock.Services;
 
-public sealed record AccentPreset(string Value, string Name, string Hex)
+public sealed record AccentPreset(string Value, UiText Label, string Hex)
 {
+    public string Name => Label.Value;
     public Color Color => (Color)ColorConverter.ConvertFromString(Hex);
 }
 
@@ -12,9 +13,9 @@ public static class AppearanceOptions
 {
     public static IReadOnlyList<AccentPreset> Accents { get; } = Array.AsReadOnly<AccentPreset>(
     [
-        new("blue", "蓝", "#0067C0"), new("teal", "青", "#038387"), new("green", "绿", "#107C10"),
-        new("purple", "紫", "#8764B8"), new("magenta", "玫红", "#C239B3"), new("orange", "橙", "#CA5010"),
-        new("slate", "石板灰", "#69797E")
+        new("blue", L.Text("Blue"), "#0067C0"), new("teal", L.Text("Teal"), "#038387"), new("green", L.Text("Green"), "#107C10"),
+        new("purple", L.Text("Purple"), "#8764B8"), new("magenta", L.Text("Magenta"), "#C239B3"), new("orange", L.Text("Orange"), "#CA5010"),
+        new("slate", L.Text("Slate"), "#69797E")
     ]);
 
     public static string? NormalizeTheme(string? value) => value is "light" or "dark" ? value : null;
@@ -34,7 +35,7 @@ public static class AppearanceOptions
     internal static WindowBackdropType EffectiveBackdrop(string value, bool supported, bool transparency, bool highContrast, bool warming = false) =>
         supported && transparency && !highContrast && !warming ? BackdropType(value) : WindowBackdropType.None;
     internal static string DescribeBackdrop(string value, bool supported, bool transparency, bool highContrast, bool failed = false) =>
-        value == "solid" ? "面板和对话框均使用纯色背景" : highContrast ? "当前使用纯色：Windows 高对比度已开启"
-        : !transparency ? "当前使用纯色：Windows 透明效果已关闭" : !supported ? "当前使用纯色：系统不支持所选材质"
-        : failed ? "当前使用纯色：背景材质暂不可用" : "应用于面板；对话框使用云母背景";
+        value == "solid" ? L.Text("SolidBackgroundsForPanelAndDialogs") : highContrast ? L.Text("UsingSolidWindowsHighContrastIsOn")
+        : !transparency ? L.Text("UsingSolidWindowsTransparencyIsOff") : !supported ? L.Text("UsingSolidMaterialIsNotSupported")
+        : failed ? L.Text("UsingSolidMaterialIsUnavailable") : L.Text("PanelMaterialDialogsUseMica");
 }

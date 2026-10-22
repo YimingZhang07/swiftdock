@@ -18,7 +18,7 @@ public sealed class MainViewModel : ObservableObject, ISettingsState, IDisposabl
     private string _lastGroupId;
     private long _revision;
     private bool _suspended, _volatileChange;
-    private string _storageStatus;
+    private UiText _storageStatus;
     private readonly Func<DateTimeOffset> _now;
     private (LaunchItem Item, string GroupId, int Index, DateTimeOffset Until)? _deleted;
     public ObservableCollection<LaunchGroup> Groups { get; }
@@ -31,6 +31,16 @@ public sealed class MainViewModel : ObservableObject, ISettingsState, IDisposabl
     public int Scale => _settings.Scale ?? 100;
     public PanelMetrics Metrics => new(Scale);
     public int IconSize => Metrics.IconSize;
+    public string Language => _settings.Language ?? "system";
+    public void SetLanguage(string language)
+    {
+        _owner.VerifyAccess();
+        string? value = L.Normalize(language);
+        if (!CanEdit || _settings.Language == value) return;
+        _settings = _settings with { Language = value };
+        L.Instance.Apply(value);
+        OnPropertyChanged(nameof(Language)); Changed();
+    }
     public string Theme => _settings.Theme ?? "system";
     public string Backdrop => _settings.Backdrop ?? "acrylic";
     public int BackdropOpacity => _settings.BackdropOpacity;
@@ -55,21 +65,24 @@ public sealed class MainViewModel : ObservableObject, ISettingsState, IDisposabl
     public string Placement => _settings.Placement ?? "lastPosition";
     public long Revision => _revision;
     public string LastGroupId => _lastGroupId;
-    public string StorageStatus
+    public string StorageStatus => _storageStatus.Value;
+    private void SetStorageStatus(UiText value)
     {
-        get => _storageStatus;
-        private set { if (SetProperty(ref _storageStatus, value)) OnPropertyChanged(nameof(StorageWarning)); }
+        _storageStatus = value; OnPropertyChanged(nameof(StorageStatus)); OnPropertyChanged(nameof(StorageWarning));
     }
-    public string StorageWarning => StorageStatus.StartsWith("尚未保存", StringComparison.Ordinal) || StorageStatus == "只读配置" ? StorageStatus : "";
+    private void LanguageChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    { OnPropertyChanged(nameof(StorageStatus)); OnPropertyChanged(nameof(StorageWarning)); }
+    public string StorageWarning => StorageStatus.StartsWith(L.Text("NotSaved"), StringComparison.Ordinal) || StorageStatus == L.Text("ReadOnlyConfiguration") ? StorageStatus : "";
 
     public MainViewModel(ConfigService store, Func<DateTimeOffset>? now = null)
     {
         _store = store;
         _now = now ?? (() => DateTimeOffset.UtcNow);
         _settings = store.Initial;
+        L.Instance.Apply(_settings.Language); L.Observe(LanguageChanged);
         Groups = new(_settings.Groups.Select(g => new LaunchGroup(g.Name, g.Items, g.Id)));
         _lastGroupId = _settings.LastGroupId!;
-        _storageStatus = IsReadOnly ? "只读配置" : store.SavedRevision < 0 ? "等待保存" : "已保存";
+        _storageStatus = IsReadOnly ? L.Text("ReadOnlyConfiguration") : store.SavedRevision < 0 ? L.Text("WaitingToSave") : L.Text("Saved");
         foreach (var group in Groups) Wire(group);
         Groups.CollectionChanged += (_, e) =>
         {
@@ -92,6 +105,7 @@ public sealed class MainViewModel : ObservableObject, ISettingsState, IDisposabl
     public void Dispose()
     {
         _suspended = true;
+        L.Unobserve(LanguageChanged);
         _debounce.Stop();
         foreach (var group in Groups) Unwire(group);
     }
@@ -100,7 +114,7 @@ public sealed class MainViewModel : ObservableObject, ISettingsState, IDisposabl
         _owner.VerifyAccess();
         if (!CanEdit || _volatileChange) return;
         _revision++;
-        StorageStatus = "等待保存";
+        SetStorageStatus(L.Text("WaitingToSave"));
         _debounce.Stop();
         _debounce.Start();
     }
@@ -233,7 +247,7 @@ public sealed class MainViewModel : ObservableObject, ISettingsState, IDisposabl
                 group.Items[index] = current with
                 {
                     LaunchCount = result.Accepted && CanEdit && current.LaunchCount < long.MaxValue ? current.LaunchCount + 1 : current.LaunchCount,
-                    ErrorMessage = result.Cancelled ? current.ErrorMessage : result.Accepted ? null : result.Message
+                    ErrorMessage = result.Cancelled ? current.ErrorMessage : result.Accepted ? null : result.Text
                 };
             }
             finally { _volatileChange = false; }
@@ -245,7 +259,7 @@ public sealed class MainViewModel : ObservableObject, ISettingsState, IDisposabl
     private async Task SaveWithFeedbackAsync()
     {
         try { await FlushAsync(); }
-        catch (Exception ex) { StorageStatus = $"尚未保存：{ex.Message}"; }
+        catch (Exception ex) { SetStorageStatus(L.Text("NotSaved0", L.Error(ex))); }
     }
     public async Task FlushAsync()
     {
@@ -253,13 +267,13 @@ public sealed class MainViewModel : ObservableObject, ISettingsState, IDisposabl
         if (IsReadOnly) return;
         long revision = _revision;
         var snapshot = Snapshot();
-        StorageStatus = "保存中…";
+        SetStorageStatus(L.Text("Saving"));
         try
         {
             await _store.SaveAsync(snapshot, revision);
-            StorageStatus = _store.SavedRevision >= _revision ? "已保存" : "等待保存";
+            SetStorageStatus(_store.SavedRevision >= _revision ? L.Text("Saved") : L.Text("WaitingToSave"));
         }
-        catch (Exception ex) { StorageStatus = $"尚未保存：{ex.Message}"; throw; }
+        catch (Exception ex) { SetStorageStatus(L.Text("NotSaved0", L.Error(ex))); throw; }
     }
     public void Suspend(bool value)
     {
@@ -271,7 +285,7 @@ public sealed class MainViewModel : ObservableObject, ISettingsState, IDisposabl
     private void Mutate(Action change, bool save = true)
     {
         _owner.VerifyAccess();
-        if (!CanEdit) throw new InvalidOperationException("当前不能修改配置。");
+        if (!CanEdit) throw L.Exception<InvalidOperationException>(L.Text("ConfigurationCannotBeChangedRightNow"));
         bool previous = _volatileChange; _volatileChange = true;
         try { change(); }
         finally { _volatileChange = previous; }
@@ -279,13 +293,13 @@ public sealed class MainViewModel : ObservableObject, ISettingsState, IDisposabl
     }
     public LaunchGroup AddGroup(string name)
     {
-        if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("分组名称不能为空。");
+        if (string.IsNullOrWhiteSpace(name)) throw L.Exception<ArgumentException>(L.Text("GroupNameMustNotBeEmpty"));
         var group = new LaunchGroup(name.Trim(), []);
         Mutate(() => Groups.Add(group)); return group;
     }
     public void RenameGroup(LaunchGroup group, string name)
     {
-        if (!Groups.Contains(group) || string.IsNullOrWhiteSpace(name)) throw new ArgumentException("分组名称不能为空。");
+        if (!Groups.Contains(group) || string.IsNullOrWhiteSpace(name)) throw L.Exception<ArgumentException>(L.Text("GroupNameMustNotBeEmpty"));
         Mutate(() => group.Name = name.Trim());
     }
     public void RemoveGroup(LaunchGroup group)
@@ -294,7 +308,7 @@ public sealed class MainViewModel : ObservableObject, ISettingsState, IDisposabl
         Mutate(() =>
         {
             Groups.Remove(group);
-            if (Groups.Count == 0) Groups.Add(new("常用", []));
+            if (Groups.Count == 0) Groups.Add(new(L.Text("Favorites"), []));
             if (_lastGroupId == group.Id) _lastGroupId = Groups[0].Id;
             if (_deleted?.GroupId == group.Id) _deleted = null;
         });
@@ -308,8 +322,8 @@ public sealed class MainViewModel : ObservableObject, ISettingsState, IDisposabl
     public void UpdateItem(LaunchGroup group, LaunchItem original, LaunchItem edited)
     {
         int index = group.Items.ToList().FindIndex(i => i.Id == original.Id);
-        if (!Groups.Contains(group) || index < 0 || original.IsPending) throw new InvalidOperationException("条目已不存在。");
-        if (IsDuplicate(group, edited, original.Id)) throw new InvalidOperationException("该组已有相同的启动条目。");
+        if (!Groups.Contains(group) || index < 0 || original.IsPending) throw L.Exception<InvalidOperationException>(L.Text("TheItemNoLongerExists"));
+        if (IsDuplicate(group, edited, original.Id)) throw L.Exception<InvalidOperationException>(L.Text("ThisGroupAlreadyContainsTheSameLaunchItem"));
         bool iconChanged = original.Path != edited.Path || original.Kind != edited.Kind || original.Icon != edited.Icon;
         Mutate(() => group.Items[index] = edited with { Id = original.Id, LaunchCount = original.LaunchCount,
             ErrorMessage = null, Visual = iconChanged ? new() : original.Visual });
@@ -363,7 +377,7 @@ public sealed class MainViewModel : ObservableObject, ISettingsState, IDisposabl
 
     public string[] BeginImport(LaunchGroup group, int slot, int count)
     {
-        var pending = Enumerable.Range(0, count).Select(_ => new LaunchItem("正在读取…", "", LaunchKind.File) { IsPending = true }).ToArray();
+        var pending = Enumerable.Range(0, count).Select(_ => new LaunchItem(L.Text("Reading283"), "", LaunchKind.File) { IsPending = true }).ToArray();
         Mutate(() => { foreach (var item in pending) group.Items.Insert(slot++, item); }, save: false);
         return pending.Select(i => i.Id).ToArray();
     }

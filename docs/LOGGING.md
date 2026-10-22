@@ -20,6 +20,8 @@ Serilog 4.3's built-in batching queues at most 512 events, in batches of up to 6
 
 Source-generated `LoggerMessage` methods define the event names. Favicon diagnostics include origins only; Shell/error messages strip web URL paths and queries. File contents are never diagnostic payloads. `benchmark.json` contains performance measurements. The E2E launch recorder's `id`, `name`, `elevated` JSONL is a separate test fixture.
 
+`tray.tooltip` records a changed tooltip's `culture`, WPF `toolTipText`, native `shellToolTip`, and `shellUpdated`. The last flag is false while preparing an uncreated icon. For an existing icon, H.NotifyIcon updates its native tooltip field only after the synchronous shell modification succeeds. This distinguishes the product's submitted text from Explorer's separately exposed UIA Button name; it does not claim that Explorer's UIA cache has refreshed.
+
 `theme.apply` records the source, target theme/accent, number of theme-dictionary reloads,
 synchronous elapsed milliseconds, recursive merged-dictionary counts before/after, and
 tracked dialog count. Sources distinguish startup, Theme/Accent/Backdrop setting changes,

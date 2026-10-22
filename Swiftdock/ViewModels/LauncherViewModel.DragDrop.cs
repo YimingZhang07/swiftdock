@@ -50,7 +50,7 @@ public sealed partial class LauncherViewModel : IDragSource, IDropTarget
         _cancelDrag = _dropCommitted = false;
         ClearAllSelections(); SetDragActive(true);
         info.Effects = DragDropEffects.Move;
-        SetStatus("拖动中 · Esc 取消 · 松开提交");
+        SetStatus(L.Text("DraggingEscToCancelReleaseToMove"));
     }
 
     public void RequestDragCancel() { _cancelDrag = true; StopDragHover(); ExternalDragActive = false; }
@@ -69,7 +69,7 @@ public sealed partial class LauncherViewModel : IDragSource, IDropTarget
     public bool TryCatchOccurredException(Exception exception)
     {
         FinishDrag(cancelled: true);
-        SetStatus($"移动失败：{exception.Message}");
+        SetStatus(L.Text("MoveFailed0", L.Error(exception)));
         return true;
     }
 
@@ -80,7 +80,7 @@ public sealed partial class LauncherViewModel : IDragSource, IDropTarget
         if (cancelled && !_dropCommitted)
         {
             if (_dragOriginalGroup is { } original && Groups.Contains(original)) SetSelectedGroup(original, preview: true);
-            _log.DragCancel(); SetStatus("已取消移动，原顺序不变。");
+            _log.DragCancel(); SetStatus(L.Text("MoveCancelledTheOriginalOrderWasKept"));
         }
         _dragData = null; _dragOriginalGroup = _dragSourceGroup = null;
         SetDragActive(false); ContentChanged?.Invoke();
@@ -158,7 +158,7 @@ public sealed partial class LauncherViewModel : IDragSource, IDropTarget
             _dropCommitted = true;
             State.CommitGroup(SelectedGroup.Id);
             _log.DragCommit(item.Id, source.Name, target.Name);
-            SetStatus($"已移动 {item.Name}，将自动保存。");
+            SetStatus(L.Text("Moved0ChangesWillBeSavedAutomatically", item.Name));
         }
         else if (info.Data is IDataObject data)
         {

@@ -23,7 +23,8 @@ public partial class EditItemDialog : Wpf.Ui.Controls.FluentWindow
     {
         ViewModel = viewModel; _icons = icons; picker.Owner = this;
         InitializeComponent(); DataContext = viewModel;
-        UrlDescription.Text = icons.AutoFetchWebsiteIcons ? "添加后会自动获取网站图标。" : "自动获取网站图标已关闭，可手动选择图标。";
+        L.LocalizeChrome(this);
+        L.Bind(UrlDescription, TextBlock.TextProperty, icons.AutoFetchWebsiteIcons ? L.Text("TheWebsiteIconWillBeFetchedAfterAdding") : L.Text("AutoFetchIsOffChooseAnIconManually"));
         InitializeIconPicker();
         viewModel.PropertyChanged += ModelChanged;
         viewModel.Accepted += Accept;

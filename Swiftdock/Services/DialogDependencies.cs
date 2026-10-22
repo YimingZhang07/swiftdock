@@ -12,6 +12,8 @@ public interface ISettingsState : INotifyPropertyChanged
     int Scale { get; }
     string Placement { get; }
     string Theme { get; }
+    string Language { get; }
+    void SetLanguage(string language);
     string Backdrop { get; }
     int BackdropOpacity { get; }
     bool KeepBackdropWhenInactive { get; }

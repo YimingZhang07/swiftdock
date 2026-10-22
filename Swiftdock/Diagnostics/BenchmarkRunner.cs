@@ -13,11 +13,11 @@ internal static class BenchmarkRunner
 {
     public static AppConfig CreateConfig(string directory, bool singleGroup)
     {
-        var groups = Enumerable.Range(0, singleGroup ? 1 : 4).Select(i => new GroupConfig { Name = $"分组 {i + 1}" }).ToList();
+        var groups = Enumerable.Range(0, singleGroup ? 1 : 4).Select(i => new GroupConfig { Name = $"Group {i + 1}" }).ToList();
         string[] paths = [Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32", "notepad.exe"),
             Path.Combine(directory, "fixture.lnk"), directory, Path.Combine(directory, "fixture.txt"), "https://example.com"];
         LaunchKind[] kinds = [LaunchKind.App, LaunchKind.App, LaunchKind.Folder, LaunchKind.File, LaunchKind.Url];
-        for (int i = 0; i < 200; i++) groups[singleGroup ? 0 : i / 50].Items.Add(new($"项目 {i + 1:000}", paths[i % 5], kinds[i % 5], i % 5 == 0 ? $"--sample={i}" : ""));
+        for (int i = 0; i < 200; i++) groups[singleGroup ? 0 : i / 50].Items.Add(new($"Item {i + 1:000}", paths[i % 5], kinds[i % 5], i % 5 == 0 ? $"--sample={i}" : ""));
         return new() { AutoFetchWebsiteIcons = false, Groups = groups, LastGroupId = groups[0].Id };
     }
 
@@ -35,7 +35,7 @@ internal static class BenchmarkRunner
         if (interactive)
         {
             window.ShowPanel("benchmark-ready");
-            System.Windows.MessageBox.Show(window, "点击确定后开始 100 次显示/隐藏与切组测试。期间请暂时不要操作其他窗口，结束后程序自动退出。", "迅启性能检查");
+            System.Windows.MessageBox.Show(window, "Click OK to start 100 show, hide and group switching cycles. Leave other windows alone until the app exits.", "Swiftdock performance check");
         }
         window.ShowPanel("benchmark-first");
         double? firstRender = await window.PendingRender;

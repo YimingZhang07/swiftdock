@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([ValidateRange(1, 600)][int]$TimeoutSeconds = 90)
+param([ValidateRange(1, 600)][int]$TimeoutSeconds = 300)
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path $PSScriptRoot -Parent
 $output = Join-Path $repoRoot 'artifacts/validation'

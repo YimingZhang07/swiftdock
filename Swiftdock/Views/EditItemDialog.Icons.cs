@@ -17,6 +17,8 @@ public partial class EditItemDialog
     {
         public CatalogIcon Icon => icon;
         public string Name => icon.Name;
+        public PickerEntry Observe() { L.Observe(LanguageChanged); return this; }
+        private void LanguageChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) => OnPropertyChanged(nameof(Name));
         public string Spec => icon.Spec;
         private bool _selected;
         public bool IsSelected { get => _selected; set => SetProperty(ref _selected, value); }
@@ -35,23 +37,23 @@ public partial class EditItemDialog
         var selection = new SelectionConverter();
         foreach (var glyph in ViewModel.Glyphs)
         {
-            var choice = new RadioButton { Tag = glyph.CodePoint, GroupName = "IconGlyph", ToolTip = glyph.Name,
+            var choice = new RadioButton { Tag = glyph.CodePoint, GroupName = "IconGlyph",
                 Style = (Style)FindResource("IconChoice"), Command = ViewModel.SelectGlyphCommand, CommandParameter = glyph.CodePoint,
                 Content = new TextBlock { Text = glyph.Text, FontFamily = new FontFamily(IconCatalog.FontName), FontSize = 18, Foreground = Brushes.White } };
             choice.SetBinding(BackgroundProperty, new Binding(nameof(EditItemViewModel.IconColor)));
             choice.SetBinding(RadioButton.IsCheckedProperty, new Binding(nameof(EditItemViewModel.SelectedGlyph))
                 { Mode = BindingMode.OneWay, Converter = selection, ConverterParameter = glyph.CodePoint });
-            AutomationProperties.SetName(choice, glyph.Name);
+            L.Bind(choice, ToolTipProperty, glyph.Label); L.Bind(choice, AutomationProperties.NameProperty, glyph.Label);
             GlyphGrid.Children.Add(choice);
         }
         foreach (var color in ViewModel.Colors)
         {
-            var choice = new RadioButton { Tag = color.Hex, GroupName = "IconColor", ToolTip = color.Name,
+            var choice = new RadioButton { Tag = color.Hex, GroupName = "IconColor",
                 Style = (Style)FindResource("IconChoice"), Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color.Hex)),
                 Command = ViewModel.SelectColorCommand, CommandParameter = color.Hex };
             choice.SetBinding(RadioButton.IsCheckedProperty, new Binding(nameof(EditItemViewModel.IconColor))
                 { Mode = BindingMode.OneWay, Converter = selection, ConverterParameter = color.Hex });
-            AutomationProperties.SetName(choice, color.Name);
+            L.Bind(choice, ToolTipProperty, color.Label); L.Bind(choice, AutomationProperties.NameProperty, color.Label);
             PaletteGrid.Children.Add(choice);
         }
     }
@@ -93,10 +95,10 @@ public partial class EditItemDialog
         try
         {
             if (series == 1 && _systemEntries is null)
-                _systemEntries = (await _icons.GetSystemIconsAsync().WaitAsync(_pickerLifetime.Token)).Select(i => new PickerEntry(i)).ToArray();
+                _systemEntries = (await _icons.GetSystemIconsAsync().WaitAsync(_pickerLifetime.Token)).Select(i => new PickerEntry(i).Observe()).ToArray();
             if (_closed || version != _seriesVersion) return;
             _entries = series == 1 ? _systemEntries!.Where(i => !_icons.IsEmptySystemIcon(i.Spec, _catalogPixels)).ToArray()
-                : _colorEntries ??= FluentColorCatalog.Icons.Select(i => new PickerEntry(i)).ToArray();
+                : _colorEntries ??= FluentColorCatalog.Icons.Select(i => new PickerEntry(i).Observe()).ToArray();
             UpdateCatalogSelection();
             CatalogRows.ItemsSource = _entries.Chunk(8).ToArray();
             int selected = Math.Max(0, Array.FindIndex(_entries, i => i.IsSelected));

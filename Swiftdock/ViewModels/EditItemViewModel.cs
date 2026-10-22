@@ -14,8 +14,14 @@ public sealed partial class EditItemViewModel : ObservableObject, IDisposable
     private readonly CancellationTokenSource _lifetime = new();
     private bool _initializing, _inferring, _settingName, _autoName, _closed;
 
-    [ObservableProperty] private string _title = "添加项目", _saveLabel = "添加";
-    [ObservableProperty] private string _name = "", _path = "", _arguments = "", _workingDirectory = "", _error = "";
+    private bool _newItem = true;
+    public string Title => L.Text(_newItem ? "AddItem" : "EditItem");
+    public string SaveLabel => L.Text(_newItem ? "Add" : "Save");
+    private UiText _errorText = "";
+    public string Error { get => _errorText.Value; set => SetError(value); }
+    private void SetError(UiText text) { _errorText = text; OnPropertyChanged(nameof(Error)); }
+    private void LanguageChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) => OnPropertyChanged(string.Empty);
+    [ObservableProperty] private string _name = "", _path = "", _arguments = "", _workingDirectory = "";
     [ObservableProperty] private bool _runAsAdmin, _advancedExpanded, _isIconPickerOpen;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TargetLabel), nameof(TargetPlaceholder), nameof(CanBrowse), nameof(IsFolder), nameof(IsApplication), nameof(IsFile), nameof(IsUrl), nameof(CanSetArguments), nameof(PreviewGlyph))]
@@ -48,7 +54,7 @@ public sealed partial class EditItemViewModel : ObservableObject, IDisposable
     public bool CanBrowse => SelectedKind != LaunchKind.Url;
     public bool IsShortcut => System.IO.Path.GetExtension(ItemEditorValidation.NormalizeTarget(Path)).Equals(".lnk", StringComparison.OrdinalIgnoreCase);
     public bool CanSetArguments => IsApplication && !IsShortcut;
-    public string TargetLabel => SelectedKind switch { LaunchKind.App => "程序路径", LaunchKind.File => "文件路径", LaunchKind.Folder => "文件夹路径", _ => "网址" };
+    public string TargetLabel => SelectedKind switch { LaunchKind.App => L.Text("ApplicationPath"), LaunchKind.File => L.Text("FilePath"), LaunchKind.Folder => L.Text("FolderPath"), _ => L.Text("Url") };
     public string TargetPlaceholder => SelectedKind == LaunchKind.Url ? "https://" : TargetLabel;
     public string PreviewGlyph => SelectedKind switch { LaunchKind.File => "\uE8A5", LaunchKind.Folder => "\uE8B7", LaunchKind.Url => "\uE774", _ => "\uE71D" };
     public LaunchItem? Result { get; private set; }
@@ -56,17 +62,17 @@ public sealed partial class EditItemViewModel : ObservableObject, IDisposable
     public event Action? Accepted;
 
     public EditItemViewModel(IFilePicker picker, IItemEditorEnvironment environment)
-    { _picker = picker; _environment = environment; Glyphs = environment.AvailableGlyphs; }
+    { L.Observe(LanguageChanged); _picker = picker; _environment = environment; Glyphs = environment.AvailableGlyphs; }
 
     public void Initialize(LaunchItem? item, bool canEdit = true)
     {
         _initializing = true;
         try
         {
-            Title = item is null ? "添加项目" : "编辑项目"; SaveLabel = item is null ? "添加" : "保存";
+            _newItem = item is null; OnPropertyChanged(nameof(Title)); OnPropertyChanged(nameof(SaveLabel));
             Name = item?.Name ?? ""; Path = item?.Path ?? ""; Arguments = item?.Arguments ?? "";
             WorkingDirectory = item?.WorkingDirectory ?? ""; RunAsAdmin = item?.RunAsAdmin ?? false;
-            SelectedKind = item?.Kind ?? LaunchKind.App; CanEdit = canEdit; Error = ""; Result = null; _autoName = false;
+            SelectedKind = item?.Kind ?? LaunchKind.App; CanEdit = canEdit; SetError(""); Result = null; _autoName = false;
             AdvancedExpanded = false;
             CustomIcon = IconSpec.Normalize(item?.Icon);
             GlyphCode = IconCatalog.Glyphs[0].CodePoint; IconColor = IconCatalog.Colors[0].Hex;
@@ -88,7 +94,7 @@ public sealed partial class EditItemViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(IsShortcut)); OnPropertyChanged(nameof(CanSetArguments));
         if (_initializing || _closed) return;
-        Error = "";
+        SetError("");
         if (ItemEditorValidation.InferUrlName(value) is { } host)
         {
             _inferring = true;
@@ -102,13 +108,13 @@ public sealed partial class EditItemViewModel : ObservableObject, IDisposable
         // Returning to App must not expand the dialog merely because its type changed.
         AdvancedExpanded = false;
         if (_initializing || _inferring) return;
-        Error = ""; QueueRefresh(false);
+        SetError(""); QueueRefresh(false);
     }
     [RelayCommand(CanExecute = nameof(IsEditing))]
     private void SelectType(LaunchKind kind)
     {
         if (!IsEditing) return;
-        SelectedKind = kind; Error = "";
+        SelectedKind = kind; SetError("");
         // Clicking an already checked card also cancels pending inference.
         QueueRefresh(false);
     }
@@ -161,10 +167,10 @@ public sealed partial class EditItemViewModel : ObservableObject, IDisposable
         try
         {
             FillPath(_environment.ResolveLocation(location), location switch
-            { CommonLocation.Desktop => "桌面", CommonLocation.Downloads => "下载", CommonLocation.Documents => "文档", CommonLocation.Pictures => "图片", _ => "用户目录" });
+            { CommonLocation.Desktop => L.Text("Desktop"), CommonLocation.Downloads => L.Text("Downloads"), CommonLocation.Documents => L.Text("Documents"), CommonLocation.Pictures => L.Text("Pictures"), _ => L.Text("UserFolder") });
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
-        { Error = "无法读取该常用位置。"; }
+        { SetError(L.Text("CouldNotReadThisCommonLocation")); }
     }
 
     [RelayCommand(CanExecute = nameof(IsEditing))]
@@ -203,8 +209,8 @@ public sealed partial class EditItemViewModel : ObservableObject, IDisposable
         if (!IsEditing) return;
         string name = Name.Trim(), path = ItemEditorValidation.NormalizeTarget(Path), working = WorkingDirectory.Trim();
         string arguments = Arguments; bool admin = RunAsAdmin; LaunchKind selected = SelectedKind; string? icon = CustomIcon;
-        if (name.Length == 0 || path.Length == 0) { Error = "名称和目标不能为空。"; return; }
-        IsIconPickerOpen = false; CancelRefresh(); IsSaving = true; Error = "正在检查目标…";
+        if (name.Length == 0 || path.Length == 0) { SetError(L.Text("NameAndTargetMustNotBeEmpty")); return; }
+        IsIconPickerOpen = false; CancelRefresh(); IsSaving = true; SetError(L.Text("CheckingTarget"));
         try
         {
             string expanded = selected == LaunchKind.Url ? path : Environment.ExpandEnvironmentVariables(path);
@@ -219,13 +225,14 @@ public sealed partial class EditItemViewModel : ObservableObject, IDisposable
         }
         catch (OperationCanceledException) when (_closed) { }
         catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
-        { if (!_closed) Error = ex.Message; }
+        { if (!_closed) SetError(L.Error(ex)); }
         finally { if (!_closed) IsSaving = false; }
     }
 
     public void Dispose()
     {
         if (_closed) return;
+        L.Unobserve(LanguageChanged);
         _closed = true; CanEdit = false; CancelRefresh(); _lifetime.Cancel(); _lifetime.Dispose();
     }
 }

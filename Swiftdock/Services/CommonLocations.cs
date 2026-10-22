@@ -23,8 +23,8 @@ internal static class CommonLocations
         int result = NativeMethods.SHGetKnownFolderPath(in id, 0x4000, 0, out nint pointer);
         try
         {
-            if (result < 0 || pointer == 0) throw new IOException("无法读取该常用位置。");
-            return Marshal.PtrToStringUni(pointer) ?? throw new IOException("无法读取该常用位置。");
+            if (result < 0 || pointer == 0) throw L.Exception<IOException>(L.Text("CouldNotReadThisCommonLocation"));
+            return Marshal.PtrToStringUni(pointer) ?? throw L.Exception<IOException>(L.Text("CouldNotReadThisCommonLocation"));
         }
         finally { Marshal.FreeCoTaskMem(pointer); }
     }

@@ -127,7 +127,7 @@ public sealed partial class LauncherViewModelTests
         await vm.OpenLocationCommand.ExecuteAsync(app); Assert.Same(app, h.Actions.Opened);
         vm.RefreshIconCommand.Execute(app); Assert.Same(app, h.Actions.Refreshed);
         h.Actions.LocationError = new IOException("location failure");
-        await vm.OpenLocationCommand.ExecuteAsync(app); Assert.Contains("location failure", vm.ToastText);
+        await vm.OpenLocationCommand.ExecuteAsync(app); Assert.Contains(Localization.Error(h.Actions.LocationError).Value, vm.ToastText);
         h.Dialogs.Edited = app with { Arguments = "--edited" };
         vm.EditCommand.Execute(app); Assert.False(h.Dialogs.IconPicker);
         app = group.Items.Single(i => i.Id == app.Id); Assert.Equal("--edited", app.Arguments);
@@ -281,7 +281,7 @@ public sealed partial class LauncherViewModelTests
         h.Actions.DropCompletion = Task.FromException<DropResolution>(new IOException("test failure"));
         await vm.ImportAsync(group, 0, new([], ["one"], null, null));
         Assert.Equal(before, group.Items); Assert.False(vm.Importing);
-        Assert.Contains("test failure", vm.ToastText); Assert.Equal(TimeSpan.FromSeconds(6), vm.ToastDuration);
+        Assert.Contains("操作失败", vm.ToastText); Assert.Equal(TimeSpan.FromSeconds(6), vm.ToastDuration);
     });
 
     // A dispatcher supplies the state store's owning thread and async continuations, without an Application or Window.
@@ -336,7 +336,7 @@ public sealed partial class LauncherViewModelTests
         public int Edits { get; private set; }
         public int Confirmations { get; private set; }
         public LaunchItem? EditItem(LaunchItem? item, bool openIconPicker) { Edits++; IconPicker = openIconPicker; return Edited; }
-        public string? Name(string title, string value) { Names++; return NameResult; }
+        public string? Name(UiText title, string value) { Names++; return NameResult; }
         public Task<bool> ConfirmDeleteGroupAsync(string name) { Confirmations++; return Confirmation ?? Task.FromResult(Confirm); }
     }
     private sealed class Actions : ILauncherActions

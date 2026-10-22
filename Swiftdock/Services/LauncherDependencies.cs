@@ -10,7 +10,7 @@ public interface ILauncherDialogs
 {
     bool HasOpenEditor { get; }
     LaunchItem? EditItem(LaunchItem? item, bool openIconPicker);
-    string? Name(string title, string value);
+    string? Name(UiText title, string value);
     Task<bool> ConfirmDeleteGroupAsync(string name);
 }
 
@@ -18,7 +18,7 @@ internal sealed class LauncherDialogs(IDialogService dialogs, Func<LauncherWindo
 {
     public bool HasOpenEditor => dialogs.HasOpenEditor;
     public LaunchItem? EditItem(LaunchItem? item, bool openIconPicker) => dialogs.EditItem(owner(), item, openIconPicker);
-    public string? Name(string title, string value) => dialogs.Name(owner(), title, value);
+    public string? Name(UiText title, string value) => dialogs.Name(owner(), title, value);
     public Task<bool> ConfirmDeleteGroupAsync(string name) => dialogs.ConfirmDeleteGroupAsync(owner(), name);
 }
 
@@ -37,7 +37,7 @@ internal sealed class LauncherActions(IconService icons, Func<LaunchItem, bool, 
     public Task OpenLocationAsync(LaunchItem item) => Task.Run(() =>
     {
         string path = Environment.ExpandEnvironmentVariables(item.Path);
-        if (path.Contains('"')) throw new ArgumentException("路径包含非法引号。");
+        if (path.Contains('"')) throw L.Exception<ArgumentException>(L.Text("ThePathContainsInvalidQuotes"));
         using var process = Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = true });
     });
     public void RefreshIcon(LaunchItem item, IEnumerable<LaunchItem> items)
