@@ -58,4 +58,4 @@ Use Windows **Installed apps**. Uninstall asks whether to delete Swiftdock data 
 
 Build and validation instructions are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
-[MIT](LICENSE) · Copyright (c) 2026 Yiming Zhang. Dependency licences and artwork credits are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+[GPL-3.0](LICENSE) · Copyright (C) 2026 Yiming Zhang. Swiftdock is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 3. It comes with no warranty. Dependency licences and artwork credits are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

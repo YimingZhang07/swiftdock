@@ -63,4 +63,4 @@
 
 从源码构建及开发验证见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
 
-[MIT 许可](LICENSE) · Copyright (c) 2026 Yiming Zhang。依赖和图标许可见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+[GPL-3.0 许可](LICENSE) · Copyright (C) 2026 Yiming Zhang。迅启是自由软件：你可以依照 GNU 通用公共许可证第 3 版重新发布和修改它，本软件不提供任何担保。依赖和图标许可见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
