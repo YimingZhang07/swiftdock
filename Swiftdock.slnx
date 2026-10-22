@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Swiftdock.E2E/Swiftdock.E2E.csproj" />
+  <Project Path="Swiftdock.Tests/Swiftdock.Tests.csproj" />
+  <Project Path="Swiftdock.Snapshots/Swiftdock.Snapshots.csproj" />
+  <Project Path="Swiftdock/Swiftdock.csproj" />
+</Solution>

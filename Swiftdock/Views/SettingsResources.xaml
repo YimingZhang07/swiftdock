@@ -1,0 +1,31 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:Swiftdock.Views"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+
+        <views:SelectionConverter x:Key="Selection" />
+        <Style TargetType="ui:CardControl" BasedOn="{StaticResource DefaultUiCardControlStyle}">
+            <Setter Property="Margin" Value="0,0,0,6" /><Setter Property="MinHeight" Value="60" />
+            <Setter Property="Padding" Value="12,8" />
+        </Style>
+        <Style x:Key="SettingDescription" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" /><Setter Property="Margin" Value="0,4,0,0" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <Style x:Key="AccentSwatch" TargetType="RadioButton">
+            <Setter Property="Width" Value="28" /><Setter Property="Height" Value="28" /><Setter Property="Margin" Value="1,0" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource DefaultControlFocusVisualStyle}" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton">
+                <Border x:Name="Ring" BorderBrush="Transparent" BorderThickness="2" CornerRadius="18" Padding="4" Background="Transparent">
+                    <Ellipse Fill="{TemplateBinding Background}" Stroke="{DynamicResource ControlStrokeColorDefaultBrush}" StrokeThickness="1" />
+                </Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Ring" Property="BorderBrush" Value="{DynamicResource TextFillColorTertiaryBrush}" /></Trigger>
+                    <Trigger Property="IsChecked" Value="True"><Setter TargetName="Ring" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" /></Trigger>
+                    <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.4" /></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+    
+</ResourceDictionary>

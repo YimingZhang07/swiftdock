@@ -6,7 +6,7 @@ $env:DOTNET_ROOT = Join-Path $repoRoot '.tools/dotnet'
 $env:DOTNET_ROOT_X64 = $env:DOTNET_ROOT
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 $env:DOTNET_NOLOGO = '1'
-$exe = Join-Path $repoRoot 'QuickLaunch/bin/Release/net10.0-windows10.0.19041.0/win-x64/QuickLaunch.exe'
+$exe = Join-Path $repoRoot 'Swiftdock/bin/Release/net10.0-windows10.0.19041.0/win-x64/Swiftdock.exe'
 if (-not (Test-Path -LiteralPath $exe)) { throw 'Build Release with scripts/dotnet.ps1 first.' }
 $diagnostics = Join-Path $repoRoot 'artifacts/validation'
 $appArguments = '--diagnostics-dir "' + $diagnostics + '"'

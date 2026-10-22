@@ -15,7 +15,7 @@ for ($index = 0; $index -lt $Count; $index++) {
     $startedAfter = [DateTime]::UtcNow
     $process = Start-Process -FilePath $Executable -ArgumentList $arguments -WindowStyle Hidden -PassThru -Wait
     if ($process.ExitCode -ne 0) { throw "Startup probe failed: $logs" }
-    $events = @(Read-QuickLaunchSession -Directory $logs -ProcessId $process.Id -StartedAfter $startedAfter)
+    $events = @(Read-SwiftdockSession -Directory $logs -ProcessId $process.Id -StartedAfter $startedAfter)
     $entry = $events | Where-Object { $_.EventId.Name -eq 'startup' } | Select-Object -First 1
     if ($null -eq $entry -or $null -eq $entry.processToReadyMs) { throw "Startup CLEF event missing: $logs" }
     $values += [double]$entry.processToReadyMs

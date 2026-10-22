@@ -8,7 +8,7 @@ Run from an unlocked Windows desktop with the repository SDK installed:
 .\scripts\E2E.ps1 -Filter 'Add_url_with_icon,Settings_live_preferences'
 ```
 
-The script restores the existing lock file, builds Release with `-warnaserror`, then runs only `QuickLaunch.E2E`. Results go to `artifacts/e2e/e2e.trx`. `Validate.ps1` restores/builds only the app + unit project and runs the fast unit cases. `Snapshots.ps1` independently builds a small rendering tool and emits 51 review PNGs plus `artifacts/validation/snapshots.json`, with a text-contrast guard for dark settings pages.
+The script restores the existing lock file, builds Release with `-warnaserror`, then runs only `Swiftdock.E2E`. Results go to `artifacts/e2e/e2e.trx`. `Validate.ps1` restores/builds only the app + unit project and runs the fast unit cases. `Snapshots.ps1` independently builds a small rendering tool and emits 55 review PNGs plus `artifacts/validation/snapshots.json`, with a text-contrast guard for dark settings pages.
 
 `-Filter` selects scenario method names by a case-insensitive literal substring. Comma-separated terms are ORed, whitespace is trimmed, and all data rows of each matching scenario run. The script prints the selected names before starting. No match fails explicitly; omitting the filter runs the full suite. The per-scenario supervisor, 60-second deadline, overall timeout and cleanup are unchanged. Use the focused run while iterating and run the full suite once before merge.
 
@@ -18,9 +18,9 @@ This icon scenario uses a solid backdrop. Before each tile capture it clears sel
 
 The snapshot plan includes `add-dialog` (App), `add-dialog-file`, `add-dialog-folder`, `add-dialog-url`, `icon-picker-system` and `icon-picker-color`, each in dark and `-light` variants. System snapshots reflect the icons installed on the rendering machine; no Windows artwork is bundled. The renderer waits through background image loads and row repacking until the realized page settles. Empty, faint-frame and unusable system resources are removed and remembered for the session at each pixel size; replacement cells fill the viewport. Catalog grids use the simple palette's space while the popup keeps one height. The existing `Add_url_with_icon_then_edit_and_undo_delete` E2E also checks that the first system page has complete rows with visible ink in every cell. `Snapshots.ps1` validates the completed inventory against `snapshots.json.expected` and reports that count, without a separate hard-coded matrix size.
 
-The suite sends real keyboard and mouse input. Leave the desktop unlocked and do not use the keyboard or mouse during the run. Tests run in one nonparallel collection, with a fresh app/profile per scenario. Background services, a locked/disconnected desktop, and runs without explicit opt-in report **Skipped**, not Passed. For direct `scripts/dotnet.ps1 test QuickLaunch.E2E -c Release`, set `QUICKLAUNCH_E2E=1`; `E2E.ps1` sets and restores that environment variable automatically. Do not opt in from a sandbox.
+The suite sends real keyboard and mouse input. Leave the desktop unlocked and do not use the keyboard or mouse during the run. Tests run in one nonparallel collection, with a fresh app/profile per scenario. Background services, a locked/disconnected desktop, and runs without explicit opt-in report **Skipped**, not Passed. For direct `scripts/dotnet.ps1 test Swiftdock.E2E -c Release`, set `SWIFTDOCK_E2E=1`; `E2E.ps1` sets and restores that environment variable automatically. Do not opt in from a sandbox.
 
-The harness resolves `QuickLaunch/bin/Release/net10.0-windows10.0.19041.0/win-x64/QuickLaunch.exe` relative to `QuickLaunch.slnx`, and reports a missing Release build clearly. It launches the apphost, preserving the app's manifest. The keyboard case starts with `--silent`, waits for the ordinary `warmup.completed` log event, verifies the panel is hidden, then starts a real secondary process and checks forwarding/exit before real input begins. It also activates a test-owned native window while the panel is visible to check deactivation behavior. Other cases start visibly. Each profile has two groups, five local folders with glyph icons, remembered panel geometry, and Ctrl+Alt+Shift+F11. F11 avoids [Windows' reservation of F12 for debuggers](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-registerhotkey). Favicons are off, except in the settings scenario, which starts enabled so it can test switching them off; that profile contains no URLs. The add-URL test stays offline. A primary work area below 1000 × 840 DIPs is skipped so the settings dialog and drag destinations fit.
+The harness resolves `Swiftdock/bin/Release/net10.0-windows10.0.19041.0/win-x64/Swiftdock.exe` relative to `Swiftdock.slnx`, and reports a missing Release build clearly. It launches the apphost, preserving the app's manifest. The keyboard case starts with `--silent`, waits for the ordinary `warmup.completed` log event, verifies the panel is hidden, then starts a real secondary process and checks forwarding/exit before real input begins. It also activates a test-owned native window while the panel is visible to check deactivation behavior. Other cases start visibly. Each profile has two groups, five local folders with glyph icons, remembered panel geometry, and Ctrl+Alt+Shift+F11. F11 avoids [Windows' reservation of F12 for debuggers](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-registerhotkey). Favicons are off, except in the settings scenario, which starts enabled so it can test switching them off; that profile contains no URLs. The add-URL test stays offline. A primary work area below 1000 × 840 DIPs is skipped so the settings dialog and drag destinations fit.
 
 `--e2e-launch-log <file>` is a test-only alternative to actual tile/Enter/context-menu launches in the ordinary interactive app. It requires an explicit isolated `--config-dir` and appends one JSON object per accepted launch, for example:
 
@@ -28,7 +28,7 @@ The harness resolves `QuickLaunch/bin/Release/net10.0-windows10.0.19041.0/win-x6
 {"id":"00000000000000000000000000000012","name":"Bravo","elevated":false}
 ```
 
-Without this switch, the production launch delegate is unchanged. The harness checks the log immediately and again after shutdown, so late duplicate launches fail too; nonlaunch scenarios expect an empty log. Config, icon cache, diagnostics, and the launch log are isolated under a fresh `%TEMP%/QuickLaunch.E2E/<guid>` directory. The owner's running instance is neither addressed nor stopped.
+Without this switch, the production launch delegate is unchanged. The harness checks the log immediately and again after shutdown, so late duplicate launches fail too; nonlaunch scenarios expect an empty log. Config, icon cache, diagnostics, and the launch log are isolated under a fresh `%TEMP%/Swiftdock.E2E/<guid>` directory. The owner's running instance is neither addressed nor stopped.
 
 Controls are located through UIA using their existing `x:Name` AutomationIds or accessible names, and tile selection is read through `SelectionItemPattern`. Keyboard and mouse scenarios use real input; text entry uses UIA `ValuePattern.SetValue` on the real text control, including its `TextChanged` handling, to avoid IME composition. Invoke/Selection setters and app-private hooks are not used. The mouse guard still refuses to click a point covered by another process, including an IME candidate window. Geometry assertions use physical UIA pixels; saved width/height are compared in DIPs using the window's DPI. Foreground acquisition retries for up to three seconds using FlaUI SetForeground/Focus. If activation is still denied, it sends one standalone Alt down/up before SetForegroundWindow, as described by [Windows foreground-lock documentation](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-locksetforegroundwindow); this fallback is skipped while any key or mouse button is held. Scenario input remains blocked until GetForegroundWindow matches the intended HWND, and a timeout still refuses to type into another app. Owned app dialogs are explicitly activated and verified before entering text. Held keys/buttons are released in `finally`, and mouse scenarios restore the original cursor position even on failure.
 
@@ -40,7 +40,7 @@ The cross-row reorder scenario seeds 48 px icons in a 340-DIP-wide window. It ch
 
 One parameterized accent test (two cases) seeds `dark` + `mica` + `purple` and `light` + `acrylic` + `green` before starting the real apphost. They require Windows high contrast to be off; they never change Windows preferences. Before any settings interaction, the harness waits for the panel to be foreground, uses the selected tab's UIA bounds to locate the center of its 14×3-DIP underline, and reads three interior screen pixels. All three must have saturation of at least 20% and hue within 15 degrees of the preset, stable for 350 ms. It repeats the pixel assertion after hiding/showing via the global hotkey, normal `WM_SETTINGCHANGE` / `WM_THEMECHANGED` / `WM_DWMCOLORIZATIONCOLORCHANGED` messages sent to the panel, and real settings clicks that change and restore the theme/material. Config is checked after graceful exit; missing/null `theme`, `backdrop` or `accent` means `system`, `acrylic` or `system` respectively, matching the product's omitted-default format. The green/acrylic case therefore does not call GetProperty on an omitted default. On Windows 11 22H2+, startup/restored panel material and changed/restored settings material also use DWM attribute checks with Windows transparency-off fallback. Successful screen captures are saved as `artifacts/e2e/Accent_preset_{dark_mica_purple|light_acrylic_green}-{phase}.png`; the normal failure screenshot and retained profile still apply. These tests exercise the ordinary host, native activation and appearance-message hook, without app-private hooks.
 
-Every app is shut down using `QuickLaunch.exe --exit --config-dir <its directory>`, then awaited before final persisted JSON is read. The pin scenario also polls the atomic config file while running to prove each click is saved. A timeout is a failure and only then permits last-resort termination, with a diagnostic warning about a possible ghost tray icon. The harness does not use FlaUI's application disposal as a termination shortcut.
+Every app is shut down using `Swiftdock.exe --exit --config-dir <its directory>`, then awaited before final persisted JSON is read. The pin scenario also polls the atomic config file while running to prove each click is saved. A timeout is a failure and only then permits last-resort termination, with a diagnostic warning about a possible ghost tray icon. The harness does not use FlaUI's application disposal as a termination shortcut.
 
 Appearance notifications use the explicit Unicode `SendMessageTimeoutW` entry point with pointer-sized HWND/WPARAM/LPARAM, a `uint` message ID and a pointer-sized result. Each of `0x001A`, `0x031A` and `0x0320` is sent only to the test panel, with `wParam = lParam = 0`, `SMTO_ABORTIFHUNG` and a 2000 ms timeout. There are no cross-process string pointers or broadcasts to other applications. `WM_SETTINGCHANGE` is a pointer-bearing system message, for which asynchronous cross-process posting is unsuitable ([PostMessage restrictions](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-postmessagew)). Delivery is checked using the nonzero API return, not the window procedure's result, which can validly be zero ([SendMessageTimeout contract](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendmessagetimeoutw)). `SetLastError = true` preserves the error read immediately through `Marshal.GetLastWin32Error`; failures report the message ID, HWND, timeout and numeric Win32 error. An error of zero on failed delivery means no extended error was supplied. All three messages remain mandatory, including on UIPI/access-denied failures; none is silently dropped. The later pixel and settings phases remain unchanged.
 
@@ -107,7 +107,7 @@ The transparency test drags the real slider, observes a change before mouse-up, 
 both indented backdrop controls.
 
 The keyboard/hotkey scenario ends with an optional real tray-input phase. It searches
-the notification area for the unique fixture tooltip `QuickLaunch · Control+Alt+Shift+F11`.
+the notification area for the unique fixture tooltip `迅启 · Control+Alt+Shift+F11`.
 If needed, it snapshots native shell windows, clicks the chevron with real mouse input,
 then searches the desktop UIA root's top-level children. It descends only into visible,
 uncloaked HWNDs owned by explorer, ShellHost or ShellExperienceHost which appeared or
@@ -118,7 +118,7 @@ between its two real mouse presses. Shell HWND/process checks precede input; no 
 tray callbacks or UIA Invoke are used. The system double-click interval supplies the waits.
 The same phase then right-clicks the verified icon with the panel visible and pinned,
 and again with the panel hidden. It finds the test process's menu through the
-`显示 QuickLaunch` MenuItem. Its UIA screen rectangle must have a corner within 24 physical
+`显示迅启` MenuItem. Its UIA screen rectangle must have a corner within 24 physical
 pixels of the click, or contain that point when clamped at a screen edge. In both cases
 the same popup HWND must remain visible, foreground and at the same native rectangle
 for at least 1.5 seconds with no input or focus repair. Disappearance fails immediately;
@@ -160,7 +160,7 @@ scales the callback point and its
 overwrites AbsolutePoint offsets; it does not use Shell_NotifyIconGetRect there. Its cached
 DPI factor comes from a temporary HwndSource, falls back to 1, and refreshes only on the
 message window's DpiChanged event. A stale 1 at 192 DPI makes WPF double the coordinates
-and clamp the menu to the screen corner. QuickLaunch
+and clamp the menu to the screen corner. Swiftdock
 now opens the same menu at the captured mouse position, using WPF's physical absolute
 placement rectangle and built-in edge clamping. Keyboard invocation uses the Shell icon
 rectangle instead of the cursor. Desktop review should compare callback/cursor/menu
@@ -205,7 +205,7 @@ more than 10 percentage points on any side also fails. The clean result must per
 for 350 ms within three seconds. Per-side coverage and mean edge/inner luminance are
 written to ordinary scenario diagnostics; only the existing failure screenshots remain.
 
-Calibration uses the reviewer's old/fixed desktop PNGs in `QuickLaunch.Tests/TestData/Frames`.
+Calibration uses the reviewer's old/fixed desktop PNGs in `Swiftdock.Tests/TestData/Frames`.
 Their sampled pixels are unchanged; the unused centers are blanked to keep both fixtures
 under 47 KB combined. The old frame scores 25.7%/100%/100%/100% (top/right/bottom/left),
 the fixed frame 0% everywhere. Pixels 0–1 look normal in both images, which is why the
@@ -250,9 +250,9 @@ resume input in the next case. Worker stdout/stderr, TRX, focus phases and timeo
 artifacts live in `artifacts/e2e/<scenario>-<guid>/`.
 
 `E2E.ps1 -TimeoutSeconds 300` adds an independent overall execution deadline. Its
-finally block stops this run's test hosts, then enumerates QuickLaunch command
+finally block stops this run's test hosts, then enumerates Swiftdock command
 lines and sends `--exit` only for config directories canonically below
-`%TEMP%/QuickLaunch.E2E/`. PID start times guard against PID reuse. The script also
+`%TEMP%/Swiftdock.E2E/`. PID start times guard against PID reuse. The script also
 uses recorded host identities if process-tree enumeration fails, releases this
 run's recorded input, and reports any last-resort kill in `cleanup.log`. Restore
 and build precede the timed desktop execution. Direct `dotnet test` still has the

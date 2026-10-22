@@ -1,6 +1,0 @@
-<Solution>
-  <Project Path="QuickLaunch.E2E/QuickLaunch.E2E.csproj" />
-  <Project Path="QuickLaunch.Tests/QuickLaunch.Tests.csproj" />
-  <Project Path="QuickLaunch.Snapshots/QuickLaunch.Snapshots.csproj" />
-  <Project Path="QuickLaunch/QuickLaunch.csproj" />
-</Solution>

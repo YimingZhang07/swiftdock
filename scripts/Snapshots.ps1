@@ -49,12 +49,12 @@ function Record-Failure([string]$reason) {
 
 Push-Location $repoRoot
 try {
-    & "$PSScriptRoot/dotnet.ps1" restore QuickLaunch.Snapshots/QuickLaunch.Snapshots.csproj --locked-mode --disable-parallel '-m:1' '-nr:false'
+    & "$PSScriptRoot/dotnet.ps1" restore Swiftdock.Snapshots/Swiftdock.Snapshots.csproj --locked-mode --disable-parallel '-m:1' '-nr:false'
     if ($LASTEXITCODE -ne 0) { throw 'Locked snapshot-tool restore failed.' }
-    & "$PSScriptRoot/dotnet.ps1" build QuickLaunch.Snapshots/QuickLaunch.Snapshots.csproj -c Release --no-restore --disable-build-servers '-m:1' '-warnaserror'
+    & "$PSScriptRoot/dotnet.ps1" build Swiftdock.Snapshots/Swiftdock.Snapshots.csproj -c Release --no-restore --disable-build-servers '-m:1' '-warnaserror'
     if ($LASTEXITCODE -ne 0) { throw 'Snapshot-tool build failed.' }
     $env:DOTNET_ROOT_X64 = Join-Path $repoRoot '.tools/dotnet'
-    $exe = Join-Path $repoRoot 'QuickLaunch.Snapshots/bin/Release/net10.0-windows10.0.19041.0/QuickLaunch.Snapshots.exe'
+    $exe = Join-Path $repoRoot 'Swiftdock.Snapshots/bin/Release/net10.0-windows10.0.19041.0/Swiftdock.Snapshots.exe'
     $process = Start-Process -FilePath $exe -ArgumentList ('"' + $output + '"') -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput (Join-Path $output 'snapshots.stdout.log') -RedirectStandardError (Join-Path $output 'snapshots.stderr.log')
     $null = $process.Handle # Keep the handle so Windows PowerShell can read ExitCode after waiting.

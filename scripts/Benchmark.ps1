@@ -5,11 +5,11 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path $PSScriptRoot -Parent
 $env:DOTNET_ROOT = Join-Path $repoRoot '.tools/dotnet'
 $env:DOTNET_ROOT_X64 = $env:DOTNET_ROOT
-if (-not $Executable) { $Executable = Join-Path $repoRoot 'QuickLaunch/bin/Release/net10.0-windows10.0.19041.0/win-x64/QuickLaunch.exe' }
+if (-not $Executable) { $Executable = Join-Path $repoRoot 'Swiftdock/bin/Release/net10.0-windows10.0.19041.0/win-x64/Swiftdock.exe' }
 $output = Join-Path $repoRoot ('artifacts/benchmarks/' + [DateTime]::Now.ToString('yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0,8))
 $profile = Join-Path $output 'profile'
 New-Item -ItemType Directory -Force -Path $profile | Out-Null
-Set-Content -LiteralPath (Join-Path $profile 'fixture.txt') -Value 'QuickLaunch benchmark fixture'
+Set-Content -LiteralPath (Join-Path $profile 'fixture.txt') -Value 'Swiftdock benchmark fixture'
 $shellLinkFactory = New-Object -ComObject WScript.Shell
 $shortcut = $shellLinkFactory.CreateShortcut((Join-Path $profile 'fixture.lnk'))
 $shortcut.TargetPath = Join-Path $env:WINDIR 'System32/notepad.exe'
@@ -24,7 +24,7 @@ $windowStyle = if ($Interactive) { 'Normal' } else { 'Hidden' }
 $startedAfter = [DateTime]::UtcNow
 $appProcess = Start-Process -FilePath $Executable -ArgumentList $appArguments -WindowStyle $windowStyle -PassThru -Wait
 if ($appProcess.ExitCode -ne 0) { throw "Benchmark failed; inspect $output" }
-$events = @(Read-QuickLaunchSession -Directory $output -ProcessId $appProcess.Id -StartedAfter $startedAfter)
+$events = @(Read-SwiftdockSession -Directory $output -ProcessId $appProcess.Id -StartedAfter $startedAfter)
 $startup = $events | Where-Object { $_.EventId.Name -eq 'startup' } | Select-Object -First 1
 if ($null -eq $startup -or $null -eq $startup.processToReadyMs) { throw "Startup CLEF event missing: $output" }
 Write-Output ("Process to ready: {0:N2} ms; UI proxy events: {1}" -f $startup.processToReadyMs, @($events | Where-Object { $_.EventId.Name -eq 'show.ui-proxy' }).Count)

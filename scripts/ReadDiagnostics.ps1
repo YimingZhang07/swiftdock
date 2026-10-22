@@ -1,13 +1,13 @@
 # Read all retained rolling segments: one session can cross a size or date boundary.
-function Read-QuickLaunchSession {
+function Read-SwiftdockSession {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$true)][string]$Directory,
         [Parameter(Mandatory=$true)][int]$ProcessId,
         [Parameter(Mandatory=$true)][datetime]$StartedAfter
     )
-    $events = @(Get-ChildItem -LiteralPath $Directory -File -Filter 'quicklaunch-*.jsonl' |
-        Where-Object { $_.Name -match '^quicklaunch-\d{8}(_\d{3,})?\.jsonl$' } |
+    $events = @(Get-ChildItem -LiteralPath $Directory -File -Filter 'swiftdock-*.jsonl' |
+        Where-Object { $_.Name -match '^swiftdock-\d{8}(_\d{3,})?\.jsonl$' } |
         Sort-Object LastWriteTimeUtc, Name -Descending |
         ForEach-Object { Get-Content -LiteralPath $_.FullName -Encoding UTF8 } |
         ForEach-Object {

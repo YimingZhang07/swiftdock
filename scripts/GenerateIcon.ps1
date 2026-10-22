@@ -9,7 +9,7 @@ if ([Threading.Thread]::CurrentThread.ApartmentState -ne 'STA') {
 Add-Type -AssemblyName PresentationCore, PresentationFramework, WindowsBase
 [Windows.Media.RenderOptions]::ProcessRenderMode = [Windows.Interop.RenderMode]::SoftwareOnly
 $repoRoot = Split-Path $PSScriptRoot -Parent
-$iconPath = Join-Path $repoRoot 'QuickLaunch/Assets/QuickLaunch.ico'
+$iconPath = Join-Path $repoRoot 'Swiftdock/Assets/Swiftdock.ico'
 $previewPath = Join-Path $repoRoot 'artifacts/icon/preview.png'
 New-Item -ItemType Directory -Force -Path (Split-Path $iconPath), (Split-Path $previewPath) | Out-Null
 

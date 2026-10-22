@@ -1,20 +1,20 @@
 # Host and diagnostics
 
-QuickLaunch creates an empty .NET Generic Host only after the single-instance handshake. `--exit` remains a client-only path. No appsettings, environment configuration, user secrets, console logging, or Windows Event Log providers are loaded. WPF owns the message loop through a no-op `IHostLifetime`.
+Swiftdock creates an empty .NET Generic Host only after the single-instance handshake. `--exit` remains a client-only path. No appsettings, environment configuration, user secrets, console logging, or Windows Event Log providers are loaded. WPF owns the message loop through a no-op `IHostLifetime`.
 
 The config store/writer, view model, theme, startup service, icon STA thread, icon/favicon services, hotkey and launcher are singletons. Settings, editors, name prompts and deletion confirmations are created on demand by factories; each call creates a fresh window. Normal exit suspends changes and flushes config before stopping the host. DI disposes the hotkey/window before their dependencies and releases the single-instance lease after config disposal. Serilog drains last. Session ending retains the 800 ms best-effort save and allows up to two seconds for cleanup without waiting for the UI dispatcher.
 
 ## Location and format
 
-The default log directory is `%LOCALAPPDATA%\QuickLaunch\logs`. Portable mode uses `Data\logs` beside the executable; `--diagnostics-dir <directory>` overrides either location. Diagnostic files use Serilog compact JSON (CLEF), one JSON object per UTF-8 line:
+The default log directory is `%LOCALAPPDATA%\Swiftdock\logs`. Portable mode uses `Data\logs` beside the executable; `--diagnostics-dir <directory>` overrides either location. Diagnostic files use Serilog compact JSON (CLEF), one JSON object per UTF-8 line:
 
 ```json
-{"@t":"2026-10-15T00:00:00Z","@mt":"Hotkey changed: {hotkey}","hotkey":"Alt+Space","EventId":{"Id":6,"Name":"hotkey.changed"},"SourceContext":"QuickLaunch.Views.LauncherWindow","Session":"a18b4d02e97a4c1ca81b83f3846496d9","Pid":1234}
+{"@t":"2026-10-15T00:00:00Z","@mt":"Hotkey changed: {hotkey}","hotkey":"Alt+Space","EventId":{"Id":6,"Name":"hotkey.changed"},"SourceContext":"Swiftdock.Views.LauncherWindow","Session":"a18b4d02e97a4c1ca81b83f3846496d9","Pid":1234}
 ```
 
 `@t` is a UTC timestamp, `@mt` is a message template, and `@l` is the level (omitted for Information). The stable event name is `EventId.Name`. Structured fields are top-level properties, including `Kind`, `Accepted`, `Cancelled`, `Message`, `processToReadyMs`, `origin`, and `saved`. Filter on `EventId.Name`, not `@mt` or CLEF's reserved `@i`. `SourceContext` contains the `ILogger<T>` category. Every event, including the in-memory fallback, carries numeric `Pid` and a GUID `Session`. The session GUID remains constant for the process session and distinguishes sessions even when Windows reuses a PID.
 
-The sink configuration is `quicklaunch-.jsonl` with `RollingInterval.Day`, `rollOnFileSizeLimit: true`, `fileSizeLimitBytes: 4 * 1024 * 1024`, `retainedFileCountLimit: 20`, and `shared: true`. Each diagnostics directory has one shared daily rolling file, named `quicklaunch-yyyyMMdd.jsonl`, with size-roll suffixes such as `_001`. Several processes, including independent `--config-dir` instances, can write the same file. Serilog manages rolling and retention; there is no custom session filename or retention routine. Legacy timestamp/PID files do not match the rolling pattern and are left untouched.
+The sink configuration is `swiftdock-.jsonl` with `RollingInterval.Day`, `rollOnFileSizeLimit: true`, `fileSizeLimitBytes: 4 * 1024 * 1024`, `retainedFileCountLimit: 20`, and `shared: true`. Each diagnostics directory has one shared daily rolling file, named `swiftdock-yyyyMMdd.jsonl`, with size-roll suffixes such as `_001`. Several processes, including independent `--config-dir` instances, can write the same file. Serilog manages rolling and retention; there is no custom session filename or retention routine. Legacy timestamp/PID files do not match the rolling pattern and are left untouched.
 
 Serilog 4.3's built-in batching queues at most 512 events, in batches of up to 64 with a 250 ms buffering interval. A small `IBatchedLogEventSink` adapter creates the standard file sink on that worker. Opening files, formatting CLEF, writing, flushing and retention never run in a UI logging call. Queue saturation may drop events. If file creation or writing fails, file logging is disabled for the session and the first `log.fallback` event remains in the DI singleton `LoggingDiagnostics.Failure`; there is no second directory fallback or recursive file logging.
 
@@ -42,7 +42,7 @@ High contrast performs one reload and keeps the existing override cleanup.
 # Run after the selected process exits and drains its logger. Capture $startedAfter
 # immediately before launching it; $process.Id is the returned process ID.
 . ./scripts/ReadDiagnostics.ps1
-$events = @(Read-QuickLaunchSession -Directory $logs -ProcessId $process.Id -StartedAfter $startedAfter)
+$events = @(Read-SwiftdockSession -Directory $logs -ProcessId $process.Id -StartedAfter $startedAfter)
 $events | Where-Object { $_.EventId.Name -eq 'startup' } |
     Select-Object Pid, Session, processToReadyMs
 $events | Where-Object { $_.EventId.Name -eq 'show.ui-proxy' } |

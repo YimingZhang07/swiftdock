@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Swiftdock.Snapshots/ManifestWriter.cs" Link="ManifestWriter.cs" />
+    <Compile Include="../Swiftdock.Snapshots/SettingsTextContrast.cs" Link="SettingsTextContrast.cs" />
+    <Compile Include="../Swiftdock.E2E/FrameDetector.cs" Link="FrameDetector.cs" />
+    <Compile Include="../Swiftdock.E2E/IconImageMatcher.cs" Link="IconImageMatcher.cs" />
+    <None Update="TestData/Frames/*.png" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../Swiftdock/Assets/Swiftdock.ico" Link="Assets/Swiftdock.ico" CopyToOutputDirectory="PreserveNewest" />
+    <EmbeddedResource Include="../Swiftdock/**/*.xaml" Exclude="../Swiftdock/bin/**;../Swiftdock/obj/**" />
+    <EmbeddedResource Include="../Swiftdock/**/*.cs" Exclude="../Swiftdock/bin/**;../Swiftdock/obj/**" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1" PrivateAssets="all" />
+    <ProjectReference Include="../Swiftdock/Swiftdock.csproj" />
+  </ItemGroup>
+</Project>
