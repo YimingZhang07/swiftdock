@@ -19,10 +19,10 @@
 
 ## 安装
 
-从仓库发布页下载 Windows x64 版本。安装版和便携版均自带 .NET，无需另装运行时。
+从 [发布页](https://github.com/YimingZhang07/swiftdock/releases/latest) 下载最新的 Windows x64 版本。安装版和便携版均自带 .NET，无需另装运行时。
 
-- **安装版**：运行 `Swiftdock-3.0.0-Setup.exe`，仅为当前用户安装，无需管理员权限。默认目录为 `%LOCALAPPDATA%\Programs\Swiftdock`，自动创建开始菜单快捷方式，桌面快捷方式可选。
-- **便携版**：将 `Swiftdock-3.0.0-Portable.zip` 解压到可写目录，运行 `Swiftdock\Swiftdock.exe`。保留程序旁的空 `Data\` 文件夹以启用便携模式；移动时保留整个文件夹。
+- **安装版**：运行 `Swiftdock-<版本>-Setup.exe`，仅为当前用户安装，无需管理员权限。默认目录为 `%LOCALAPPDATA%\Programs\Swiftdock`，自动创建开始菜单快捷方式，桌面快捷方式可选。
+- **便携版**：将 `Swiftdock-<版本>-Portable.zip` 解压到可写目录，运行 `Swiftdock\Swiftdock.exe`。保留程序旁的空 `Data\` 文件夹以启用便携模式；移动时保留整个文件夹。
 
 程序未签名。若 SmartScreen 提示“Windows 已保护你的电脑”，请确认下载来源后点击 **更多信息 → 仍要运行**。发布附带 `SHA256SUMS.txt`，可用于校验下载文件。
 

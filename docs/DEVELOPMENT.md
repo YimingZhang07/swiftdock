@@ -1,6 +1,6 @@
 # Developing Swiftdock
 
-Windows 11 x64, PowerShell, .NET 10, WPF. The UI remains Chinese in 3.0.0. Product text is kept as ordinary view strings for the following localisation task; assemblies, paths and command-line identifiers use Swiftdock.
+Windows 11 x64, PowerShell, .NET 10, WPF. Product text supports English and Simplified Chinese; assemblies, paths and command-line identifiers use Swiftdock.
 
 ## Setup and build
 
@@ -30,7 +30,7 @@ Regenerate locks only when necessary and review resolved package versions and co
 | `scripts/E2E.ps1` | UI changes, on an unlocked desktop | Real input, windows, tray and appearance; `artifacts/e2e/e2e.trx`. |
 | `scripts/Snapshots.ps1` | Visual review, on an unlocked desktop | WPF composition PNGs and dark settings text contrast; `artifacts/validation/snapshots.json`. |
 
-Default validation neither builds nor runs desktop tools. Unit tests cover config, view models, parsing, icons, geometry, resources and DI lifetime. E2E and snapshots use isolated profiles; do not use an everyday profile for validation. See [E2E.md](E2E.md) for desktop requirements and filters. For the 3.0 rename, run the entire existing E2E suite and snapshot plan once, particularly tray tooltip/menu, hotkey/second instance, settings/About/exit, portable/profile handling and appearance. No new desktop scenarios were added.
+Default validation neither builds nor runs desktop tools. Unit tests cover config, view models, parsing, icons, geometry, resources and DI lifetime. E2E and snapshots use isolated profiles; do not use an everyday profile for validation. See [E2E.md](E2E.md) for desktop requirements and filters. Before merging 3.0.1, run the entire existing E2E suite once, particularly silent startup, hotkey/second instance, settings/About/exit and tray tooltip/menu. Review portable/profile handling and installer upgrades separately. No new desktop scenarios were added.
 
 Build desktop tools without running them:
 
@@ -59,23 +59,19 @@ The single version source is `<Version>` in `Swiftdock/Swiftdock.csproj`. About,
 
 ## Installer upgrade review
 
-The permanent production AppId is `{22501D8C-9899-4325-8628-268B36134004}`. Keep it unchanged. Before installing, Setup reads the previous `InstallLocation` and `UninstallString` from that identity's HKCU uninstall entry. If `InstallLocation` is absent, production builds also check `%LOCALAPPDATA%\Programs\QuickLaunch` for `QuickLaunch.exe`. It requests bounded graceful shutdown of both executable names by full path, never force-kills, and refuses to install back into the legacy directory. After copying new files, it deletes the old executable and recorded uninstaller's `.exe`/`.dat`/`.msg`; the missing-key fallback instead permits only `unins000.exe`/`.dat`/`.msg` in that exact folder. The same-directory guard always preserves the new uninstaller and skips directory removal. Otherwise the old folder is removed only if empty. Old QuickLaunch shortcuts are removed only when WScript.Shell reports a target inside the previous legacy directory; unrelated or unreadable shortcuts remain. Normal Swiftdock upgrades retain their previous directory. Uninstall's optional data deletion defaults to No and includes both names; silent uninstall retains data.
+The permanent production AppId is `{22501D8C-9899-4325-8628-268B36134004}`. Keep it unchanged. Inno Setup's standard `UsePreviousAppDir=yes` preserves the previous Swiftdock installation directory on upgrades. Setup requests bounded graceful shutdown of `Swiftdock.exe` in the selected directory by full path and never force-kills. Uninstall removes only `Swiftdock_*` Run values whose executable is inside this installation directory. Optional data deletion covers only `%APPDATA%\Swiftdock` and `%LOCALAPPDATA%\Swiftdock`, defaults to No, and is skipped during silent uninstall.
 
 For **reviewer isolation only**, compile with a fresh AppId; Release.ps1 never uses this override:
 
 ```powershell
-& .\.tools\innosetup\ISCC.exe '/DTestAppId={7E3FCD4D-5CD0-4ECA-BC54-3F07472B503B}' /DAppVersion=3.0.0 "/DPublishDir=$PWD\artifacts\staging\3.0.0" "/DReleaseDir=$PWD\artifacts\installer-test" .\installer\Swiftdock.iss
+& .\.tools\innosetup\ISCC.exe '/DTestAppId={7E3FCD4D-5CD0-4ECA-BC54-3F07472B503B}' /DAppVersion=3.0.1 "/DPublishDir=$PWD\artifacts\staging\3.0.1" "/DReleaseDir=$PWD\artifacts\installer-test" .\installer\Swiftdock.iss
 ```
 
-Both braced and unbraced GUIDs are accepted. Use a separate install directory. This isolates the Installed apps entry; shared shortcut names and default data paths still apply. For upgrade review, seed a legacy **test** installation under that same test identity and use a separate Windows user for data-deletion checks. Never point the test entry at the owner's actual installation. Verify one Installed apps entry, the new directory, graceful shutdown and saved data, old-file/shortcut cleanup, autostart migration, and uninstall's No/Yes choices manually.
+Both braced and unbraced GUIDs are accepted. Use a separate install directory. This isolates the Installed apps entry; shared shortcut names and default data paths still apply. For upgrade review, compile Swiftdock 3.0.0 with that same test identity and install it in a custom directory, then upgrade to 3.0.1. Use a separate Windows user for data-deletion checks. Never point the test entry at the owner's actual installation. Verify one Installed apps entry, the retained custom directory, graceful shutdown and saved data, shortcuts, and both installer languages. Check uninstall's No/Yes choices and silent retention; confirm only this installation's startup values are removed and other installations' values remain.
 
-To review the missing-key fallback, add `"/DTestLegacyDir=$PWD\artifacts\legacy-test"` to that compiler command and place a legacy test installation there without an `InstallLocation` in the test uninstall key. `TestLegacyDir` is honoured only together with `TestAppId`; test builds without it have no fallback, and never inspect the owner's default QuickLaunch folder. Release.ps1 uses neither define. Check that a QuickLaunch shortcut targeting the test legacy directory is removed while one targeting a different directory is retained.
-
-## Profiles and migration
+## Profiles
 
 Default config is `%APPDATA%\Swiftdock\config.json`; icons and logs are under `%LOCALAPPDATA%\Swiftdock`. A sibling `Data/` selects portable mode, placing config, icons and logs there. `--config-dir` overrides that choice; `--diagnostics-dir` independently overrides logs.
-
-Only a normal default-profile startup copies the legacy `%APPDATA%\QuickLaunch` config and optional backup, without overwriting new files or deleting old ones. Backup is copied first so failure before the primary copy remains retryable. The copy happens under the new single-instance lease, before opening config; a successful copy emits `migration.config` once. Cache and logs are not copied. Legacy `QuickLaunch_*` Run values are migrated only when their command uses the old default config or a `QuickLaunch.exe` without `--config-dir`. The new value is written before matching old values are deleted; unrelated entries remain. Registry access uses the existing injected seam in unit tests.
 
 Config writes are atomic, with backup recovery and preserved broken originals; future versions open read-only. Appearance defaults are omitted. Legacy `iconSize` 32/40/48 maps to scale 80/100/120 and is retired on save. Scale is 80–150 in steps of 10, default 100; `backdropOpacity` is 0–100 and the UI displays `100 - backdropOpacity`. Theme/accent default to system, backdrop to acrylic, placement to last position and always-on-top to true. High contrast overrides visual choices without rewriting preferences.
 
@@ -85,8 +81,8 @@ Config writes are atomic, with backup recovery and preserved broken originals; f
 .\scripts\Benchmark.ps1 -Interactive
 .\scripts\Benchmark.ps1 -SingleGroup -Prewarm
 .\scripts\Benchmark.ps1 -Prewarm -IdleSeconds 300
-.\scripts\Benchmark.ps1 -Executable 'artifacts\staging\3.0.0\Swiftdock.exe' -Interactive
-.\scripts\MeasureStartup.ps1 -Executable 'artifacts\staging\3.0.0\Swiftdock.exe'
+.\scripts\Benchmark.ps1 -Executable 'artifacts\staging\3.0.1\Swiftdock.exe' -Interactive
+.\scripts\MeasureStartup.ps1 -Executable 'artifacts\staging\3.0.1\Swiftdock.exe'
 ```
 
 Benchmarks generate isolated data (four groups × 50 items, or one group of 200), show/hide and switch groups without launching items, and disable website requests. Background processes may lack foreground permission; focus failures are reported separately. First, prewarmed, idle-resume and first/visited-group timings remain distinct. Do not force GC or trim the working set. Logs go to `artifacts/benchmarks/` and `artifacts/startup/`. Startup measurements may explicitly use `-AllowUnavailableTray` in a trayless environment; this allowance applies only in performance mode. See [LOGGING.md](LOGGING.md) for CLEF events, privacy and diagnostic-reading scripts.
@@ -94,7 +90,7 @@ Benchmarks generate isolated data (four groups × 50 items, or one group of 200)
 To check resources inside a single-file release without starting the application, run after `Release.ps1 -SkipTests`:
 
 ```powershell
-$env:SWIFTDOCK_PUBLISHED_EXE = (Resolve-Path artifacts/staging/3.0.0/Swiftdock.exe).Path
+$env:SWIFTDOCK_PUBLISHED_EXE = (Resolve-Path artifacts/staging/3.0.1/Swiftdock.exe).Path
 .\scripts\dotnet.ps1 test Swiftdock.Tests/Swiftdock.Tests.csproj -c Release --no-build --no-restore --filter BothCulturesResolveFromPublishedBundleWhenProvided
 Remove-Item Env:SWIFTDOCK_PUBLISHED_EXE
 ```

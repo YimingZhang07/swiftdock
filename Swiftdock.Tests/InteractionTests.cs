@@ -259,6 +259,7 @@ public sealed class InteractionTests
         });
         Assert.False(service.IsEnabled); service.SetEnabled(true); Assert.True(service.IsEnabled);
         Assert.Equal(service.Command, values[service.ValueName]);
+        Assert.StartsWith("Swiftdock_", service.ValueName);
         Assert.Contains("--silent --config-dir \"C:\\Test Profile\"", service.Command);
         service.SetEnabled(false); Assert.False(service.IsEnabled); Assert.Empty(values);
         Assert.Equal("\"C:\\\\\"", StartupService.Quote(@"C:\"));

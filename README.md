@@ -19,10 +19,10 @@ A quiet Windows 10/11 x64 launcher. Press **Alt+Space**, then click what you nee
 
 ## Install
 
-Download a release for Windows x64. Both editions include .NET; no separate runtime is needed.
+Download the latest release from [Releases](https://github.com/YimingZhang07/swiftdock/releases/latest) (Windows x64). Both editions include .NET; no separate runtime is needed.
 
-- **Installer:** run `Swiftdock-3.0.0-Setup.exe`. It installs for the current user, normally in `%LOCALAPPDATA%\Programs\Swiftdock`, with a Start-menu shortcut and an optional desktop shortcut.
-- **Portable:** extract `Swiftdock-3.0.0-Portable.zip` to a writable folder and run `Swiftdock\Swiftdock.exe`. Keep the empty `Data\` directory beside the executable; it enables portable mode. Move the whole folder together.
+- **Installer:** run `Swiftdock-<version>-Setup.exe`. It installs for the current user, normally in `%LOCALAPPDATA%\Programs\Swiftdock`, with a Start-menu shortcut and an optional desktop shortcut.
+- **Portable:** extract `Swiftdock-<version>-Portable.zip` to a writable folder and run `Swiftdock\Swiftdock.exe`. Keep the empty `Data\` directory beside the executable; it enables portable mode. Move the whole folder together.
 
 The binaries are unsigned. If SmartScreen shows “Windows protected your PC”, check the download source, then choose **More info → Run anyway**. `SHA256SUMS.txt` contains the release checksums.
 

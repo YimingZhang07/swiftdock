@@ -2,8 +2,7 @@
   #error AppVersion must be supplied by scripts/Release.ps1
 #endif
 
-; Test builds can isolate their uninstall entry. TestLegacyDir is only honoured
-; with TestAppId; Release.ps1 never sets either define.
+; Test builds can isolate their uninstall entry; Release.ps1 never sets TestAppId.
 #ifndef TestAppId
   #define ProductAppId "{22501D8C-9899-4325-8628-268B36134004}"
 #else
@@ -31,7 +30,7 @@ VersionInfoVersion={#AppVersion}
 PrivilegesRequired=lowest
 DefaultDirName={autopf}\Swiftdock
 DisableDirPage=no
-UsePreviousAppDir=no
+UsePreviousAppDir=yes
 DisableProgramGroupPage=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -57,12 +56,10 @@ english.ProductName=Swiftdock
 chinesesimplified.ProductName=迅启
 english.LaunchProduct=Launch Swiftdock
 chinesesimplified.LaunchProduct=启动迅启
-english.ExitMessage=Swiftdock or QuickLaunch is still running or its exit could not be verified. Exit it from the tray, then retry.
-chinesesimplified.ExitMessage=迅启或旧版 QuickLaunch 仍在运行或无法确认其已退出。请从托盘退出后重试。
-english.ChooseNewDirectory=Choose a new Swiftdock installation directory.
-chinesesimplified.ChooseNewDirectory=请选择新的迅启安装目录。
-english.DeleteData=Also delete Swiftdock and legacy QuickLaunch configuration, icon cache and logs? Data is kept by default.
-chinesesimplified.DeleteData=是否同时删除迅启和旧版 QuickLaunch 的配置、图标缓存和日志？默认保留。
+english.ExitMessage=Swiftdock is still running or its exit could not be verified. Exit it from the tray, then retry.
+chinesesimplified.ExitMessage=迅启仍在运行或无法确认其已退出。请从托盘退出后重试。
+english.DeleteData=Also delete Swiftdock configuration, icon cache and logs? Data is kept by default.
+chinesesimplified.DeleteData=是否同时删除迅启的配置、图标缓存和日志？默认保留。
 
 [Messages]
 english.BeveledLabel=Swiftdock
@@ -113,12 +110,6 @@ Filename: "{app}\Swiftdock.exe"; Description: "{cm:LaunchProduct}"; Flags: nowai
 [Code]
 const
   RunKey = 'Software\Microsoft\Windows\CurrentVersion\Run';
-  UninstallKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#ProductAppId}_is1';
-
-
-var
-  PreviousDirectory, PreviousUninstaller: String;
-  LegacyInstallation: Boolean;
 
 function EnumProcesses(var ProcessIds: Cardinal; Size: Cardinal; var BytesReturned: Cardinal): BOOL;
   external 'EnumProcesses@psapi.dll stdcall';
@@ -181,34 +172,10 @@ begin
   Result := False;
 end;
 
-function IsLegacyDirectory(Directory: String): Boolean;
-begin
-  Result := LegacyInstallation and
-    (CompareText(RemoveBackslash(ExpandFileName(PreviousDirectory)), RemoveBackslash(ExpandFileName(Directory))) = 0);
-end;
-
-function NextButtonClick(CurPageID: Integer): Boolean;
-begin
-  Result := True;
-  if (CurPageID = wpSelectDir) and IsLegacyDirectory(WizardDirValue) then begin
-    MsgBox(CustomMessage('ChooseNewDirectory'), mbInformation, MB_OK);
-    Result := False;
-  end;
-end;
-
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   Result := '';
-  { Defensive guard for silent installs using /DIR without a directory page. }
-  if IsLegacyDirectory(ExpandConstant('{app}')) then begin
-    Result := CustomMessage('ChooseNewDirectory');
-    Exit;
-  end;
-  if not StopApp(ExpandConstant('{app}\Swiftdock.exe')) then begin Result := CustomMessage('ExitMessage'); Exit; end;
-  if PreviousDirectory <> '' then begin
-    if not StopApp(AddBackslash(PreviousDirectory) + 'QuickLaunch.exe') then begin Result := CustomMessage('ExitMessage'); Exit; end;
-    if not StopApp(AddBackslash(PreviousDirectory) + 'Swiftdock.exe') then Result := CustomMessage('ExitMessage');
-  end;
+  if not StopApp(ExpandConstant('{app}\Swiftdock.exe')) then Result := CustomMessage('ExitMessage');
 end;
 
 function StopInstalledAppForUninstall: Boolean;
@@ -248,93 +215,6 @@ begin
   if (Copy(Result, 2, 2) <> ':\') and (Copy(Result, 1, 2) <> '\\') then Result := '';
 end;
 
-function InitializeSetup: Boolean;
-var
-  Command, FallbackDirectory: String;
-begin
-  { Read before Setup updates the shared product identity to the new location. }
-  RegQueryStringValue(HKCU, UninstallKey, 'InstallLocation', PreviousDirectory);
-  FallbackDirectory := '';
-#ifndef TestAppId
-  FallbackDirectory := ExpandConstant('{localappdata}\Programs\QuickLaunch');
-#else
-  #ifdef TestLegacyDir
-  FallbackDirectory := '{#StringChange(TestLegacyDir, "'", "''")}';
-  #endif
-#endif
-  { Recover the known legacy install whose uninstall entry may be missing.
-    Test builds never inspect the owner's default legacy installation. }
-  if (PreviousDirectory = '') and (FallbackDirectory <> '') then begin
-    FallbackDirectory := RemoveBackslash(ExpandFileName(FallbackDirectory));
-    if FileExists(AddBackslash(FallbackDirectory) + 'QuickLaunch.exe') then begin
-      PreviousDirectory := FallbackDirectory;
-      { No recorded uninstaller: only these exact names in the fallback folder
-        may be removed, still subject to the same-directory guard below. }
-      PreviousUninstaller := AddBackslash(FallbackDirectory) + 'unins000.exe';
-      Log('Found legacy QuickLaunch installation without InstallLocation: ' + PreviousDirectory);
-    end;
-  end;
-  if PreviousDirectory <> '' then begin
-    PreviousDirectory := RemoveBackslash(ExpandFileName(PreviousDirectory));
-    LegacyInstallation := FileExists(AddBackslash(PreviousDirectory) + 'QuickLaunch.exe') or
-      (CompareText(ExtractFileName(PreviousDirectory), 'QuickLaunch') = 0);
-    if PreviousUninstaller = '' then
-      if RegQueryStringValue(HKCU, UninstallKey, 'UninstallString', Command) then
-        PreviousUninstaller := CommandExecutable(Command);
-  end;
-  Result := True;
-end;
-
-procedure InitializeWizard;
-begin
-  { Keep an existing Swiftdock location; never reuse the legacy directory. }
-  if (PreviousDirectory <> '') and not LegacyInstallation then WizardForm.DirEdit.Text := PreviousDirectory;
-end;
-
-procedure RemoveLegacyShortcut(ShortcutPath: String);
-var
-  Shell, Shortcut: Variant;
-  Target, LegacyDirectory: String;
-begin
-  if not FileExists(ShortcutPath) then Exit;
-  try
-    Shell := CreateOleObject('WScript.Shell');
-    Shortcut := Shell.CreateShortcut(ShortcutPath);
-    Target := Shortcut.TargetPath;
-    { Leave empty, relative or unreadable targets alone. Include a trailing
-      separator so a sibling such as QuickLaunchOther cannot match. }
-    if (Copy(Target, 2, 2) <> ':\') and (Copy(Target, 1, 2) <> '\\') then Exit;
-    Target := ExpandFileName(Target);
-    LegacyDirectory := AddBackslash(ExpandFileName(PreviousDirectory));
-    if CompareText(Copy(Target, 1, Length(LegacyDirectory)), LegacyDirectory) = 0 then
-      DeleteFile(ShortcutPath);
-  except
-    Log('Could not inspect legacy shortcut; kept it: ' + ShortcutPath + ': ' + GetExceptionMessage);
-  end;
-end;
-
-procedure CurStepChanged(CurStep: TSetupStep);
-begin
-  if (CurStep <> ssPostInstall) or not LegacyInstallation then Exit;
-  { Only the previous app and its recorded uninstaller are removed, after the
-    new files are installed. Preserve the new uninstaller if Setup reused the
-    previous directory. User files prevent RemoveDir from succeeding. }
-  DeleteFile(AddBackslash(PreviousDirectory) + 'QuickLaunch.exe');
-  if CompareText(RemoveBackslash(ExpandConstant('{app}')), PreviousDirectory) <> 0 then begin
-    if (PreviousUninstaller <> '') and
-        (CompareText(ExtractFileDir(PreviousUninstaller), PreviousDirectory) = 0) and
-        (CompareText(Copy(ExtractFileName(PreviousUninstaller), 1, 5), 'unins') = 0) and
-        (CompareText(ExtractFileExt(PreviousUninstaller), '.exe') = 0) then begin
-      DeleteFile(PreviousUninstaller);
-      DeleteFile(ChangeFileExt(PreviousUninstaller, '.dat'));
-      DeleteFile(ChangeFileExt(PreviousUninstaller, '.msg'));
-    end;
-    RemoveDir(PreviousDirectory);
-  end;
-  RemoveLegacyShortcut(ExpandConstant('{autoprograms}\QuickLaunch.lnk'));
-  RemoveLegacyShortcut(ExpandConstant('{autodesktop}\QuickLaunch.lnk'));
-end;
-
 procedure RemoveInstalledStartupValues;
 var
   Names: TArrayOfString;
@@ -344,8 +224,7 @@ begin
   AppDirectory := AddBackslash(ExpandFileName(ExpandConstant('{app}')));
   if not RegGetValueNames(HKCU, RunKey, Names) then Exit;
   for I := 0 to GetArrayLength(Names) - 1 do begin
-    if (CompareText(Copy(Names[I], 1, 10), 'Swiftdock_') = 0) or
-        (CompareText(Copy(Names[I], 1, 12), 'QuickLaunch_') = 0) then begin
+    if CompareText(Copy(Names[I], 1, 10), 'Swiftdock_') = 0 then begin
       if RegQueryStringValue(HKCU, RunKey, Names[I], Command) then begin
         Exe := CommandExecutable(Command);
         if Exe <> '' then begin
@@ -369,19 +248,12 @@ begin
     RemoveInstalledStartupValues;
     if not UninstallSilent then
       if MsgBox(CustomMessage('DeleteData') + #13#10#13#10 +
-          ExpandConstant('{userappdata}\Swiftdock') + #13#10 + ExpandConstant('{localappdata}\Swiftdock') + #13#10 +
-          ExpandConstant('{userappdata}\QuickLaunch') + #13#10 + ExpandConstant('{localappdata}\QuickLaunch'),
+          ExpandConstant('{userappdata}\Swiftdock') + #13#10 + ExpandConstant('{localappdata}\Swiftdock'),
           mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then begin
         if not DelTree(ExpandConstant('{userappdata}\Swiftdock'), True, True, True) then
           Log('Could not completely delete the configuration directory.');
         if not DelTree(ExpandConstant('{localappdata}\Swiftdock'), True, True, True) then
           Log('Could not completely delete the cache/log directory.');
-        if DirExists(ExpandConstant('{userappdata}\QuickLaunch')) then
-          if not DelTree(ExpandConstant('{userappdata}\QuickLaunch'), True, True, True) then
-            Log('Could not completely delete the legacy configuration directory.');
-        if DirExists(ExpandConstant('{localappdata}\QuickLaunch')) then
-          if not DelTree(ExpandConstant('{localappdata}\QuickLaunch'), True, True, True) then
-            Log('Could not completely delete the legacy cache/log directory.');
       end;
   end;
 end;

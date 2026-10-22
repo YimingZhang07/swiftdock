@@ -10,6 +10,7 @@ public class DeploymentTests
     [InlineData(true, false)]
     [InlineData(false, false)]
     [InlineData(true, true)]
+    [InlineData(false, true)]
     public void DataDirectorySelectsPortableUnlessConfigIsExplicit(bool hasData, bool explicitConfig)
     {
         string root = Path.Combine(Path.GetTempPath(), "Swiftdock-paths-" + Guid.NewGuid().ToString("N"));
@@ -64,7 +65,10 @@ public class DeploymentTests
         var installed = new StartupService(@"C:\Programs\Swiftdock\Swiftdock.exe", DataPaths.DefaultConfigDirectory,
             "Tests", _ => null, (_, _) => { });
         Assert.Equal("\"C:\\Portable\\Swiftdock.exe\" --silent", portable.Command);
+        Assert.Equal("\"C:\\Portable\\Swiftdock.exe\" --silent --config-dir \"C:\\Portable\\Data\"", explicitProfile.Command);
         Assert.Equal(explicitProfile.ValueName, portable.ValueName);
         Assert.NotEqual(installed.ValueName, portable.ValueName);
+        Assert.StartsWith("Swiftdock_", installed.ValueName);
+        Assert.Contains("--silent --config-dir " + StartupService.Quote(DataPaths.DefaultConfigDirectory), installed.Command);
     }
 }

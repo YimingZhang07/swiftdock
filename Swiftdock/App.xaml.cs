@@ -119,28 +119,17 @@ public partial class App : Application
             await _loggingInitialization;
             if (_exiting) return; // An IPC/OS exit may have arrived during initialization.
             builder.Services.AddSerilog(_sessionLogger!, dispose: false);
-            bool configMigrated = !readOnly && paths.MigrateLegacyConfig();
             double registrationMs = hostWatch.Elapsed.TotalMilliseconds;
             _host = builder.Build();
             _host.Services.GetRequiredService<SingleInstanceService>();
             _instance = null; // The host now owns the lease, including failed startup cleanup.
             _log = _host.Services.GetRequiredService<ILogger<App>>();
-            if (configMigrated) _log.LegacyConfigCopied();
             await _host.StartAsync();
             double hostStartedMs = hostWatch.Elapsed.TotalMilliseconds;
             _window = _host.Services.GetRequiredService<LauncherWindow>();
             _store = _host.Services.GetRequiredService<ConfigService>();
             _viewModel = _host.Services.GetRequiredService<MainViewModel>();
             _startup = _host.Services.GetRequiredService<StartupService>();
-            if (paths.UsesDefaultProfile && !readOnly)
-            {
-                try
-                {
-                    int migrated = _startup.MigrateLegacyDefaultProfile();
-                    if (migrated > 0) _log.LegacyStartupMigrated(migrated);
-                }
-                catch (Exception ex) { _log.LegacyStartupMigrationFailed(LogPrivacy.Message(L.Diagnostic(ex))); }
-            }
             _dialogs = _host.Services.GetRequiredService<IDialogService>();
             MainWindow = _window;
             _hotkey = _host.Services.GetRequiredService<HotkeyService>();

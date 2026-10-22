@@ -17,17 +17,10 @@ internal static partial class LoggingLogEvents
 
 internal static partial class AppLogEvents
 {
+    // Event IDs 35-37 are retired; do not reuse them.
     [LoggerMessage(38, LogLevel.Information, "Tray tooltip changed: {culture}; WPF {toolTipText}; native {shellToolTip}; shell updated {shellUpdated}", EventName = "tray.tooltip")]
     internal static partial void TrayTooltipChanged(this ILogger logger, string culture, string toolTipText, string shellToolTip, bool shellUpdated);
 
-    [LoggerMessage(35, LogLevel.Information, "Copied the legacy QuickLaunch configuration into Swiftdock; legacy files retained", EventName = "migration.config")]
-    internal static partial void LegacyConfigCopied(this ILogger logger);
-
-    [LoggerMessage(36, LogLevel.Information, "Migrated {count} legacy QuickLaunch startup values", EventName = "migration.startup")]
-    internal static partial void LegacyStartupMigrated(this ILogger logger, int count);
-
-    [LoggerMessage(37, LogLevel.Warning, "Legacy startup migration failed: {Message}", EventName = "migration.startup-failed")]
-    internal static partial void LegacyStartupMigrationFailed(this ILogger logger, string message);
     [LoggerMessage(33, LogLevel.Information, "Tray menu: {input}; cursor physical {cursor}; H.NotifyIcon callback {callback} ({version}); anchor physical {anchor}; overflow {overflow}, cursor root {cursorRoot}; menu physical {bounds}; DPI {dpi}; WPF keyboard focus within {keyboardFocusWithin}", EventName = "tray.menu")]
     internal static partial void TrayMenuOpened(this ILogger logger, string input, string cursor, string callback,
         string version, string anchor, string overflow, string cursorRoot, string bounds, uint dpi, bool keyboardFocusWithin);
