@@ -170,23 +170,58 @@ public sealed class BackdropSettingsTests
     [Fact]
     public Task SettingsPagesFitAtNormalTextSizeWithoutDesktopWindows() => WpfTestHost.RunAsync(async () =>
     {
-        using var model = CreateModel(new() { DirectoryPath = @"C:\Users\LongProfileName\AppData\Roaming\Swiftdock\" + new string('x', 120) });
-        foreach (var page in new SettingsPage[] { new SettingsGeneralPage(), new SettingsAppearancePage(), new SettingsPanelPage(), new SettingsAboutPage() })
+        var state = new SettingsViewModelTests.SettingsState { DirectoryPath = @"C:\Users\LongProfileName\AppData\Roaming\Swiftdock\" + new string('x', 120) };
+        using var model = CreateModel(state);
+        foreach (string language in new[] { "zh-CN", "en" })
+        foreach (string? browser in new[] { null, @"C:\Missing\Example Browser.exe", @"C:\Missing\An exceptionally long browser program name for tooltip coverage.exe" })
         {
-            page.DataContext = model;
-            page.FontFamily = new FontFamily("Segoe UI, Microsoft YaHei UI");
-            // Conservative content allocation within the 760 x 540 window and 160-DIP pane.
-            var size = new Size(590, 430);
-            page.Measure(size); page.Arrange(new Rect(size)); page.UpdateLayout();
-            await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
-            page.UpdateLayout();
-            var scroll = (ScrollViewer)page.FindName("PageScroll");
-            Assert.True(scroll.ScrollableHeight == 0, $"{page.GetType().Name}: {scroll.ExtentHeight} > {scroll.ViewportHeight}");
-            foreach (var control in LauncherWindow.Descendants<Control>(page).Where(c => c is Button or CheckBox or ComboBox or Slider or RadioButton or TextBox or Wpf.Ui.Controls.ToggleSwitch))
+            Swiftdock.Services.Localization.Instance.Apply(language);
+            state.SetBrowser(browser);
+            foreach (var page in new SettingsPage[] { new SettingsGeneralPage(), new SettingsAppearancePage(), new SettingsPanelPage(), new SettingsAboutPage() })
             {
-                if (!control.IsVisible && control.Visibility == Visibility.Collapsed) continue;
-                var bounds = control.TransformToAncestor(page).TransformBounds(new Rect(control.RenderSize));
-                Assert.True(bounds.Right <= size.Width && bounds.Left >= 0, $"{page.GetType().Name}/{control.Name}: clipped at {bounds}");
+                page.DataContext = model;
+                page.FontFamily = new FontFamily("Segoe UI, Microsoft YaHei UI");
+                // Conservative content allocation within the 760 x 540 window and 160-DIP pane.
+                var size = new Size(590, 430);
+                page.Measure(size); page.Arrange(new Rect(size)); page.UpdateLayout();
+                await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                page.UpdateLayout();
+                var scroll = (ScrollViewer)page.FindName("PageScroll");
+                Assert.True(scroll.ScrollableHeight == 0, $"{page.GetType().Name}: {scroll.ExtentHeight} > {scroll.ViewportHeight}");
+                foreach (var control in LauncherWindow.Descendants<Control>(page).Where(c => c is Button or CheckBox or ComboBox or Slider or RadioButton or TextBox or Wpf.Ui.Controls.ToggleSwitch))
+                {
+                    if (!control.IsVisible && control.Visibility == Visibility.Collapsed) continue;
+                    var bounds = control.TransformToAncestor(page).TransformBounds(new Rect(control.RenderSize));
+                    Assert.True(bounds.Right <= size.Width && bounds.Left >= 0, $"{page.GetType().Name}/{control.Name}: clipped at {bounds}");
+                }
+                if (page is SettingsGeneralPage)
+                {
+                    var combo = (ComboBox)page.FindName("BrowserBox");
+                    var text = Assert.Single(LauncherWindow.Descendants<TextBlock>(combo), t => t.Text == model.SelectedBrowser!.DisplayName);
+                    Assert.Equal(TextTrimming.CharacterEllipsis, text.TextTrimming);
+                    Assert.Equal(TextWrapping.NoWrap, text.TextWrapping);
+                    Assert.Equal(browser, combo.ToolTip);
+                    Assert.Equal(browser, text.ToolTip);
+                    // Exercise the dropdown container/template without opening a native Popup.
+                    var choice = new ComboBoxItem { DataContext = model.SelectedBrowser, Content = model.SelectedBrowser,
+                        ContentTemplate = combo.ItemTemplate, Style = combo.ItemContainerStyle };
+                    choice.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                    choice.Arrange(new Rect(choice.DesiredSize)); choice.UpdateLayout();
+                    Assert.Equal(browser, choice.ToolTip);
+                    Assert.True(choice.ActualWidth <= combo.ActualWidth, "Dropdown browser names should fit the same width as the ComboBox.");
+                    var description = (TextBlock)page.FindName("BrowserDescription");
+                    Assert.Equal(model.BrowserDescription, description.Text);
+                    Assert.Equal(browser is not null, model.BrowserUnavailable);
+                    var color = ((SolidColorBrush)page.FindResource(browser is null ? "TextFillColorSecondaryBrush" : "SystemFillColorCautionBrush")).Color;
+                    Assert.Equal(color, ((SolidColorBrush)description.Foreground).Color);
+                    if (browser?.Contains("exceptionally", StringComparison.Ordinal) == true)
+                    {
+                        var fullText = new FormattedText(text.Text, CultureInfo.CurrentUICulture, text.FlowDirection,
+                            new Typeface(text.FontFamily, text.FontStyle, text.FontWeight, text.FontStretch), text.FontSize,
+                            text.Foreground, VisualTreeHelper.GetDpi(text).PixelsPerDip);
+                        Assert.True(text.ActualWidth < fullText.WidthIncludingTrailingWhitespace, "Long browser name should ellipsize while its tooltip retains the full path.");
+                    }
+                }
             }
         }
     });
@@ -195,6 +230,7 @@ public sealed class BackdropSettingsTests
     public Task SettingsForegroundFollowsThemeAndContrastGuardRejectsBlackText() => WpfTestHost.RunAsync(async () =>
     {
         var state = new SettingsViewModelTests.SettingsState();
+        state.SetBrowser(@"C:\Missing\Example Browser.exe");
         state.SetTheme("dark"); state.SetAccent("blue");
         using var appearance = new ThemeService(Dispatcher.CurrentDispatcher, state, new WpfThemeApplication(), () => (true, false, true));
         using var model = CreateModel(state, appearance);

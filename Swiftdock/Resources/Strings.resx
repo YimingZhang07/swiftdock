@@ -1160,6 +1160,14 @@ Cancel: return to the app</value>
   <data name="Yes" xml:space="preserve">
     <value>Yes</value>
   </data>
+  <data name="OpenWebsites" xml:space="preserve"><value>Open websites</value></data>
+  <data name="OpenWebsitesDescription" xml:space="preserve"><value>Browser for website items.</value></data>
+  <data name="SystemDefaultBrowser" xml:space="preserve"><value>System default browser</value></data>
+  <data name="CustomBrowserProgram" xml:space="preserve"><value>Custom program…</value></data>
+  <data name="ChooseBrowserProgram" xml:space="preserve"><value>Choose browser program</value></data>
+  <data name="ExecutableProgramsExe" xml:space="preserve"><value>Programs (*.exe)|*.exe</value></data>
+  <data name="UnavailableBrowserDescription" xml:space="preserve"><value>The selected browser is unavailable; websites open with the system default.</value></data>
+  <data name="SelectedBrowserUnavailable" xml:space="preserve"><value>The selected browser is unavailable; opened with the system default.</value></data>
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
   </resheader>

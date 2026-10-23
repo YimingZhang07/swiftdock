@@ -11,6 +11,22 @@ namespace Swiftdock.Tests;
 public sealed class InteractionTests
 {
     [Theory]
+    [InlineData(false)] [InlineData(true)]
+    public Task BrowserPreferenceUsesTheSavePipelineAndRespectsReadOnly(bool readOnly) => OnSta(vm =>
+    {
+        long revision = vm.Revision;
+        vm.SetBrowser(@" %USERPROFILE%\Browsers\..\Browser\custom.exe ");
+        Assert.Equal(readOnly ? null : @"%USERPROFILE%\Browser\custom.exe", vm.Browser);
+        Assert.Equal(revision + (readOnly ? 0 : 1), vm.Revision);
+        vm.SetBrowser(vm.Browser);
+        Assert.Equal(revision + (readOnly ? 0 : 1), vm.Revision);
+        var loaded = ConfigValidation.Parse(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(vm.Snapshot(), ConfigJsonContext.Default.AppConfig));
+        Assert.Equal(vm.Browser, loaded.Browser);
+        vm.SetBrowser(null); Assert.Null(vm.Browser);
+        Assert.Equal(revision + (readOnly ? 0 : 2), vm.Revision);
+    }, readOnly: readOnly);
+
+    [Theory]
     [InlineData(false, false, true, false)]
     [InlineData(true, true, false, true)]
     [InlineData(true, false, true, true)]

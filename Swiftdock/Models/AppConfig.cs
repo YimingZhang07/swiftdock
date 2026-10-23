@@ -54,6 +54,8 @@ public sealed record AppConfig
     // Null is the default (on); only an explicit opt-out is written.
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? AutoFetchWebsiteIcons { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Browser { get; init; }
     public int Columns { get; init; } = 6;
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public double? WindowWidth { get; init; }

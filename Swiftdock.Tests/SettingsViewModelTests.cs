@@ -11,6 +11,41 @@ namespace Swiftdock.Tests;
 public sealed class SettingsViewModelTests
 {
     [Fact]
+    public void BrowserChoiceAppliesImmediatelyKeepsUnavailablePathsAndRestoresSelectionOnCancel()
+    {
+        var state = new SettingsState(); var picker = new BrowserPicker();
+        using var model = new SettingsViewModel(state, Startup(), new Hotkey(), new Actions(), NullLogger<SettingsViewModel>.Instance,
+            browsers: new Browsers(), filePicker: picker);
+        Assert.Null(model.SelectedBrowser!.Path);
+        Assert.False(model.BrowserUnavailable);
+        Assert.Equal(Localization.Text("OpenWebsitesDescription").Value, model.BrowserDescription);
+        model.SelectedBrowser = model.BrowserChoices.Single(c => c.IsCustom);
+        Assert.Null(model.SelectedBrowser.Path); Assert.Empty(state.Calls);
+        picker.Path = Environment.ProcessPath!;
+        model.SelectedBrowser = model.BrowserChoices.Single(c => c.IsCustom);
+        Assert.Equal(BrowserCatalog.NormalizePath(picker.Path), state.Browser);
+        Assert.Equal(picker.Path, model.SelectedBrowser!.Path);
+        Assert.Equal(BrowserCatalog.ProgramName(picker.Path), model.SelectedBrowser.DisplayName);
+        Assert.False(model.BrowserUnavailable);
+        Assert.Single(state.Calls);
+        state.SetBrowser(@"C:\Missing Browser\custom.exe");
+        Assert.Equal("custom", model.SelectedBrowser.DisplayName);
+        Assert.True(model.BrowserUnavailable);
+        Assert.Equal(Localization.Text("UnavailableBrowserDescription").Value, model.BrowserDescription);
+        Assert.Contains(model.SelectedBrowser, model.BrowserChoices);
+        picker.Path = null;
+        model.SelectedBrowser = model.BrowserChoices.Single(c => c.IsCustom);
+        Assert.Equal(@"C:\Missing Browser\custom.exe", state.Browser);
+        model.SelectedBrowser = model.BrowserChoices[0];
+        Assert.Null(state.Browser);
+        Assert.False(model.BrowserUnavailable);
+        Assert.Equal(Localization.Text("OpenWebsitesDescription").Value, model.BrowserDescription);
+        int calls = state.Calls.Count; state.SetEditable(false);
+        model.SelectedBrowser = model.BrowserChoices.Single(c => c.IsCustom);
+        Assert.Equal(calls, state.Calls.Count); Assert.Null(state.Browser);
+    }
+
+    [Fact]
     public async Task LivePreferencesApplyExactlyOnceAndFollowExternalChanges()
     {
         var state = new SettingsState(); var hotkey = new Hotkey(); var actions = new Actions();
@@ -103,6 +138,18 @@ public sealed class SettingsViewModelTests
     private static StartupService Startup(Func<string, string?>? read = null, Action<string, string?>? write = null) =>
         new(@"C:\Swiftdock\Swiftdock.exe", @"C:\profile", @"Software\Swiftdock\Tests", read ?? (_ => null), write ?? ((_, _) => { }));
 
+    private sealed class Browsers : IBrowserCatalog
+    {
+        public IReadOnlyList<BrowserProgram> Detect() => [new("Detected browser", @"C:\Detected\browser.exe")];
+    }
+    private sealed class BrowserPicker : IFilePicker
+    {
+        internal string? Path { get; set; }
+        public string? PickBrowser() => Path;
+        public string? PickIcon() => null;
+        public string? PickTarget(LaunchKind kind) => null;
+    }
+
     internal sealed class SettingsState : ISettingsState
     {
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -119,6 +166,8 @@ public sealed class SettingsViewModelTests
         public bool KeepBackdropWhenInactive { get; private set; } = true;
         public string Accent { get; private set; } = "system";
         public bool AutoFetchWebsiteIcons { get; private set; } = true;
+        public string? Browser { get; private set; }
+        public void SetBrowser(string? path) { Browser = BrowserCatalog.NormalizePath(path); Calls.Add("browser:" + Browser); Changed(nameof(Browser)); }
         internal List<string> Calls { get; } = [];
         private void Changed(string name) => PropertyChanged?.Invoke(this, new(name));
         internal void SetEditable(bool value) { CanEdit = value; Changed(nameof(CanEdit)); }

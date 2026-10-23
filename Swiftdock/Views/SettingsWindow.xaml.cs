@@ -7,9 +7,10 @@ namespace Swiftdock.Views;
 public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
 {
     public SettingsViewModel ViewModel { get; }
-    public SettingsWindow(SettingsViewModel viewModel)
+    public SettingsWindow(SettingsViewModel viewModel, DialogFilePicker? filePicker = null)
     {
         ViewModel = viewModel;
+        if (filePicker is not null) filePicker.Owner = this;
         InitializeComponent(); DataContext = viewModel;
         Swiftdock.Services.Localization.LocalizeChrome(this);
         SettingsNavigation.SetServiceProvider(new PageProvider(viewModel));

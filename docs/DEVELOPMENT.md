@@ -39,11 +39,13 @@ Build desktop tools without running them:
 .\scripts\dotnet.ps1 build Swiftdock.Snapshots/Swiftdock.Snapshots.csproj -c Release --no-restore --disable-build-servers '-m:1' '-warnaserror'
 ```
 
-`--e2e-launch-log <file>` requires an isolated `--config-dir`; it replaces Shell launch with JSONL records containing `id`, `name` and `elevated`. All CLI switches retain their existing spelling, including `--exit`, `--silent`, `--diagnostics-dir` and benchmark flags.
+`--e2e-launch-log <file>` requires an isolated `--config-dir`; it replaces process launch with JSONL records containing `id`, `name`, `elevated`, `program` (browser executable or `shell`) and `arguments` (the browser's single URL argument, otherwise empty). The existing `Settings_navigation_and_transparency_drag_persist_after_exit` scenario selects a custom executable through the native file picker, verifies URL routing, then verifies the system default. All CLI switches retain their existing spelling, including `--exit`, `--silent`, `--diagnostics-dir` and benchmark flags.
 
 Snapshots use one bounded worker process per image (six seconds each), attempt remaining images after a failure and update `snapshots.json` throughout. The script has a 90-second overall default deadline (`-TimeoutSeconds` overrides it). Inspect the manifest, not stale PNGs. Windows remain offscreen without activation; confirm dialogs avoid modal loops. Images show WPF composition, without native DWM material, borders or shadows; E2E checks native materials.
 
 The plan includes dark/light launcher, launcher status, all settings pages, add/edit/name dialogs, icon pickers, item menu and delete confirmation; blue/purple material combinations; panel polish; and 80%/150% launcher scales. See `SnapshotRunner.CreatePlan` for the complete inventory. README images in `docs/images/` are unmodified renderer output copied from `artifacts/validation/launcher.png`, `launcher-light.png` and `settings-appearance.png`; refresh those three after visual review. They were reused for the rename because these views contain no old branding.
+
+The General page also includes unavailable-browser captures in both languages and themes (`settings-general-unavailable-*.png`). The optional config `browser` stores an executable path using `ItemIdentity.PortablePath`; a missing executable stays configured while URL launches fall back to the system default.
 
 ## Release and versioning
 

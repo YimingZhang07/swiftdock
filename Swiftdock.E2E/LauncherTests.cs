@@ -17,6 +17,7 @@ public sealed class LauncherTests(ITestOutputHelper output)
         bool supported = app.SupportsMaterial("acrylic");
         app.Click(app.ById("SettingsButton"));
         var settings = app.Dialog("设置");
+        settings = app.AssertBrowserRouting(settings);
         foreach (var (page, control) in new[] { ("General", "MainKey"), ("Appearance", "TransparencySlider"),
             ("Panel", "ResetSizeButton"), ("About", "DirectoryLabel") })
         {

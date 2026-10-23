@@ -13,6 +13,20 @@ namespace Swiftdock.Tests;
 public sealed partial class LauncherViewModelTests
 {
     [Fact]
+    public Task BrowserFallbackNoticeIsVisibleWithoutMarkingTheWebsiteAsFailed() => OnModel(async h =>
+    {
+        var item = new LaunchItem("web", "https://example.com", LaunchKind.Url);
+        h.Model.SelectedGroup.Items.Add(item);
+        h.State.SetBrowser(@"C:\Missing\browser.exe");
+        h.Actions.Result = new(true, false, Localization.Text("SelectedBrowserUnavailable")) { Notice = true };
+        await h.Model.LaunchCommand.ExecuteAsync(item);
+        Assert.True(h.Model.ToastVisible);
+        Assert.Contains(h.Actions.Result.Message, h.Model.ToastText);
+        Assert.Null(h.Model.SelectedGroup.Items.Single(i => i.Id == item.Id).ErrorMessage);
+        Assert.Equal(@"C:\Missing\browser.exe", h.State.Browser);
+    });
+
+    [Fact]
     public Task EscapeDefersToMenuThenCancelsDragThenClearsSelectionThenHides() => OnModel(async h =>
     {
         var vm = h.Model; var item = vm.SelectedGroup.Items[0];

@@ -19,6 +19,14 @@ internal static class Desktop
         var name = new StringBuilder(256);
         return window != 0 && GetClassName(window, name, name.Capacity) != 0 ? name.ToString() : "<unavailable>";
     }
+    [DllImport("user32.dll", EntryPoint = "GetWindowTextW", CharSet = CharSet.Unicode)]
+    private static extern int GetWindowText(nint window, StringBuilder text, int capacity);
+    internal static string WindowTitle(nint window)
+    {
+        var title = new StringBuilder(1024);
+        return GetWindowText(window, title, title.Capacity) > 0 ? title.ToString() : "";
+    }
+    [DllImport("user32.dll")] internal static extern nint GetWindow(nint window, uint command);
     internal static int? WindowCloaking(nint window) =>
         DwmGetWindowAttribute(window, 14, out int value, sizeof(int)) >= 0 ? value : null; // DWMWA_CLOAKED
     internal static bool IsDiscoverableWindow(nint window) => window != 0 && IsWindowVisible(window) && WindowCloaking(window) == 0;
@@ -105,6 +113,7 @@ internal static class Desktop
     }
     [DllImport("user32.dll")] internal static extern bool GetWindowRect(nint window, out NativeRect rectangle);
     [DllImport("user32.dll")] internal static extern bool IsWindowVisible(nint window);
+    [DllImport("user32.dll")] internal static extern bool IsWindow(nint window);
     [DllImport("user32.dll", EntryPoint = "GetWindowLongW", ExactSpelling = true)]
     internal static extern int GetWindowLong(nint window, int index);
     [StructLayout(LayoutKind.Sequential)]
@@ -137,6 +146,12 @@ internal static class Desktop
     [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern nint SendTextMessageTimeout(nint window, uint message, nint length, StringBuilder text,
         uint flags, uint timeout, out nuint result);
+    internal static void SetEditText(nint window, string value)
+    {
+        if (SendTextMessageTimeout(window, 0x000C, 0, new StringBuilder(value), 0x0002, 500, out nuint accepted) == 0)
+            throw new TimeoutException("Test-owned EDIT WM_SETTEXT failed or exceeded 500 ms.");
+        if (accepted == 0) throw new InvalidOperationException("Test-owned EDIT rejected WM_SETTEXT.");
+    }
     internal static string ReadEditText(nint window)
     {
         var text = new StringBuilder(256);

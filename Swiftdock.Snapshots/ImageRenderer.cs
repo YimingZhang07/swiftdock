@@ -65,6 +65,7 @@ internal static class ImageRenderer
         state.Groups[0].Name = Swiftdock.Services.Localization.Instance["Favorites"];
         if (state.Groups.Count > 1) state.Groups[1].Name = Swiftdock.Services.Localization.Instance["Work"];
         state.SetAutoFetchWebsiteIcons(false);
+        if (image.Kind == "settings-general-unavailable") state.SetBrowser(Path.Combine(profile, "Example Browser.exe"));
         state.SetWindowSize(new Size(620, 350));
         state.SetScale(image.Scale);
         state.SetTheme(image.Theme); state.SetAccent(image.Accent); state.SetBackdrop(image.Backdrop);
@@ -121,13 +122,14 @@ internal static class ImageRenderer
                     launcher.SetStatus(Swiftdock.Services.Localization.Text("DraggingEscToCancelReleaseToMove"));
                     target = launcherWindow;
                     break;
+                case "settings-general-unavailable":
                 case "settings-general":
                 case "settings-appearance":
                 case "settings-panel":
                 case "settings-about":
                     var settings = (SettingsWindow)Open(scope.ServiceProvider.GetRequiredService<SettingsWindow>());
                     await Dispatcher.Yield(DispatcherPriority.Loaded);
-                    settings.NavigateTo(image.Kind["settings-".Length..]);
+                    settings.NavigateTo(image.Kind == "settings-general-unavailable" ? "general" : image.Kind["settings-".Length..]);
                     target = settings;
                     break;
                 case "name-dialog":

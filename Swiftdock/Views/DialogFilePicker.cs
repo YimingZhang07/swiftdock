@@ -8,6 +8,12 @@ namespace Swiftdock.Views;
 public sealed class DialogFilePicker : IFilePicker
 {
     internal Window? Owner { get; set; }
+    public string? PickBrowser()
+    {
+        var dialog = new OpenFileDialog { Title = L.Text("ChooseBrowserProgram"), CheckFileExists = true,
+            Filter = L.Text("ExecutableProgramsExe"), DefaultExt = ".exe" };
+        return dialog.ShowDialog(Owner) == true ? dialog.FileName : null;
+    }
     public string? PickTarget(LaunchKind kind)
     {
         if (kind == LaunchKind.Folder)

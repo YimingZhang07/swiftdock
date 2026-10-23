@@ -19,6 +19,8 @@ public interface ISettingsState : INotifyPropertyChanged
     bool KeepBackdropWhenInactive { get; }
     string Accent { get; }
     bool AutoFetchWebsiteIcons { get; }
+    string? Browser { get; }
+    void SetBrowser(string? path);
     void ApplySettings(HotkeyConfig hotkey);
     void SetScale(int scale);
     void SetPlacement(string placement);
@@ -58,6 +60,7 @@ public interface IFilePicker
 {
     string? PickTarget(LaunchKind kind);
     string? PickIcon();
+    string? PickBrowser();
 }
 
 public interface IItemEditorEnvironment

@@ -60,7 +60,8 @@ internal sealed partial class LauncherSession
 
     internal void AssertPersistedIcon(string name, string spec) => Eventually(() =>
     {
-        using var document = JsonDocument.Parse(File.ReadAllText(ConfigFile));
+        using var document = TryReadConfig();
+        if (document is null) return false;
         return document.RootElement.GetProperty("groups")[0].GetProperty("items").EnumerateArray()
             .Any(i => i.GetProperty("name").GetString() == name && i.TryGetProperty("icon", out var icon) && icon.GetString() == spec);
     }, $"{name} persisted icon {spec}");

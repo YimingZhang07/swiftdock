@@ -110,6 +110,7 @@ public sealed class LocalizationTests
             await using var store = ConfigService.Open(folder, writer: new LanguageWriter());
             using var state = new MainViewModel(store);
             state.SetLanguage("zh-CN");
+            state.SetBrowser(@"C:\Missing\Browser.exe");
             var originalNames = state.Groups.Select(g => g.Name).ToArray();
             using var services = new ServiceCollection().AddLogging().AddIconServices(Path.Combine(folder, "icons"))
                 .AddDialogs().AddSingleton<ISettingsState>(state)
@@ -149,6 +150,11 @@ public sealed class LocalizationTests
                     Assert.Equal(label, languageLabel.Text);
                     Assert.Equal("中文", ((RadioButton)page.FindName("ChineseLanguage")).Content);
                     Assert.Equal("English", ((RadioButton)page.FindName("EnglishLanguage")).Content);
+                    Assert.Equal(Localization.Text("SystemDefaultBrowser").Value, settings.ViewModel.BrowserChoices[0].DisplayName);
+                    Assert.Equal(Localization.Text("CustomBrowserProgram").Value, settings.ViewModel.BrowserChoices[^1].DisplayName);
+                    Assert.Equal("Browser", settings.ViewModel.SelectedBrowser!.DisplayName);
+                    Assert.True(settings.ViewModel.BrowserUnavailable);
+                    Assert.Equal(Localization.Text("UnavailableBrowserDescription").Value, settings.ViewModel.BrowserDescription);
                     string tooltip = Localization.Text("Swiftdock0", state.HotkeyDisplay);
                     Assert.Equal(tooltip, tray.ToolTipText);
                     Assert.Equal(tooltip, tray.TrayIcon.ToolTip);

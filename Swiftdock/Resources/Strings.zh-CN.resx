@@ -1160,6 +1160,14 @@
   <data name="Yes" xml:space="preserve">
     <value>是</value>
   </data>
+  <data name="OpenWebsites" xml:space="preserve"><value>打开网址</value></data>
+  <data name="OpenWebsitesDescription" xml:space="preserve"><value>用于打开网址项目的浏览器。</value></data>
+  <data name="SystemDefaultBrowser" xml:space="preserve"><value>系统默认浏览器</value></data>
+  <data name="CustomBrowserProgram" xml:space="preserve"><value>自定义程序…</value></data>
+  <data name="ChooseBrowserProgram" xml:space="preserve"><value>选择浏览器程序</value></data>
+  <data name="ExecutableProgramsExe" xml:space="preserve"><value>程序 (*.exe)|*.exe</value></data>
+  <data name="UnavailableBrowserDescription" xml:space="preserve"><value>所选浏览器不可用，将改用系统默认浏览器。</value></data>
+  <data name="SelectedBrowserUnavailable" xml:space="preserve"><value>所选浏览器不可用，已用系统默认浏览器打开。</value></data>
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
   </resheader>

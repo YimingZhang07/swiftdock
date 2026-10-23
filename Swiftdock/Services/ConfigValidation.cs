@@ -76,7 +76,7 @@ public static class ConfigValidation
         return config with { Language = L.Normalize(config.Language), Scale = scale == 100 ? null : scale, IconSize = null,
             HideOnDeactivate = false, AutoFetchWebsiteIcons = config.AutoFetchWebsiteIcons == false ? false : null,
             Theme = AppearanceOptions.NormalizeTheme(config.Theme), Backdrop = AppearanceOptions.NormalizeBackdrop(config.Backdrop),
-            Accent = AppearanceOptions.NormalizeAccent(config.Accent),
+            Accent = AppearanceOptions.NormalizeAccent(config.Accent), Browser = BrowserCatalog.NormalizePath(config.Browser),
             BackdropOpacity = Math.Clamp(config.BackdropOpacity, 0, 100),
             KeepBackdropWhenInactive = config.KeepBackdropWhenInactive == false ? false : null,
             AlwaysOnTop = config.AlwaysOnTop == false ? false : null,

@@ -24,6 +24,10 @@ public class SettingsPage : UserControl
 public partial class SettingsGeneralPage : SettingsPage
 {
     public SettingsGeneralPage() => InitializeComponent();
+    private void BrowserDropDownOpened(object sender, EventArgs e)
+    {
+        if (DataContext is SettingsViewModel model) model.RefreshBrowserChoices();
+    }
 }
 
 public partial class SettingsAppearancePage : SettingsPage

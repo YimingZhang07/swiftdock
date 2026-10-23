@@ -30,14 +30,43 @@
                             </Style></TextBlock.Style>
                         </TextBlock>
                         <WrapPanel Margin="0,10,0,0" Orientation="Horizontal" VerticalAlignment="Center">
-                            <CheckBox MinWidth="0" x:Name="Alt" IsChecked="{Binding Alt}" IsEnabled="{Binding CanEdit}" Content="Alt" Margin="0,0,4,0" />
-                            <CheckBox MinWidth="0" x:Name="Control" IsChecked="{Binding Control}" IsEnabled="{Binding CanEdit}" Content="Ctrl" Margin="0,0,4,0" />
-                            <CheckBox MinWidth="0" x:Name="Shift" IsChecked="{Binding Shift}" IsEnabled="{Binding CanEdit}" Content="Shift" Margin="0,0,4,0" />
-                            <CheckBox MinWidth="0" x:Name="Windows" IsChecked="{Binding Windows}" IsEnabled="{Binding CanEdit}" Content="Win" Margin="0,0,4,0" />
+                            <CheckBox MinWidth="0" Padding="4,0" x:Name="Alt" IsChecked="{Binding Alt}" IsEnabled="{Binding CanEdit}" Content="Alt" Margin="0,0,4,0" />
+                            <CheckBox MinWidth="0" Padding="4,0" x:Name="Control" IsChecked="{Binding Control}" IsEnabled="{Binding CanEdit}" Content="Ctrl" Margin="0,0,4,0" />
+                            <CheckBox MinWidth="0" Padding="4,0" x:Name="Shift" IsChecked="{Binding Shift}" IsEnabled="{Binding CanEdit}" Content="Shift" Margin="0,0,4,0" />
+                            <CheckBox MinWidth="0" Padding="4,0" x:Name="Windows" IsChecked="{Binding Windows}" IsEnabled="{Binding CanEdit}" Content="Win" Margin="0,0,4,0" />
                             <ComboBox x:Name="MainKey" ItemsSource="{Binding Keys}" SelectedItem="{Binding MainKey}" IsEnabled="{Binding CanEdit}" MinWidth="112" Margin="0,0,8,0" AutomationProperties.Name="{loc:Loc MainKey}" />
                             <ui:Button x:Name="ApplyButton" Content="{loc:Loc Apply}" Appearance="Primary" Command="{Binding ApplyCommand}" />
                         </WrapPanel>
                     </StackPanel>
+                </ui:CardControl.Header>
+            </ui:CardControl>
+            <ui:CardControl HorizontalContentAlignment="Stretch" Padding="12,2">
+                <ui:CardControl.Icon><ui:SymbolIcon Symbol="Globe24" /></ui:CardControl.Icon>
+                <ui:CardControl.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="250" /></Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                            <TextBlock Text="{loc:Loc OpenWebsites}" />
+                            <TextBlock x:Name="BrowserDescription" Text="{Binding BrowserDescription}">
+                                <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource SettingDescription}">
+                                    <Style.Triggers><DataTrigger Binding="{Binding BrowserUnavailable}" Value="True"><Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" /></DataTrigger></Style.Triggers>
+                                </Style></TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                        <ComboBox x:Name="BrowserBox" Grid.Column="1" AutomationProperties.AutomationId="BrowserBox" AutomationProperties.Name="{loc:Loc OpenWebsites}"
+                                  ItemsSource="{Binding BrowserChoices}" SelectedItem="{Binding SelectedBrowser}"
+                                  IsEnabled="{Binding CanEdit}" HorizontalAlignment="Stretch" VerticalAlignment="Center" DropDownOpened="BrowserDropDownOpened"
+                                  ToolTip="{Binding SelectedBrowser.Path}">
+                            <ComboBox.ItemTemplate><DataTemplate>
+                                <TextBlock Text="{Binding DisplayName}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Path}" />
+                            </DataTemplate></ComboBox.ItemTemplate>
+                            <ComboBox.ItemContainerStyle><Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
+                                <Setter Property="ToolTip" Value="{Binding Path}" />
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="MaxWidth" Value="250" />
+                            </Style></ComboBox.ItemContainerStyle>
+                        </ComboBox>
+                    </Grid>
                 </ui:CardControl.Header>
             </ui:CardControl>
             <ui:CardControl>

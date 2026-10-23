@@ -181,6 +181,7 @@ public sealed class EditItemViewModelTests
         internal int Calls { get; private set; }
         public string? PickTarget(LaunchKind kind) { Kind = kind; Calls++; return Target; }
         public string? PickIcon() { Calls++; return Icon; }
+        public string? PickBrowser() => null;
     }
     private sealed class EditorEnvironment : IItemEditorEnvironment
     {

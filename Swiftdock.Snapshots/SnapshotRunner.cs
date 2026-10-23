@@ -124,6 +124,8 @@ internal static class SnapshotRunner
         }
         images.Add(new("panel-polish.png", "launcher", "dark", Selected: true));
         foreach (string theme in new[] { "dark", "light" })
+            images.Add(new($"settings-general-unavailable-{theme}.png", "settings-general-unavailable", theme));
+        foreach (string theme in new[] { "dark", "light" })
         foreach (int scale in new[] { 80, 150 })
             images.Add(new($"launcher-{scale}-{theme}.png", "launcher", theme, Selected: true, Scale: scale));
         foreach (var image in images.ToArray())

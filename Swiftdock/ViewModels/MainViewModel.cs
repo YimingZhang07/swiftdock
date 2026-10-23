@@ -58,6 +58,15 @@ public sealed class MainViewModel : ObservableObject, ISettingsState, IDisposabl
     }
     public string Accent => _settings.Accent ?? "system";
     public bool AutoFetchWebsiteIcons => _settings.AutoFetchWebsiteIcons ?? true;
+    public string? Browser => _settings.Browser;
+    public void SetBrowser(string? path)
+    {
+        _owner.VerifyAccess();
+        string? value = BrowserCatalog.NormalizePath(path);
+        if (!CanEdit || _settings.Browser == value) return;
+        _settings = _settings with { Browser = value };
+        OnPropertyChanged(nameof(Browser)); Changed();
+    }
     public double CellSize => Metrics.CellSize;
     public double TileSize => Metrics.TileSize;
     public Size? WindowSize => _settings.WindowWidth is { } width && _settings.WindowHeight is { } height ? new(width, height) : null;

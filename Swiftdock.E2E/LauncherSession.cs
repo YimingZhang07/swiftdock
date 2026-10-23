@@ -627,7 +627,7 @@ internal sealed partial class LauncherSession
             try
             {
                 foreach (nint hwnd in Desktop.ProcessWindowHandles(_process!.Id))
-                    writer.WriteLine($"Native: HWND=0x{hwnd:X}; class={Desktop.WindowClass(hwnd)}; visible={Desktop.IsWindowVisible(hwnd)}; cloaked={Desktop.WindowCloaking(hwnd)}");
+                    writer.WriteLine($"Native: HWND=0x{hwnd:X}; title={JsonSerializer.Serialize(Desktop.WindowTitle(hwnd))}; class={Desktop.WindowClass(hwnd)}; owner=0x{Desktop.GetWindow(hwnd, 4):X}; visible={Desktop.IsWindowVisible(hwnd)}; cloaked={Desktop.WindowCloaking(hwnd)}");
                 var windows = AppWindows(); // Never query hidden providers, even for failure diagnostics.
                 writer.WriteLine($"UIA Window elements: {windows.Length}");
                 foreach (var scope in windows)
@@ -691,6 +691,17 @@ internal sealed partial class LauncherSession
             Diagnostic($"Failure screenshot: {screenshot}; report: {report}; retained temp data: {_temp}");
         }
         catch (Exception ex) { Diagnostic($"Could not save failure artifacts: {ex.Message}. Original failure: {error}"); }
+    }
+
+    // The app may be writing or replacing config.json; share access and let Eventually retry.
+    private JsonDocument? TryReadConfig()
+    {
+        try
+        {
+            using var stream = new FileStream(ConfigFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            return JsonDocument.Parse(stream);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { return null; }
     }
 
     public static void Eventually(Func<bool> condition, string expected, int timeoutMs = 3000)

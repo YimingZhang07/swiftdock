@@ -35,8 +35,13 @@ internal static class ApplicationServices
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(paths.LogDirectory) { UseShellExecute = true });
             }));
         services.AddDialogs();
-        services.AddSingleton<Func<LaunchItem, bool, Task<LaunchResult>>>(_ => launchLog is null
-            ? LaunchService.StartAsync : new E2eLaunchRecorder(launchLog).RecordAsync);
+        services.AddSingleton<Func<LaunchItem, bool, Task<LaunchResult>>>(sp =>
+        {
+            var state = sp.GetRequiredService<MainViewModel>();
+            var recorder = launchLog is null ? null : new E2eLaunchRecorder(launchLog);
+            return (item, elevate) => recorder is null ? LaunchService.StartAsync(item, elevate, state.Browser)
+                : recorder.RecordAsync(item, elevate, state.Browser);
+        });
         services.AddSingleton<ILauncherDialogs>(sp => new LauncherDialogs(sp.GetRequiredService<IDialogService>(),
             () => sp.GetRequiredService<LauncherWindow>()));
         services.AddSingleton<ILauncherActions, LauncherActions>();
@@ -63,6 +68,8 @@ internal static class ApplicationServices
     {
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<IItemEditorEnvironment, ItemEditorEnvironment>();
+        services.AddSingleton<IBrowserRegistry, WindowsBrowserRegistry>();
+        services.AddSingleton<IBrowserCatalog, BrowserCatalog>();
         services.AddScoped<DialogFilePicker>();
         services.AddScoped<IFilePicker>(sp => sp.GetRequiredService<DialogFilePicker>());
         services.AddScoped<SettingsViewModel>();

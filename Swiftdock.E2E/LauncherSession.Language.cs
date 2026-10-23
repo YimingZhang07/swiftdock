@@ -29,7 +29,8 @@ internal sealed partial class LauncherSession
         Foreground(settings);
         Eventually(() =>
         {
-            using var config = JsonDocument.Parse(File.ReadAllText(ConfigFile));
+            using var config = TryReadConfig();
+            if (config is null) return false;
             return config.RootElement.GetProperty("language").GetString() == (english ? "en" : "zh-CN");
         }, "language to persist after real input");
     }

@@ -195,7 +195,7 @@ public sealed partial class LauncherViewModel : ObservableObject, IDisposable
         catch (OperationCanceledException) { return; }
         if (_closing || cancellation.IsCancellationRequested) return;
         State.RecordLaunch(item!, result);
-        SetStatus(L.Text("LaunchStatus", item!.Name, result.Text), toast: !result.Accepted || result.Cancelled);
+        SetStatus(L.Text("LaunchStatus", item!.Name, result.Text), toast: !result.Accepted || result.Cancelled || result.Notice);
         _log.LaunchResult((int)item.Kind, result.Accepted, result.Cancelled, LogPrivacy.Message(result.Text.English));
     }
     [RelayCommand(CanExecute = nameof(CanOpenLocation))]

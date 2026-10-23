@@ -14,6 +14,7 @@ A quiet Windows 10/11 x64 launcher. Press **Alt+Space**, then click what you nee
 
 - Apps, files, folders and websites in one panel, with groups and drag to reorder.
 - A global hotkey, tray access, keyboard navigation and optional start at login.
+- **Settings → General → Open websites** selects the system default, an installed browser or a custom executable for all website items.
 - Custom icons, light/dark/system themes, pinning, scale and transparency controls.
 - Automatic saving, config backups and a portable mode with local data.
 
